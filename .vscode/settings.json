@@ -1,5 +1,8 @@
 {
 	"ruff.enable": true,
 	"ruff.fixAll": true,
-	"python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "mypy-type-checker.importStrategy": "fromEnvironment",
+    "mypy-type-checker.preferDaemon": true,
+    "mypy-type-checker.reportingScope": "workspace"
 }
