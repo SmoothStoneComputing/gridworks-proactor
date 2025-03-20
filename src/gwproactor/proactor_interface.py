@@ -107,8 +107,6 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
     and has a GridWorks ShNode.
     """
 
-    def __init__(self, name: str, services: "ServicesInterface") -> None: ...
-
     @property
     @abstractmethod
     def name(self) -> str:
