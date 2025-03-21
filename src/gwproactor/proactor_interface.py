@@ -122,6 +122,11 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
         """Called after constructor so derived functions can be used in setup."""
 
     @classmethod
+    @abstractmethod
+    def instantiate(cls, name: str, services: "ServicesInterface") -> "ActorInterface":
+        raise NotImplementedError
+
+    @classmethod
     def load(
         cls,
         name: str,
@@ -139,7 +144,7 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
                 f"with via requested name <{actor_class_name} "
                 "does not implement ActorInterface",
             )
-        actor = actor_class(name, services)
+        actor = actor_class.instantiate(name, services)
         if not isinstance(actor, ActorInterface):
             raise ValueError(  # noqa: TRY004
                 f"ERROR. Constructed object with type {type(actor)} "

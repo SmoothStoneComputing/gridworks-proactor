@@ -26,6 +26,10 @@ class Actor(ActorInterface, Communicator, ABC):
         self._node = services.hardware_layout.node(name)
         super().__init__(name, services)
 
+    @classmethod
+    def instantiate(cls, name: str, services: "ServicesInterface") -> "ActorInterface":
+        return cls(name, services)
+
     @property
     def name(self) -> str:
         return self._name
