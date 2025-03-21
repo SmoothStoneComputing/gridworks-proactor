@@ -4,7 +4,6 @@ import contextlib
 import os
 import shutil
 from pathlib import Path
-from types import NoneType
 from typing import Any, Generator, Optional
 
 import dotenv
@@ -51,11 +50,11 @@ class DefaultTestEnv:
 
     DEFAULT_PREFIXES = DEFAULT_PREFIXES
 
-    xdg_home: Path | NoneType = None
+    xdg_home: Path | None = None
     src_test_layout: Path = TEST_HARDWARE_LAYOUT_PATH
     copy_test_layout: bool = True
     use_test_dotenv: bool = True
-    prefixes: Optional[list[str]] = None
+    prefixes: list[str]
 
     def __init__(
         self,
@@ -66,8 +65,8 @@ class DefaultTestEnv:
         use_test_dotenv: bool = True,
         prefixes: Optional[list[str]] = None,
     ) -> None:
-        if isinstance(xdg_home, str) and bool(xdg_home):
-            xdg_home = Path(xdg_home)
+        if isinstance(xdg_home, str):
+            xdg_home = Path(xdg_home) if xdg_home else None
         self.xdg_home = xdg_home
         self.src_test_layout = src_test_layout
         self.copy_test_layout = copy_test_layout
@@ -98,7 +97,7 @@ class DefaultTestEnv:
             m.setenv("XDG_CONFIG_HOME", str(self.xdg_home / ".config"))
             if self.copy_test_layout:
                 paths = Paths()
-                paths.hardware_layout.parent.mkdir(parents=True, exist_ok=True)
+                Path(paths.hardware_layout).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(self.src_test_layout, paths.hardware_layout)
 
     def clean_env(self, m: MonkeyPatch) -> None:

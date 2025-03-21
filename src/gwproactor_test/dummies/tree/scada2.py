@@ -5,7 +5,7 @@ from typing import Optional
 import rich
 from gwproto import Message
 
-from gwproactor import Proactor
+from gwproactor import Proactor, ProactorSettings
 from gwproactor.links.link_settings import LinkSettings
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import TimedRollingFilePersister
@@ -16,6 +16,7 @@ from gwproactor_test.dummies.tree.admin_messages import (
 )
 from gwproactor_test.dummies.tree.codecs import AdminCodec, DummyCodec
 from gwproactor_test.dummies.tree.messages import (
+    RelayInfo,
     RelayReportEvent,
     SetRelay,
 )
@@ -74,11 +75,11 @@ class DummyScada2(Proactor):
 
     @classmethod
     def make_event_persister(
-        cls, settings: DummyScada2Settings
+        cls, settings: ProactorSettings
     ) -> TimedRollingFilePersister:
         return TimedRollingFilePersister(settings.paths.event_dir)
 
-    def _process_set_relay(self, payload: SetRelay) -> None:
+    def _process_set_relay(self, payload: RelayInfo) -> None:
         self._logger.path(
             f"++{self.name}._process_set_relay "
             f"{payload.RelayName}  "

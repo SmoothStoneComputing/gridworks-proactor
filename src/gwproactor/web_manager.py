@@ -56,7 +56,7 @@ class _WebManager(Communicator, Runnable):
         self._configs = {}
         self._routes = defaultdict(list)
 
-    def process_message(self, message: Message) -> Result[bool, Exception]:  # noqa: ARG002
+    def process_message(self, message: Message[Any]) -> Result[bool, Exception]:  # noqa: ARG002
         raise ValueError("_WebManager does not currently process any messages")
 
     def disable(self) -> None:

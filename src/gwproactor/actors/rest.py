@@ -13,20 +13,20 @@ from aiohttp import ClientResponse, ClientSession, ClientTimeout
 from gwproto import Message
 from gwproto.data_classes.components.rest_poller_component import RESTPollerComponent
 from gwproto.type_helpers import AioHttpClientTimeout, RESTPollerSettings, URLConfig
-from result import Result
+from result import Ok, Result
 
 from gwproactor import Actor, Problems, ServicesInterface
 from gwproactor.proactor_interface import INVALID_IO_TASK_HANDLE, IOLoopInterface
 
-Converter = Callable[[ClientResponse], Awaitable[Optional[Message]]]
-ThreadSafeForwarder = Callable[[Message], Any]
+Converter = Callable[[ClientResponse], Awaitable[Optional[Message[Any]]]]
+ThreadSafeForwarder = Callable[[Message[Any]], Any]
 
 
-async def null_converter(_response: ClientResponse) -> Optional[Message]:
+async def null_converter(_: ClientResponse) -> Optional[Message[Any]]:
     return None
 
 
-def null_forwarder(_message: Message) -> None:
+def null_forwarder(_: Message[Any]) -> None:
     return None
 
 
@@ -41,14 +41,14 @@ def to_client_timeout(
 @dataclass
 class SessionArgs:
     base_url: Optional[yarl.URL] = None
-    kwargs: dict = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class RequestArgs:
     method: str = "GET"
     url: Optional[yarl.URL] = None
-    kwargs: dict = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 class RESTPoller:
@@ -75,7 +75,7 @@ class RESTPoller:
         self._task_id = INVALID_IO_TASK_HANDLE
         self._rest = rest
         self._io_loop_manager = loop_manager
-        self._convert = convert
+        setattr(self, "_convert", convert)  # noqa: B010
         self._forward = forward
         if cache_request_args:
             self._session_args = self._make_session_args()
@@ -117,6 +117,8 @@ class RESTPoller:
             args = self._request_args
             if args is None:
                 args = self._make_request_args()
+            if args.url is None:
+                raise ValueError(f"ERROR. args <{args}> produced url of None")  # noqa: TRY301
             response = await session.request(args.method, args.url, **args.kwargs)
             if self._rest.errors.request.error_for_http_status:
                 response.raise_for_status()
@@ -139,7 +141,7 @@ class RESTPoller:
                 raise
         return response
 
-    async def _convert(self, response: ClientResponse) -> Optional[Message]:
+    async def _convert(self, response: ClientResponse) -> Optional[Message[Any]]:
         try:
             message = await self._converter(response)
         except Exception as convert_exception:
@@ -213,7 +215,7 @@ class RESTPollerActor(Actor):
                 f"ERROR. Component <{display_name}> has type {type(component)}. "
                 f"Expected RESTPollerComponent.\n"
                 f"  Node: {self.name}\n"
-                f"  Component id: {component.component_id}"
+                f"  Component id: {getattr(component, 'component_id', None)}"
             )
         self._poller = RESTPoller(
             name,
@@ -224,8 +226,8 @@ class RESTPollerActor(Actor):
             cache_request_args=cache_request_args,
         )
 
-    def process_message(self, message: Message) -> Result[bool, Exception]:
-        pass
+    def process_message(self, _: Message[Any]) -> Result[bool, Exception]:
+        return Ok()
 
     def start(self) -> None:
         self._poller.start()

@@ -1,7 +1,7 @@
 import logging
 import sys
 from types import TracebackType
-from typing import Optional, Self, Sequence, Type
+from typing import Iterator, Optional, Self, Sequence, Type
 
 import pytest
 
@@ -21,7 +21,7 @@ class LoggerGuard:
         self.propagate = logger.propagate
         self.disabled = logger.disabled
         self.handlers = set(logger.handlers)
-        self.filters = set(logger.filters)
+        self.filters = set(logger.filters)  # type: ignore[arg-type]
 
     def restore(self) -> None:
         screen_handlers = [
@@ -45,7 +45,7 @@ class LoggerGuard:
             self.logger.removeHandler(handler)
         for handler in self.handlers - curr_handlers:
             self.logger.addHandler(handler)
-        curr_filters = set(self.logger.filters)
+        curr_filters: set[logging.Filter] = set(self.logger.filters)  # type: ignore[arg-type]
         for filter_ in curr_filters - self.filters:
             self.logger.removeFilter(filter_)
         for filter_ in self.filters - curr_filters:
@@ -78,7 +78,7 @@ class LoggerGuards:
             for logger_name in logger_names
         }
 
-    def add_loggers(self, logger_names: Optional[Sequence[str]] = None) -> None:
+    def add_loggers(self, logger_names: Sequence[str]) -> None:
         for logger_name in logger_names:
             if logger_name not in self.guards:
                 self.guards[logger_name] = LoggerGuard(logging.getLogger(logger_name))
@@ -107,7 +107,7 @@ class LoggerGuards:
 
 
 @pytest.fixture
-def restore_loggers() -> LoggerGuards:
+def restore_loggers() -> Iterator[LoggerGuards]:
     num_root_handlers = len(logging.getLogger().handlers)
     guards = LoggerGuards()
     yield guards

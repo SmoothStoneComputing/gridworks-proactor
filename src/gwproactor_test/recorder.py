@@ -1,5 +1,8 @@
 # ruff: noqa: ERA001
+# mypy: disable-error-code="union-attr,attr-defined"
+
 import dataclasses
+import typing
 from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -8,6 +11,7 @@ from typing import Any, Callable, Optional, Tuple, Type, TypeVar, cast
 from gwproto import Message
 from gwproto.messages import CommEvent, EventBase, EventT, PingMessage
 from paho.mqtt.client import MQTT_ERR_SUCCESS, MQTTMessageInfo
+from result import Result
 
 from gwproactor import Proactor, ProactorSettings, Runnable, ServicesInterface
 from gwproactor.config import LoggerLevels
@@ -116,7 +120,7 @@ class RecorderInterface(ServicesInterface, Runnable):
 @dataclass
 class _PausedAck:
     link_name: str
-    message: Message
+    message: Message[Any]
     qos: int
     context: Optional[Any]
 
@@ -132,13 +136,26 @@ class RecorderLinks(LinkManager):
         self.needs_ack = []
 
     def publish_message(
-        self, client: str, message: Message, qos: int = 0, context: Any = None
+        self,
+        client: str,
+        message: Message[Any],
+        qos: int = 0,
+        context: Any = None,
+        *,
+        topic: str = "",
+        use_link_topic: bool = False,
     ) -> MQTTMessageInfo:
         if self.acks_paused:
             self.needs_ack.append(_PausedAck(client, message, qos, context))
             return MQTTMessageInfo(-1)
-        # noinspection PyProtectedMember
-        return super().publish_message(client, message, qos=qos, context=context)
+        return super().publish_message(
+            client,
+            message,
+            qos=qos,
+            context=context,
+            topic=topic,
+            use_link_topic=use_link_topic,
+        )
 
     def release_acks(self, clear: bool = False, num_to_release: int = -1) -> int:
         # self._logger.info(
@@ -167,7 +184,7 @@ class RecorderLinks(LinkManager):
         # )
         return len(needs_ack)
 
-    def generate_event(self, event: EventT) -> None:
+    def generate_event(self, event: EventT) -> Result[bool, Exception]:
         if not event.Src:
             event.Src = self.publication_name
         if isinstance(event, CommEvent) and event.Src == self.publication_name:
@@ -178,15 +195,15 @@ class RecorderLinks(LinkManager):
             cast(RecorderLinkStats, self._stats.link(event.Src)).forwarded[
                 event.TypeName
             ] += 1
-        super().generate_event(event)
+        return super().generate_event(event)
 
 
 def make_recorder_class(  # noqa: C901
     proactor_type: Type[ProactorT],
 ) -> Callable[..., RecorderInterface]:
-    class Recorder(proactor_type):
+    class Recorder(proactor_type):  # type: ignore  # noqa: PGH003
         _subacks_paused: dict[str, bool]
-        _subacks_available: dict[str, list[Message]]
+        _subacks_available: dict[str, list[Message[Any]]]
         _mqtt_messages_dropped: dict[str, bool]
 
         def __init__(
@@ -196,7 +213,7 @@ def make_recorder_class(  # noqa: C901
             self._subacks_paused = defaultdict(bool)
             self._subacks_available = defaultdict(list)
             self._mqtt_messages_dropped = defaultdict(bool)
-            self._links = RecorderLinks(self._links)
+            self._links = RecorderLinks(self.links)
 
         @classmethod
         def make_stats(cls) -> RecorderStats:
@@ -263,14 +280,14 @@ def make_recorder_class(  # noqa: C901
         def release_upstream_subacks(self: ProactorT, num_released: int = -1) -> None:
             self.release_subacks(self.upstream_client, num_released)
 
-        async def process_message(self, message: Message) -> None:
+        async def async_process_message(self, message: Message[Any]) -> None:
             if (
                 isinstance(message.Payload, MQTTSubackPayload)
                 and self._subacks_paused[message.Payload.client_name]
             ):
                 self._subacks_available[message.Payload.client_name].append(message)
             else:
-                await super().process_message(message)
+                await super().async_process_message(message)
 
         def _derived_process_mqtt_message(
             self, message: Message[MQTTReceiptPayload], decoded: Message[Any]
@@ -371,7 +388,7 @@ def make_recorder_class(  # noqa: C901
                 )
             )
 
-        def _derived_process_message(self, message: Message) -> None:
+        def _derived_process_message(self, message: Message[Any]) -> None:
             match message.Payload:
                 case DBGPayload():
                     message.Header.Src = self.publication_name
@@ -384,7 +401,7 @@ def make_recorder_class(  # noqa: C901
 
         def mqtt_quiescent(self) -> bool:
             if hasattr(super(), "mqtt_quiescent"):
-                return super().mqtt_quiescent()
+                return typing.cast(bool, super().mqtt_quiescent())
             return self._links.link(self.upstream_client).active_for_send()
 
         def _call_super_if_present(self, function_name: str) -> None:

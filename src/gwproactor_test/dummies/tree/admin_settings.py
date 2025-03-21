@@ -1,3 +1,4 @@
+import typing
 from typing import Any, Self
 
 from pydantic import Field, model_validator
@@ -21,16 +22,16 @@ class AdminLinkSettings(TreeLinkSettings):
 
 class DummyAdminSettings(ProactorSettings):
     target_gnode: str = ""
-    paths: Paths = Field({}, validate_default=True)
+    paths: Paths = Field(default=typing.cast(Paths, {}), validate_default=True)
     link: AdminLinkSettings = AdminLinkSettings()
     model_config = SettingsConfigDict(env_prefix="GWADMIN_", env_nested_delimiter="__")
 
     @model_validator(mode="before")
     @classmethod
-    def pre_root_validator(cls, values: dict) -> dict:
+    def pre_root_validator(cls, values: dict[str, Any]) -> dict[str, Any]:
         return ProactorSettings.update_paths_name(values, DUMMY_ADMIN_NAME)
 
     @model_validator(mode="after")
-    def validate(self) -> Self:
+    def validate_(self) -> Self:
         self.link.update_tls_paths(self.paths.certs_dir, self.link.client_name)
         return self

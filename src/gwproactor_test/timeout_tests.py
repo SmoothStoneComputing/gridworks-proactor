@@ -1,19 +1,30 @@
 # ruff: noqa: PLR2004, ERA001
+# mypy: disable-error-code="union-attr"
+
 
 import asyncio
+import typing
 from typing import Type
 
 import pytest
 from gwproto import MQTTTopic
 
 from gwproactor.links import StateName
-from gwproactor_test.comm_test_helper import CommTestHelper
+from gwproactor_test.comm_test_helper import (
+    ChildSettingsT,
+    ChildT,
+    CommTestHelper,
+    ParentSettingsT,
+    ParentT,
+)
 from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-class ProactorCommTimeoutTests:
-    CTH: Type[CommTestHelper]
+class ProactorCommTimeoutTests(
+    typing.Generic[ParentT, ChildT, ParentSettingsT, ChildSettingsT]
+):
+    CTH: Type[CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]]
 
     @pytest.mark.asyncio
     async def test_response_timeout(self) -> None:
@@ -87,9 +98,9 @@ class ProactorCommTimeoutTests:
             # (active -> response_timeout -> awaiting_peer)
             parent.pause_acks()
             child.force_ping(child.upstream_client)
-            exp_timeouts = stats.timeouts + len(
-                child.links.ack_manager._acks[child.upstream_client]  # noqa: SLF001
-            )
+            child_acks_map = child.links.ack_manager._acks  # noqa: SLF001
+            child_acks = child_acks_map[child.upstream_client]
+            exp_timeouts = int(stats.timeouts) + len(child_acks)
             await await_for(
                 lambda: stats.timeouts == exp_timeouts,
                 1,

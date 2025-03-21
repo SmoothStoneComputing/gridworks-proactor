@@ -15,4 +15,3 @@ tests/.env-gwproactor-test
 tests/.certificate_cache
 tests/.ci-ca
 hacking
-.vscode

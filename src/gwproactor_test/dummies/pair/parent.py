@@ -51,7 +51,7 @@ class DummyParent(Proactor):
                 client_name=self.CHILD_MQTT,
                 gnode_name=DUMMY_CHILD_NAME,
                 spaceheat_name=CHILD_SHORT_NAME,
-                mqtt=settings.child_mqtt,
+                mqtt=self.settings.child_mqtt,
                 codec=ParentMQTTCodec(),
                 downstream=True,
             )
@@ -59,7 +59,8 @@ class DummyParent(Proactor):
 
     @classmethod
     def make_event_persister(
-        cls, settings: DummyParentSettings
+        cls,
+        settings: DummyParentSettings,  # type: ignore[override]
     ) -> SimpleDirectoryWriter:
         return SimpleDirectoryWriter(settings.paths.event_dir)
 

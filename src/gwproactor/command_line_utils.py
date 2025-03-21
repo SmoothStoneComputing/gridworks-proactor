@@ -57,11 +57,12 @@ def get_settings(
     settings: Optional[ProactorSettingsT] = None,
     env_file: str | Path = ".env",
 ) -> ProactorSettingsT:
-    if (settings_type is None and settings is None) or (
-        settings_type is not None and settings is not None
-    ):
-        raise ValueError("ERROR. Specify exactly one of (settings_type, settings)")
-    if settings_type is not None:
+    if settings_type is None:
+        if settings is None:
+            raise ValueError("ERROR. Specifiy exactly one of (settings_type, settings)")
+    else:
+        if settings is not None:
+            raise ValueError("ERROR. Specify exactly one of (settings_type, settings)")
         settings = settings_type(_env_file=str(env_file))
     return settings
 
@@ -72,7 +73,7 @@ def print_settings(
     settings: Optional[ProactorSettingsT] = None,
     env_file: str | Path = ".env",
 ) -> None:
-    dotenv_file = dotenv.find_dotenv(env_file)
+    dotenv_file = dotenv.find_dotenv(str(env_file))
     rich.print(
         f"Env file: <{dotenv_file}>  exists:{env_file and Path(dotenv_file).exists()}"
     )
@@ -98,7 +99,7 @@ def get_proactor(  # noqa: PLR0913
     run_in_thread: bool = False,
     add_screen_handler: bool = True,
 ) -> ProactorT:
-    dotenv_file = dotenv.find_dotenv(env_file)
+    dotenv_file = dotenv.find_dotenv(str(env_file))
     dotenv_file_debug_str = (
         f"Env file: <{dotenv_file}>  exists:{Path(dotenv_file).exists()}"
     )
@@ -150,9 +151,11 @@ async def run_async_main(  # noqa: PLR0913
     settings = get_settings(
         settings_type=settings_type,
         settings=settings,
-        env_file=dotenv.find_dotenv(env_file),
+        env_file=dotenv.find_dotenv(str(env_file)),
     )
-    exception_logger = logging.getLogger(settings.logging.base_log_name)
+    exception_logger: logging.Logger | logging.LoggerAdapter[logging.Logger] = (
+        logging.getLogger(settings.logging.base_log_name)
+    )
     try:
         proactor = get_proactor(
             name=name,
@@ -162,6 +165,7 @@ async def run_async_main(  # noqa: PLR0913
             verbose=verbose,
             message_summary=message_summary,
         )
+        # noinspection PyTypeChecker
         exception_logger = proactor.logger
         try:
             await proactor.run_forever()

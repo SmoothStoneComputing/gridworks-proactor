@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import model_validator
 from pydantic_settings import SettingsConfigDict
 
@@ -13,5 +15,5 @@ class DummyParentSettings(ProactorSettings):
 
     @model_validator(mode="before")
     @classmethod
-    def pre_root_validator(cls, values: dict) -> dict:
+    def pre_root_validator(cls, values: dict[str, Any]) -> dict[str, Any]:
         return ProactorSettings.update_paths_name(values, DUMMY_PARENT_NAME)

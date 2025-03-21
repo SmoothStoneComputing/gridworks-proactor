@@ -8,7 +8,10 @@ from gwproactor import Proactor, ProactorSettings, setup_logging
 from gwproactor.config import DEFAULT_BASE_NAME, LoggingSettings, MQTTClient, Paths
 from gwproactor_test.comm_test_helper import (
     ChildSettingsT,
+    ChildT,
     CommTestHelper,
+    ParentSettingsT,
+    ParentT,
     ProactorTestHelper,
 )
 from gwproactor_test.dummies import DUMMY_ATN_NAME, DUMMY_SCADA1_NAME, DUMMY_SCADA2_NAME
@@ -20,10 +23,12 @@ from gwproactor_test.recorder import (
 )
 
 
-class TreeCommTestHelper(CommTestHelper):
+class TreeCommTestHelper(
+    CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]
+):
     child2_t: Type[Proactor]
     child2_settings_t: Type[ProactorSettings]
-    child2_recorder_t: Callable[..., RecorderInterface] = None
+    child2_recorder_t: Callable[..., RecorderInterface] = None  # type: ignore[assignment]
     child2_helper: ProactorTestHelper
     child2_verbose: bool = False
     child2_on_screen: bool = False
@@ -44,7 +49,7 @@ class TreeCommTestHelper(CommTestHelper):
         child_path_name: str = DUMMY_SCADA1_NAME,
         parent_path_name: str = DUMMY_ATN_NAME,
         child2_path_name: str = DUMMY_SCADA2_NAME,
-        child2_kwargs: Optional[dict] = None,
+        child2_kwargs: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
         if not kwargs.get("child_name"):
@@ -86,16 +91,18 @@ class TreeCommTestHelper(CommTestHelper):
     @classmethod
     def setup_child2_class(cls) -> None:
         if cls.child2_recorder_t is None:
-            cls.child2_recorder_t = make_recorder_class(cls.child2_t)
+            cls.child2_recorder_t = make_recorder_class(cls.child2_t)  # type: ignore[unreachable]
 
     @property
     def child1(self) -> Optional[ProactorT]:
-        return self.child
+        return self.child  # type: ignore[return-value]
 
     def add_child1(self) -> Self:
-        return self.add_child()
+        return self.add_child()  # type: ignore[return-value]
 
-    def start_child1(self) -> "CommTestHelper":
+    def start_child1(
+        self,
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         return self.start_child()
 
     def make_child2(self) -> RecorderInterface:
@@ -103,7 +110,7 @@ class TreeCommTestHelper(CommTestHelper):
 
     @property
     def child2(self) -> Optional[ProactorT]:
-        return self.child2_helper.proactor
+        return self.child2_helper.proactor  # type: ignore[return-value]
 
     def start_child2(self) -> Self:
         if self.child2 is not None:
@@ -127,7 +134,7 @@ class TreeCommTestHelper(CommTestHelper):
 
     def setup_child2_logging(self) -> None:
         self.child2_helper.settings.paths.mkdirs(parents=True)
-        errors = []
+        errors: list[Exception] = []
         if not self.lifecycle_logging and not self.verbose and not self.child2_verbose:
             self.child2_helper.settings.logging.levels.lifecycle = logging.WARNING
         self.logger_guards.add_loggers(
@@ -162,15 +169,15 @@ class TreeCommTestHelper(CommTestHelper):
             s += "SCADA1: None\n"
         else:
             s += "SCADA1:\n"
-            s += textwrap.indent(self.child1.summary_str(), "    ") + "\n"
+            s += textwrap.indent(self.child1.summary_str(), "    ") + "\n"  # type: ignore[attr-defined]
         if self.child2 is None:
             s += "SCADA2: None\n"
         else:
             s += "SCADA2:\n"
-            s += textwrap.indent(self.child2.summary_str(), "    ") + "\n"
+            s += textwrap.indent(self.child2.summary_str(), "    ") + "\n"  # type: ignore[attr-defined]
         if self.parent is None:
             s += "ATN: None\n"
         else:
             s += "ATN:\n"
-            s += textwrap.indent(self.parent.summary_str(), "    ") + "\n"
+            s += textwrap.indent(self.parent.summary_str(), "    ") + "\n"  # type: ignore[attr-defined]
         return s

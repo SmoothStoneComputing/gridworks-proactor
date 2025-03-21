@@ -55,7 +55,7 @@ class DummyChild(Proactor):
                 client_name=DummyChild.PARENT_MQTT,
                 gnode_name=DUMMY_PARENT_NAME,
                 spaceheat_name=PARENT_SHORT_NAME,
-                mqtt=settings.parent_mqtt,
+                mqtt=self.settings.parent_mqtt,
                 codec=ChildMQTTCodec(),
                 upstream=True,
             )

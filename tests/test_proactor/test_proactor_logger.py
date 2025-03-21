@@ -1,7 +1,8 @@
-import argparse
+import argparse  # noqa: I001
 import logging
+import typing
 import warnings
-from typing import Any
+from typing import Any, Mapping
 
 import pytest
 
@@ -10,15 +11,21 @@ from gwproactor.config import Paths
 from gwproactor_test import LoggerGuards
 
 
+def _prlogger(settings: ProactorSettings) -> ProactorLogger:
+    return ProactorLogger(
+        **typing.cast(Mapping[str, Any], settings.logging.qualified_logger_names()),
+    )
+
+
 def test_proactor_logger(caplog: Any) -> None:
     paths = Paths()
     paths.mkdirs()
     settings = ProactorSettings()
     with LoggerGuards():
-        errors = []
+        errors: list[Exception] = []
         setup_logging(argparse.Namespace(), settings, errors=errors)
         assert len(errors) == 0
-        logger = ProactorLogger(**settings.logging.qualified_logger_names())
+        logger = _prlogger(settings)
         assert not logger.isEnabledFor(logging.INFO)
         assert not logger.message_summary_enabled
         assert logger.message_summary_logger.level == logging.WARNING
@@ -38,7 +45,7 @@ def test_proactor_logger(caplog: Any) -> None:
         add_screen_handler=False,
     )
     assert len(errors) == 0
-    logger = ProactorLogger(**settings.logging.qualified_logger_names())
+    logger = _prlogger(settings)
     assert logger.isEnabledFor(logging.INFO)
     assert logger.message_summary_enabled
     assert logger.message_summary_logger.level == logging.DEBUG
@@ -76,19 +83,20 @@ def test_proactor_logger(caplog: Any) -> None:
 def test_category_logger() -> None:
     # default - no categories
     settings = ProactorSettings()
-    prlogger = ProactorLogger(**settings.logging.qualified_logger_names())
+    prlogger = _prlogger(settings)
     assert not prlogger.category_loggers
 
     # One cat logger in constructor
     cat_name = "Spots"
     prlogger = ProactorLogger(
         category_logger_names=[cat_name],
-        **settings.logging.qualified_logger_names(),
+        **typing.cast(Mapping[str, Any], settings.logging.qualified_logger_names()),
     )
     assert len(prlogger.category_loggers) == 1
     logger = prlogger.category_logger(cat_name)
     assert logger is not None
     assert logger.getEffectiveLevel() == logging.INFO
+    assert hasattr(logger, "disabled")
     assert not logger.disabled
     assert logger.name == f"{prlogger.name}.{cat_name}"
 
@@ -97,7 +105,7 @@ def test_category_logger() -> None:
         prlogger.add_category_logger()
 
     # query for missing logger does not crash
-    prlogger = ProactorLogger(**settings.logging.qualified_logger_names())
+    prlogger = _prlogger(settings)
     assert prlogger.category_logger("foo") is None
 
     # Add cat loggers in various ways
@@ -107,6 +115,7 @@ def test_category_logger() -> None:
     assert logger is not None
     assert logger is prlogger.category_logger(cat_name)
     assert logger.getEffectiveLevel() == logging.DEBUG
+    assert hasattr(logger, "disabled")
     assert not logger.disabled
     assert logger.name == f"{prlogger.name}.{cat_name}"
 
@@ -120,6 +129,7 @@ def test_category_logger() -> None:
     assert logger is explicit_logger
     assert logger is prlogger.category_logger(cat_name)
     assert logger.getEffectiveLevel() == logging.WARNING
+    assert hasattr(logger, "disabled")
     assert logger.disabled
     assert logger.name == f"{prlogger.name}.{cat_name}"
 
@@ -132,20 +142,30 @@ def test_category_logger() -> None:
     assert logger is explicit_logger
     assert logger is prlogger.category_logger(cat_name)
     assert logger.getEffectiveLevel() == logging.ERROR
+    assert hasattr(logger, "disabled")
     assert not logger.disabled
     assert logger.name == cat_name
 
     # Test resetting the category logger levels
-    prlogger.category_logger("Max").setLevel(logging.INFO)
-    prlogger.category_logger("Max").disabled = True
-    prlogger.category_logger("Sandy").setLevel(logging.INFO)
-    prlogger.category_logger("Sandy").disabled = False
-    prlogger.category_logger("Oreo").setLevel(logging.INFO)
-    prlogger.category_logger("Oreo").disabled = True
+    Max = prlogger.category_logger("Max")
+    assert Max is not None
+    assert hasattr(Max, "disabled")
+    Max.setLevel(logging.INFO)
+    Max.disabled = True
+    Sandy = prlogger.category_logger("Sandy")
+    assert Sandy is not None
+    assert hasattr(Sandy, "disabled")
+    Sandy.setLevel(logging.INFO)
+    Sandy.disabled = False
+    Oreo = prlogger.category_logger("Oreo")
+    assert Oreo is not None
+    assert hasattr(Oreo, "disabled")
+    Oreo.setLevel(logging.INFO)
+    Oreo.disabled = True
     prlogger.reset_default_category_levels()
-    assert prlogger.category_logger("Max").getEffectiveLevel() == logging.DEBUG
-    assert not prlogger.category_logger("Max").disabled
-    assert prlogger.category_logger("Sandy").getEffectiveLevel() == logging.WARNING
-    assert prlogger.category_logger("Sandy").disabled
-    assert prlogger.category_logger("Oreo").getEffectiveLevel() == logging.ERROR
-    assert not prlogger.category_logger("Oreo").disabled
+    assert Max.getEffectiveLevel() == logging.DEBUG
+    assert not Max.disabled
+    assert Sandy.getEffectiveLevel() == logging.WARNING
+    assert Sandy.disabled
+    assert Oreo.getEffectiveLevel() == logging.ERROR
+    assert not Oreo.disabled

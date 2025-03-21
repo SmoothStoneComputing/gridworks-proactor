@@ -5,7 +5,7 @@ import rich
 from gwproto import Message
 from gwproto.messages import EventBase
 
-from gwproactor import Proactor
+from gwproactor import Proactor, ProactorSettings
 from gwproactor.links.link_settings import LinkSettings
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import TimedRollingFilePersister
@@ -96,7 +96,7 @@ class DummyScada1(Proactor):
 
     @classmethod
     def make_event_persister(
-        cls, settings: DummyScada1Settings
+        cls, settings: ProactorSettings
     ) -> TimedRollingFilePersister:
         return TimedRollingFilePersister(settings.paths.event_dir)
 
@@ -110,7 +110,7 @@ class DummyScada1(Proactor):
             )
         )
 
-    def _derived_process_message(self, message: Message) -> None:
+    def _derived_process_message(self, message: Message[typing.Any]) -> None:
         self._logger.path(
             f"++{self.name}._derived_process_message "
             f"{message.Header.Src}/{message.Header.MessageType}"

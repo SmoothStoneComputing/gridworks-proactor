@@ -18,7 +18,7 @@ class TLSInfo(BaseModel):
     ciphers: Optional[str] = None
     keyfile_password: SecretStr = SecretStr("")
 
-    def update_tls_paths(self, certs_dir: Path, client_name: str) -> "TLSInfo":
+    def update_tls_paths(self, certs_dir: str | Path, client_name: str) -> "TLSInfo":
         """Calculate non-set paths given a certs_dir and client name. Meant to be called in context where those are
         known, e.g. a validator on a higher-level model which has access to a Paths object and a named MQTT
         configuration."""
@@ -38,7 +38,7 @@ class MQTTClient(BaseModel):
     password: SecretStr = SecretStr("")
     tls: TLSInfo = TLSInfo()
 
-    def update_tls_paths(self, certs_dir: Path, client_name: str) -> "MQTTClient":
+    def update_tls_paths(self, certs_dir: str | Path, client_name: str) -> "MQTTClient":
         """Calculate non-set paths given a certs_dir and client name. Meant to be called in context where those are
         known, e.g. a validator on a higher-level model which has access to a Paths object and a named MQTT
         configuration."""

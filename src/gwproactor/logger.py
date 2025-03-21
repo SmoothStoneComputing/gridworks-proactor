@@ -1,7 +1,7 @@
 import contextlib
 import datetime
 import logging
-from typing import Any, Optional, Sequence, TypeAlias
+from typing import Any, Mapping, Optional, Sequence, TypeAlias
 
 
 class MessageSummary:
@@ -80,7 +80,8 @@ class MessageSummary:
         return ""
 
 
-LoggerOrAdapter: TypeAlias = logging.Logger | logging.LoggerAdapter
+LoggerAdapterT = logging.LoggerAdapter[logging.Logger]
+LoggerOrAdapter: TypeAlias = logging.Logger | logging.LoggerAdapter[logging.Logger]
 
 
 class CategoryLoggerInfo:
@@ -93,10 +94,10 @@ class CategoryLoggerInfo:
     ) -> None:
         self.logger = logger
         self.default_level = default_level
-        self.default_disabled = logger.disabled
+        self.default_disabled = getattr(logger, "disabled", False)
 
 
-class ProactorLogger(logging.LoggerAdapter):
+class ProactorLogger(LoggerAdapterT):
     MESSAGE_DELIMITER_WIDTH = 88
     MESSAGE_ENTRY_DELIMITER = "+" * MESSAGE_DELIMITER_WIDTH
     MESSAGE_EXIT_DELIMITER = "-" * MESSAGE_DELIMITER_WIDTH
@@ -112,8 +113,10 @@ class ProactorLogger(logging.LoggerAdapter):
         message_summary: str,
         lifecycle: str,
         comm_event: str,
-        extra: Optional[dict] = None,
+        *,
+        extra: Optional[dict[str, Any]] = None,
         category_logger_names: Optional[Sequence[str]] = None,
+        **_kwargs: Mapping[str, Any],
     ) -> None:
         super().__init__(logging.getLogger(base), extra=extra)
         self.message_summary_logger = logging.getLogger(message_summary)
@@ -193,9 +196,7 @@ class ProactorLogger(logging.LoggerAdapter):
     def category_logger_name(self, category: str) -> str:
         return f"{self.name}.{category}"
 
-    def category_logger(
-        self, category: str
-    ) -> Optional[logging.Logger | logging.LoggerAdapter]:
+    def category_logger(self, category: str) -> Optional[LoggerOrAdapter]:
         """Get existing category logger"""
         logger_info = self.category_loggers.get(category)
         if logger_info is not None:
@@ -244,7 +245,8 @@ class ProactorLogger(logging.LoggerAdapter):
     def reset_default_category_levels(self) -> None:
         for logger_info in self.category_loggers.values():
             logger_info.logger.setLevel(logger_info.default_level)
-            logger_info.logger.disabled = logger_info.default_disabled
+            if hasattr(logger_info.logger, "disabled"):
+                logger_info.logger.disabled = logger_info.default_disabled
 
     def __repr__(self) -> str:
         return (

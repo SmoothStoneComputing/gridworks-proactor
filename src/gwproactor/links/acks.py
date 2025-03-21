@@ -28,7 +28,7 @@ class AckManager:
         self,
         timer_mgr: TimerManagerInterface,
         callback: AckTimerCallback,
-        delay: Optional[float] = DEFAULT_ACK_DELAY,
+        delay: float = DEFAULT_ACK_DELAY,
     ) -> None:
         self._acks = {}
         self._timer_mgr = timer_mgr
@@ -72,16 +72,18 @@ class AckManager:
         if (wait_info := self._pop_wait_info(link_name, message_id)) is not None:
             self._user_callback(wait_info)
 
-    def cancel_ack_timer(self, link_name: str, message_id: str) -> AckWaitInfo:
+    def cancel_ack_timer(
+        self, link_name: str, message_id: str
+    ) -> Optional[AckWaitInfo]:
         if (wait_info := self._pop_wait_info(link_name, message_id)) is not None:
             self._timer_mgr.cancel_timer(wait_info.timer_handle)
         return wait_info
 
     def cancel_ack_timers(self, link_name: str) -> list[AckWaitInfo]:
         if link_name in self._acks:
-            wait_infos = self._acks[link_name]
+            wait_infos = list(self._acks[link_name].values())
             self._acks[link_name] = {}
-            for wait_info in wait_infos.values():
+            for wait_info in wait_infos:
                 self._timer_mgr.cancel_timer(wait_info.timer_handle)
         else:
             wait_infos = []

@@ -44,11 +44,11 @@ class DummyScada1Settings(ProactorSettings):
 
     @model_validator(mode="before")
     @classmethod
-    def pre_root_validator(cls, values: dict) -> dict:
+    def pre_root_validator(cls, values: dict[str, Any]) -> dict[str, Any]:
         return ProactorSettings.update_paths_name(values, DUMMY_SCADA1_NAME)
 
     @model_validator(mode="after")
-    def validate(self) -> Self:
+    def validate_(self) -> Self:
         self.atn_link.update_tls_paths(self.paths.certs_dir, self.atn_link.client_name)
         self.scada2_link.update_tls_paths(
             self.paths.certs_dir, self.scada2_link.client_name

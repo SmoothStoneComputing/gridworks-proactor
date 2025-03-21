@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
-from typing import Callable, Optional, Type, TypeVar
+from typing import Any, Callable, Generic, Optional, Type, TypeVar
 
 from gwproactor import Proactor, ProactorSettings, setup_logging
 from gwproactor.config import DEFAULT_BASE_NAME, LoggingSettings, MQTTClient, Paths
@@ -13,7 +13,6 @@ from gwproactor_test import copy_keys
 from gwproactor_test.certs import uses_tls
 from gwproactor_test.logger_guard import LoggerGuards
 from gwproactor_test.recorder import (
-    ProactorT,
     RecorderInterface,
     make_recorder_class,
 )
@@ -24,7 +23,7 @@ class ProactorTestHelper:
     name: str
     path_name: str
     settings: ProactorSettings
-    kwargs: dict = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
     proactor: Optional[RecorderInterface] = None
 
 
@@ -34,14 +33,14 @@ ChildSettingsT = TypeVar("ChildSettingsT", bound=ProactorSettings)
 ParentSettingsT = TypeVar("ParentSettingsT", bound=ProactorSettings)
 
 
-class CommTestHelper:
-    parent_t: Type[ProactorT]
-    child_t: Type[Proactor]
+class CommTestHelper(Generic[ParentT, ChildT, ParentSettingsT, ChildSettingsT]):
+    parent_t: Type[ParentT]
+    child_t: Type[ChildT]
     parent_settings_t: Type[ParentSettingsT]
-    child_settings_t: Type[ProactorSettings]
+    child_settings_t: Type[ChildSettingsT]
 
-    parent_recorder_t: Callable[..., RecorderInterface] = None
-    child_recorder_t: Callable[..., RecorderInterface] = None
+    parent_recorder_t: Callable[..., RecorderInterface] = None  # type:ignore[assignment]
+    child_recorder_t: Callable[..., RecorderInterface] = None  # type:ignore[assignment]
 
     parent_helper: ProactorTestHelper
     child_helper: ProactorTestHelper
@@ -57,9 +56,9 @@ class CommTestHelper:
     @classmethod
     def setup_class(cls) -> None:
         if cls.parent_recorder_t is None:
-            cls.parent_recorder_t = make_recorder_class(cls.parent_t)
+            cls.parent_recorder_t = make_recorder_class(cls.parent_t)  # type: ignore[unreachable]
         if cls.child_recorder_t is None:
-            cls.child_recorder_t = make_recorder_class(cls.child_t)
+            cls.child_recorder_t = make_recorder_class(cls.child_t)  # type: ignore[unreachable]
 
     def __init__(
         self,
@@ -79,8 +78,8 @@ class CommTestHelper:
         parent_name: str = "",
         child_path_name: str = "child",
         parent_path_name: str = "parent",
-        child_kwargs: Optional[dict] = None,
-        parent_kwargs: Optional[dict] = None,
+        child_kwargs: Optional[dict[str, Any]] = None,
+        parent_kwargs: Optional[dict[str, Any]] = None,
     ) -> None:
         self.setup_class()
         self.child_helper = ProactorTestHelper(
@@ -143,43 +142,59 @@ class CommTestHelper:
         return self._make(self.child_recorder_t, self.child_helper)
 
     @property
-    def parent(self) -> Optional[ProactorT]:
-        return self.parent_helper.proactor
+    def parent(self) -> Optional[ParentT]:
+        return self.parent_helper.proactor  # type: ignore[return-value]
 
     @property
-    def child(self) -> Optional[ProactorT]:
-        return self.child_helper.proactor
+    def child(self) -> Optional[ChildT]:
+        return self.child_helper.proactor  # type: ignore[return-value]
 
-    def start_child(self) -> "CommTestHelper":
+    def start_child(
+        self,
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         if self.child is not None:
             self.start_proactor(self.child)
         return self
 
-    def start_parent(self) -> "CommTestHelper":
+    def start_parent(
+        self,
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         if self.parent is not None:
             self.start_proactor(self.parent)
         return self
 
-    def start_proactor(self, proactor: Proactor) -> "CommTestHelper":
+    def start_proactor(
+        self, proactor: Proactor
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         asyncio.create_task(proactor.run_forever(), name=f"{proactor.name}_run_forever")  # noqa: RUF006
         return self
 
-    def start(self) -> "CommTestHelper":
+    def start(
+        self,
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         return self
 
-    def add_child(self) -> "CommTestHelper":
+    def add_child(
+        self,
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         self.child_helper.proactor = self.make_child()
         return self
 
-    def add_parent(self) -> "CommTestHelper":
+    def add_parent(
+        self,
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         self.parent_helper.proactor = self.make_parent()
         return self
 
-    def remove_child(self) -> "CommTestHelper":
+    def remove_child(
+        self,
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         self.child_helper.proactor = None
         return self
 
-    def remove_parent(self) -> "CommTestHelper":
+    def remove_parent(
+        self,
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         self.parent_helper.proactor = None
         return self
 
@@ -218,7 +233,7 @@ class CommTestHelper:
     def setup_logging(self) -> None:
         self.child_helper.settings.paths.mkdirs(parents=True)
         self.parent_helper.settings.paths.mkdirs(parents=True)
-        errors = []
+        errors: list[Exception] = []
         if not self.lifecycle_logging and not self.verbose:
             if not self.child_verbose:
                 self.child_helper.settings.logging.levels.lifecycle = logging.WARNING
@@ -263,7 +278,9 @@ class CommTestHelper:
             with contextlib.suppress(Exception):
                 await proactor.join()
 
-    async def __aenter__(self) -> "CommTestHelper":
+    async def __aenter__(
+        self,
+    ) -> "CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]":
         return self
 
     def get_log_path_str(self, exc: BaseException) -> str:
@@ -279,7 +296,7 @@ class CommTestHelper:
         exc_type: Optional[Type[BaseException]],
         exc: Optional[BaseException],
         tb: Optional[TracebackType],
-    ) -> bool:
+    ) -> bool:  # noqa
         try:
             await self.stop_and_join()
         finally:
@@ -303,11 +320,11 @@ class CommTestHelper:
     def summary_str(self) -> str:
         s = ""
         if self.child:
-            s += "CHILD:\n" f"{self.child.summary_str()}\n"
+            s += "CHILD:\n" f"{self.child.summary_str()}\n"  # type: ignore[attr-defined]
         else:
             s += "CHILD: None\n"
         if self.parent:
-            s += "PARENT:\n" f"{self.parent.summary_str()}"
+            s += "PARENT:\n" f"{self.parent.summary_str()}"  # type: ignore[attr-defined]
         else:
             s += "PARENT: None\n"
         return s

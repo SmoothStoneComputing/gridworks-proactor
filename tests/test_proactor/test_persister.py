@@ -1,11 +1,12 @@
 # ruff: noqa: PLR2004
+# mypy: disable-error-code="union-attr"
 
 import datetime
 import json
 import shutil
 import time
 from pathlib import Path
-from typing import Any, NoReturn, Optional, Union
+from typing import Any, Optional, Union
 
 import gwproto.messages
 from freezegun import freeze_time
@@ -51,7 +52,7 @@ def _tomorrow() -> datetime.datetime:
 
 
 class PatWatchdogWithFile(ExternalWatchdogCommandBuilder):
-    pat_dir: Optional[Path] = None
+    pat_dir: Path
     """Explicitly set this path on the class before running tests"""
 
     @classmethod
@@ -123,8 +124,14 @@ def test_problems() -> None:
     p2.add_warning(PersisterWarning(uid="12"))
     assert len(p2.errors) == 4
     assert len(p2.warnings) == 4
-    assert [int(entry.uid) for entry in p2.errors] == [3, 4, 1, 7]  # noqa
-    assert [int(entry.uid) for entry in p2.warnings] == [5, 6, 2, 9]  # noqa
+    assert all(isinstance(entry, PersisterError) for entry in p2.errors)
+    assert all(isinstance(entry, PersisterWarning) for entry in p2.warnings)
+    for error, exp_uid in zip(p2.errors, [3, 4, 1, 7]):
+        assert isinstance(error, PersisterError)
+        assert int(error.uid) == exp_uid
+    for error, exp_uid in zip(p2.warnings, [5, 6, 2, 9]):
+        assert isinstance(error, PersisterWarning)
+        assert int(error.uid) == exp_uid
     assert str(p2)
 
 
@@ -147,8 +154,8 @@ def test_persister_exception() -> None:
 
 def assert_contents(
     p: TimedRollingFilePersister,
-    uids: Optional[list] = None,
-    exp_paths: Optional[list] = None,
+    uids: Optional[list[str]] = None,
+    exp_paths: Optional[list[Path | str]] = None,
     nearby_days: bool = True,
     possible_days: Optional[list[datetime.datetime]] = None,
     exact_days: Optional[list[datetime.datetime]] = None,
@@ -263,6 +270,7 @@ def test_persister_happy_path(tmp_path: Path) -> None:
     # deserialize
     loaded = json.loads(retrieved.value.decode("utf-8"))
     assert loaded == json.loads(event.model_dump_json())
+    assert isinstance(retrieved.value, bytes)
     loaded_event = ProblemEvent.model_validate_json(retrieved.value)
     assert loaded_event == event
 
@@ -803,6 +811,7 @@ def test_persister_indexing() -> None:
         p.get_path(p.pending_ids()[5]).unlink()
         index.pop(p.pending_ids()[5])
         p6 = p.get_path(p.pending_ids()[6])
+        assert p6 is not None
         p6_dir = p6.parent
         # invalid file - rgx failure
         shutil.copy(p6, p6_dir / (p6.name + "x"))
@@ -859,7 +868,7 @@ def test_persister_problems() -> None:
 
         # persist, unexpected error
         class BrokenRoller(TimedRollingFilePersister):
-            def _roll_curr_dir(self) -> NoReturn:
+            def _roll_curr_dir(self) -> None:
                 raise ValueError("whoops")
 
         broken = BrokenRoller(settings.paths.event_dir)
@@ -916,7 +925,7 @@ def test_persister_problems() -> None:
 
         class BrokenRoller3(TimedRollingFilePersister):
             @classmethod
-            def _persisted_item_from_file_path(cls, filepath: Path) -> NoReturn:  # noqa: ARG003
+            def _persisted_item_from_file_path(cls, filepath: Path) -> None:  # noqa: ARG003
                 raise ValueError("arg")
 
         p = BrokenRoller3(settings.paths.event_dir, max_bytes=len(buf) + 50)

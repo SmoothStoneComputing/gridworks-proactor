@@ -1,20 +1,22 @@
 import asyncio
 import traceback
-from typing import Awaitable, Iterable, Optional
+from asyncio import Task
+from typing import Any, Iterable, Optional
 
 
 def str_tasks(
     loop_: asyncio.AbstractEventLoop,
     tag: str = "",
-    tasks: Optional[Iterable[Awaitable]] = None,
+    tasks: Optional[Iterable[Task[Any]]] = None,
 ) -> str:
     s = ""
     try:
         if tasks is None:
             tasks = asyncio.all_tasks(loop_)
+        tasks = list(tasks)
         s += f"Tasks: {len(tasks)}  [{tag}]\n"
 
-        def _get_task_exception(task_: asyncio.Task) -> BaseException:
+        def _get_task_exception(task_: asyncio.Task[Any]) -> BaseException | None:
             try:
                 exception_ = task_.exception()
             except asyncio.CancelledError as _e:

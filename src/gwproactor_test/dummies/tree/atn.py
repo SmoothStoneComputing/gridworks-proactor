@@ -5,6 +5,7 @@ from typing import Any, Optional, cast
 from gwproto import Message
 from gwproto.messages import EventBase
 
+from gwproactor import ProactorSettings
 from gwproactor.links.link_settings import LinkSettings
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import SimpleDirectoryWriter
@@ -42,7 +43,7 @@ class DummyAtn(Proactor):
         self.links.log_subscriptions()
 
     @classmethod
-    def make_event_persister(cls, settings: DummyAtnSettings) -> SimpleDirectoryWriter:
+    def make_event_persister(cls, settings: ProactorSettings) -> SimpleDirectoryWriter:
         return SimpleDirectoryWriter(settings.paths.event_dir)
 
     @property

@@ -6,7 +6,9 @@ import time
 from inspect import getframeinfo, stack
 from pathlib import Path
 from types import TracebackType
-from typing import Awaitable, Callable, Optional, Self, Type, Union
+from typing import Any, Awaitable, Callable, Optional, Self, Type, Union
+
+import typing_extensions
 
 Predicate = Callable[[], bool]
 AwaitablePredicate = Callable[[], Awaitable[bool]]
@@ -29,7 +31,7 @@ class StopWatch:
         exc_type: Optional[Type[BaseException]],
         exc: Optional[BaseException],
         tb: Optional[TracebackType],
-    ) -> bool:
+    ) -> typing_extensions.Literal[False]:
         self.end = time.time()
         self.elapsed = self.end - self.start
         return False
@@ -42,8 +44,8 @@ async def await_for(  # noqa: C901
     raise_timeout: bool = True,
     retry_duration: float = 0.1,
     err_str_f: Optional[ErrorStringFunction] = None,
-    logger: Optional[logging.Logger | logging.LoggerAdapter] = None,
-    error_dict: Optional[dict] = None,
+    logger: Optional[logging.Logger | logging.LoggerAdapter[logging.Logger]] = None,
+    error_dict: Optional[dict[str, Any]] = None,
 ) -> bool:
     """Similar to wait_for(), but awaitable. Instead of sleeping after a False resoinse from function f, await_for
     will asyncio.sleep(), allowing the event loop to continue. Additionally, f may be either a function or a coroutine.
@@ -71,14 +73,14 @@ async def await_for(  # noqa: C901
     result = False
     if now >= until:
         if f_is_async:
-            result = await f()
+            result = await f()  # type:ignore[misc]
         else:
-            result = f()
+            result = f()  # type:ignore[assignment]
     while now < until and not result:
         if f_is_async:
-            result = await f()
+            result = await f()  # type:ignore[misc]
         else:
-            result = f()
+            result = f()  # type:ignore[assignment]
         if not result:
             now = time.time()
             if now < until:
@@ -87,9 +89,9 @@ async def await_for(  # noqa: C901
                 # oops! we overslept
                 if now >= until:
                     if f_is_async:
-                        result = await f()
+                        result = await f()  # type:ignore[misc]
                     else:
-                        result = f()
+                        result = f()  # type:ignore[assignment]
     if result:
         return True
     caller = getframeinfo(stack()[1][0])
