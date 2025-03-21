@@ -9,6 +9,7 @@ from gwproactor import Proactor, ProactorSettings
 from gwproactor.links.link_settings import LinkSettings
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import TimedRollingFilePersister
+from gwproactor.proactor_implementation import ProactorCallbacks
 from gwproactor_test.dummies.names import DUMMY_SCADA1_SHORT_NAME
 from gwproactor_test.dummies.tree.admin_messages import (
     AdminCommandReadRelays,
@@ -34,11 +35,15 @@ class DummyScada1(Proactor):
         self,
         name: str = "",
         settings: Optional[DummyScada1Settings] = None,
+        callbacks: Optional[ProactorCallbacks] = None,
     ) -> None:
         self.relays = RelayStates()
         if settings is None:
             settings = DummyScada1Settings()
-        super().__init__(name=name, settings=settings)
+        callbacks = ProactorCallbacks() if callbacks is None else callbacks
+        callbacks.process_message = self._derived_process_message
+        callbacks.process_mqtt_message = self._derived_process_mqtt_message
+        super().__init__(name=name, settings=settings, callbacks=callbacks)
 
         self._links.add_mqtt_link(
             LinkSettings(

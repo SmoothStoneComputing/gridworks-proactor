@@ -9,7 +9,7 @@ from gwproactor import ProactorSettings
 from gwproactor.links.link_settings import LinkSettings
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import SimpleDirectoryWriter
-from gwproactor.proactor_implementation import Proactor
+from gwproactor.proactor_implementation import Proactor, ProactorCallbacks
 from gwproactor_test.dummies import DUMMY_ATN_NAME
 from gwproactor_test.dummies.names import DUMMY_ATN_SHORT_NAME
 from gwproactor_test.dummies.tree.atn_settings import DummyAtnSettings
@@ -21,10 +21,14 @@ class DummyAtn(Proactor):
         self,
         name: str = "",
         settings: Optional[DummyAtnSettings] = None,
+        callbacks: Optional[ProactorCallbacks] = None,
     ) -> None:
+        callbacks = ProactorCallbacks() if callbacks is None else callbacks
+        callbacks.process_mqtt_message = self._derived_process_mqtt_message
         super().__init__(
             name=name or DUMMY_ATN_NAME,
             settings=DummyAtnSettings() if settings is None else settings,
+            callbacks=callbacks,
         )
         self._links.add_mqtt_link(
             LinkSettings(

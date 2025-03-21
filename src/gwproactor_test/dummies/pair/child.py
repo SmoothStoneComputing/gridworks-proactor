@@ -7,7 +7,7 @@ from gwproactor import ProactorSettings
 from gwproactor.links import QOS
 from gwproactor.links.link_settings import LinkSettings
 from gwproactor.persister import TimedRollingFilePersister
-from gwproactor.proactor_implementation import Proactor
+from gwproactor.proactor_implementation import Proactor, ProactorCallbacks
 from gwproactor_test.dummies.names import (
     CHILD_SHORT_NAME,
     DUMMY_CHILD_NAME,
@@ -45,10 +45,12 @@ class DummyChild(Proactor):
         self,
         name: str = "",
         settings: Optional[DummyChildSettings] = None,
+        callbacks: Optional[ProactorCallbacks] = None,
     ) -> None:
         super().__init__(
             name=name or DUMMY_CHILD_NAME,
             settings=DummyChildSettings() if settings is None else settings,
+            callbacks=callbacks,
         )
         self._links.add_mqtt_link(
             LinkSettings(

@@ -6,7 +6,7 @@ from gwproto import MQTTCodec, create_message_model
 
 from gwproactor.links.link_settings import LinkSettings
 from gwproactor.persister import SimpleDirectoryWriter
-from gwproactor.proactor_implementation import Proactor
+from gwproactor.proactor_implementation import Proactor, ProactorCallbacks
 from gwproactor_test.dummies.names import (
     CHILD_SHORT_NAME,
     DUMMY_CHILD_NAME,
@@ -41,10 +41,12 @@ class DummyParent(Proactor):
         self,
         name: str = "",
         settings: Optional[DummyParentSettings] = None,
+        callbacks: Optional[ProactorCallbacks] = None,
     ) -> None:
         super().__init__(
             name=name or DUMMY_PARENT_NAME,
             settings=DummyParentSettings() if settings is None else settings,
+            callbacks=callbacks,
         )
         self._links.add_mqtt_link(
             LinkSettings(

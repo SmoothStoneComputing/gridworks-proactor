@@ -6,8 +6,10 @@ import threading
 import traceback
 import typing
 import uuid
+from dataclasses import dataclass
 from typing import (
     Any,
+    Callable,
     Dict,
     List,
     Mapping,
@@ -39,7 +41,6 @@ from gwproactor.links import (
     AsyncioTimerManager,
     LinkManager,
     LinkManagerTransition,
-    Transition,
 )
 from gwproactor.logger import ProactorLogger
 from gwproactor.message import (
@@ -71,11 +72,31 @@ from gwproactor.web_manager import _WebManager
 
 T = TypeVar("T")
 
+PreChildStartCallback = Callable[[], None]
+StartTasksCallback = Callable[[], None]
+StartProcessingMessagesCallback = Callable[[], None]
+ProcessMessageCallback = Callable[[Message[Any]], None]
+ProcessMQTTMessageCallback = Callable[[Message[MQTTReceiptPayload], Message[Any]], None]
+RecvDeactivatedCallback = Callable[[LinkManagerTransition], Result[bool, Exception]]
+RecvActivatedCallback = Callable[[LinkManagerTransition], Result[bool, Exception]]
+
+
+@dataclass
+class ProactorCallbacks:
+    pre_child_start: Optional[PreChildStartCallback] = None
+    start_tasks: Optional[StartTasksCallback] = None
+    start_processing_messages: Optional[StartProcessingMessagesCallback] = None
+    process_message: Optional[ProcessMessageCallback] = None
+    process_mqtt_message: Optional[ProcessMQTTMessageCallback] = None
+    recv_activated: Optional[RecvActivatedCallback] = None
+    recv_deactivated: Optional[RecvDeactivatedCallback] = None
+
 
 class Proactor(ServicesInterface, Runnable):
     _name: str
     _settings: ProactorSettings
     _node: ShNode
+    _callbacks: ProactorCallbacks
     _layout: HardwareLayout
     _logger: ProactorLogger
     _stats: ProactorStats
@@ -96,10 +117,12 @@ class Proactor(ServicesInterface, Runnable):
         self,
         name: str,
         settings: ProactorSettings,
+        callbacks: Optional[ProactorCallbacks] = None,
         hardware_layout: Optional[HardwareLayout] = None,
     ) -> None:
         self._name = name
         self._settings = settings
+        self._callbacks = ProactorCallbacks() if callbacks is None else callbacks
         if hardware_layout is None:
             hardware_layout = HardwareLayout(
                 layout={
@@ -315,9 +338,12 @@ class Proactor(ServicesInterface, Runnable):
         match self._links.process_ack_timeout(wait_info):
             case Ok(transition):
                 path_dbg |= 0x00000001
-                if transition.deactivated():
+                if (
+                    transition.deactivated()
+                    and self._callbacks.recv_deactivated is not None
+                ):
                     path_dbg |= 0x00000002
-                    self._derived_recv_deactivated(transition)
+                    self._callbacks.recv_deactivated(transition)
             case Err(exception):
                 path_dbg |= 0x00000004
                 self._report_error(exception, msg="Proactor._process_ack_timeout")
@@ -380,7 +406,8 @@ class Proactor(ServicesInterface, Runnable):
                 "ERROR. process_messages() called before Proactor started."
             )
         try:
-            self._start_processing_messages()
+            if self._callbacks.start_processing_messages is not None:
+                self._callbacks.start_processing_messages()
             while not self._stop_requested:
                 message = await self._receive_queue.get()
                 if not self._stop_requested:
@@ -415,18 +442,8 @@ class Proactor(ServicesInterface, Runnable):
             asyncio.create_task(self.process_messages(), name="process_messages"),
             *self._links.start_ping_tasks(),
         ]
-        self._start_derived_tasks()
-
-    def _start_derived_tasks(self) -> None:
-        pass
-
-    def _derived_process_message(self, message: Message[Any]) -> None:
-        pass
-
-    def _derived_process_mqtt_message(
-        self, message: Message[MQTTReceiptPayload], decoded: Message[Any]
-    ) -> None:
-        pass
+        if self._callbacks.start_tasks is not None:
+            self._callbacks.start_tasks()
 
     @classmethod
     def _second_caller(cls) -> str:
@@ -455,9 +472,6 @@ class Proactor(ServicesInterface, Runnable):
         except Exception as e2:  # noqa: BLE001
             return Err(e2)
         return Ok()
-
-    def _start_processing_messages(self) -> None:
-        """Hook for processing before any messages are pulled from queue"""
 
     def process_message(self, message: Message[Any]) -> Result[bool, Exception]:
         raise NotImplementedError(
@@ -514,7 +528,9 @@ class Proactor(ServicesInterface, Runnable):
                 self.generate_event(message.Payload)
             case _:
                 path_dbg |= 0x00000400
-                self._derived_process_message(message)
+                if self._callbacks.process_message is not None:
+                    path_dbg |= 0x00000800
+                    self._callbacks.process_message(message)
         if not isinstance(message.Payload, PatWatchdog):
             self._logger.message_exit(
                 "--Proactor.process_message  path:0x%08X", path_dbg
@@ -550,7 +566,7 @@ class Proactor(ServicesInterface, Runnable):
             result = Err(e)
         return result
 
-    def _process_mqtt_message(  # noqa: C901
+    def _process_mqtt_message(  # noqa: C901, PLR0912
         self, mqtt_receipt_message: Message[MQTTReceiptPayload]
     ) -> Result[Message[Any], Exception]:
         self._logger.path(
@@ -584,9 +600,12 @@ class Proactor(ServicesInterface, Runnable):
                 match self._links.process_mqtt_message(mqtt_receipt_message):
                     case Ok(transition):
                         path_dbg |= 0x00000002
-                        if transition.recv_activated():
+                        if (
+                            transition.recv_activated()
+                            and self._callbacks.recv_activated is not None
+                        ):
                             path_dbg |= 0x00000004
-                            self._derived_recv_activated(transition)
+                            self._callbacks.recv_activated(transition)
                     case Err(error):
                         path_dbg |= 0x00000008
                         self._report_error(
@@ -607,11 +626,13 @@ class Proactor(ServicesInterface, Runnable):
                         self._process_dbg(decoded_message.Payload)
                     case _:
                         path_dbg |= 0x00000080
-                        self._derived_process_mqtt_message(
-                            mqtt_receipt_message, decoded_message
-                        )
+                        if self._callbacks.process_mqtt_message is not None:
+                            path_dbg |= 0x00000100
+                            self._callbacks.process_mqtt_message(
+                                mqtt_receipt_message, decoded_message
+                            )
                 if decoded_message.Header.AckRequired:
-                    path_dbg |= 0x00000100
+                    path_dbg |= 0x00000200
                     self._links.send_ack(
                         mqtt_receipt_message.Payload.client_name, decoded_message
                     )
@@ -627,28 +648,17 @@ class Proactor(ServicesInterface, Runnable):
             case Err(error):
                 self._report_error(error, "_process_mqtt_connected")
 
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def _derived_recv_deactivated(
-        self,
-        transition: LinkManagerTransition,  # noqa: ARG002
-    ) -> Result[bool, Exception]:
-        return Ok()
-
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def _derived_recv_activated(
-        self,
-        transition: Transition,  # noqa: ARG002
-    ) -> Result[bool, Exception]:
-        return Ok()
-
     def _process_mqtt_disconnected(
         self, message: Message[MQTTDisconnectPayload]
     ) -> Result[bool, Exception]:
         result: Result[bool, Exception] = Ok()
         match self._links.process_mqtt_disconnected(message):
             case Ok(transition):
-                if transition.recv_deactivated():
-                    result = self._derived_recv_deactivated(transition)
+                if (
+                    transition.recv_deactivated()
+                    and self._callbacks.recv_deactivated is not None
+                ):
+                    result = self._callbacks.recv_deactivated(transition)
             case Err(error):
                 result = Err(error)
         return result
@@ -673,9 +683,12 @@ class Proactor(ServicesInterface, Runnable):
         match self._links.process_mqtt_suback(message):
             case Ok(transition):
                 path_dbg |= 0x00000001
-                if transition.recv_activated():
+                if (
+                    transition.recv_activated()
+                    and self._callbacks.recv_activated is not None
+                ):
                     path_dbg |= 0x00000002
-                    result = self._derived_recv_activated(transition)
+                    result = self._callbacks.recv_activated(transition)
             case Err(error):
                 path_dbg |= 0x00000004
                 result = Err(error)

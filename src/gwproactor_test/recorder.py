@@ -2,6 +2,7 @@
 # mypy: disable-error-code="union-attr,attr-defined"
 
 import dataclasses
+import functools
 import typing
 from abc import abstractmethod
 from collections import defaultdict
@@ -21,6 +22,11 @@ from gwproactor.message import (
     DBGPayload,
     MQTTReceiptPayload,
     MQTTSubackPayload,
+)
+from gwproactor.proactor_implementation import (
+    ProactorCallbacks,
+    ProcessMessageCallback,
+    ProcessMQTTMessageCallback,
 )
 from gwproactor.stats import LinkStats, ProactorStats
 
@@ -198,6 +204,38 @@ class RecorderLinks(LinkManager):
         return super().generate_event(event)
 
 
+def recorder_process_message(
+    message: Message[Any],
+    services: ServicesInterface,
+    callback: Optional[ProcessMessageCallback],
+) -> None:
+    match message.Payload:
+        case DBGPayload():
+            message.Header.Src = services.publication_name
+            dst_client = message.Header.Dst
+            message.Header.Dst = ""
+            services.publish_message(dst_client, message)
+        case _:
+            if callback is not None:
+                callback(message)
+
+
+def recorder_process_mqtt_message(
+    message: Message[MQTTReceiptPayload],
+    decoded: Message[Any],
+    services: ServicesInterface,
+    callback: Optional[ProcessMQTTMessageCallback],
+) -> None:
+    if callback is not None:
+        callback(message, decoded)
+        match decoded.Payload:
+            case EventBase() as event:
+                stats = cast(
+                    RecorderLinkStats, services.stats.link(message.Payload.client_name)
+                )
+                stats.event_counts[event.Src][event.TypeName] += 1
+
+
 def make_recorder_class(  # noqa: C901
     proactor_type: Type[ProactorT],
 ) -> Callable[..., RecorderInterface]:
@@ -207,9 +245,27 @@ def make_recorder_class(  # noqa: C901
         _mqtt_messages_dropped: dict[str, bool]
 
         def __init__(
-            self, name: str, settings: ProactorSettings, **kwargs_: Any
+            self,
+            name: str,
+            settings: ProactorSettings,
+            callbacks: Optional[ProactorCallbacks] = None,
+            **kwargs_: Any,
         ) -> None:
-            super().__init__(name=name, settings=settings, **kwargs_)
+            if callbacks is None:
+                callbacks = ProactorCallbacks()
+            callbacks.process_message = functools.partial(
+                recorder_process_message,
+                services=self,
+                callback=callbacks.process_message,
+            )
+            callbacks.process_mqtt_message = functools.partial(
+                recorder_process_mqtt_message,
+                services=self,
+                callback=callbacks.process_mqtt_message,
+            )
+            super().__init__(
+                name=name, settings=settings, callbacks=callbacks, **kwargs_
+            )
             self._subacks_paused = defaultdict(bool)
             self._subacks_available = defaultdict(list)
             self._mqtt_messages_dropped = defaultdict(bool)
