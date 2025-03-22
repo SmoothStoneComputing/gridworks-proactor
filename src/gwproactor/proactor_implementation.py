@@ -40,7 +40,7 @@ from gwproactor.links import (
     AckWaitInfo,
     AsyncioTimerManager,
     LinkManager,
-    LinkManagerTransition,
+    Transition,
 )
 from gwproactor.logger import ProactorLogger
 from gwproactor.message import (
@@ -77,8 +77,8 @@ StartTasksCallback = Callable[[], None]
 StartProcessingMessagesCallback = Callable[[], None]
 ProcessMessageCallback = Callable[[Message[Any]], None]
 ProcessMQTTMessageCallback = Callable[[Message[MQTTReceiptPayload], Message[Any]], None]
-RecvDeactivatedCallback = Callable[[LinkManagerTransition], Result[bool, Exception]]
-RecvActivatedCallback = Callable[[LinkManagerTransition], Result[bool, Exception]]
+RecvDeactivatedCallback = Callable[[Transition], Result[bool, Exception]]
+RecvActivatedCallback = Callable[[Transition], Result[bool, Exception]]
 
 
 @dataclass
