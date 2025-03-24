@@ -1,6 +1,8 @@
-from typing import Self
+import typing
+from pathlib import Path
+from typing import Any, Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from gwproactor.config.logging import LoggingSettings
@@ -13,7 +15,7 @@ NUM_INITIAL_EVENT_REUPLOADS: int = 5
 
 
 class ProactorSettings(BaseSettings):
-    paths: Paths = Field({}, validate_default=True)
+    paths: Paths = Field(default=typing.cast(Paths, {}), validate_default=True)
     logging: LoggingSettings = LoggingSettings()
     mqtt_link_poll_seconds: float = MQTT_LINK_POLL_SECONDS
     ack_timeout_seconds: float = ACK_TIMEOUT_SECONDS
@@ -28,16 +30,18 @@ class ProactorSettings(BaseSettings):
         return v
 
     @classmethod
-    def update_paths_name(cls, values: dict, name: str) -> dict:
+    def update_paths_name(cls, values: dict[str, Any], name: str) -> dict[str, Any]:
         """Update paths member with a new 'name' attribute, e.g., a name known by a derived class.
 
         This is meant to be called in a 'pre=True' root validator of a derived class.
         """
         if "paths" not in values:
             values["paths"] = Paths(name=name)
-        elif isinstance(values["paths"], BaseModel):
+        elif isinstance(values["paths"], Paths):
             if "name" not in values["paths"].model_fields_set:
-                values["paths"] = values["paths"].copy(name=name, deep=True)
+                values["paths"] = Paths(
+                    name=name, **values["paths"].model_dump(exclude_unset=True)
+                )
         elif "name" not in values["paths"]:
             values["paths"]["name"] = name
         return values
@@ -52,5 +56,5 @@ class ProactorSettings(BaseSettings):
         for field_name in self.model_fields:
             v = getattr(self, field_name)
             if isinstance(v, MQTTClient):
-                v.update_tls_paths(self.paths.certs_dir, field_name)
+                v.update_tls_paths(Path(self.paths.certs_dir), field_name)
         return self

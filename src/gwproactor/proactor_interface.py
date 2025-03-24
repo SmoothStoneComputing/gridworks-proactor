@@ -7,10 +7,10 @@ import importlib
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Coroutine, NoReturn, Optional, Sequence, Type, TypeVar
+from typing import Any, Coroutine, Optional, Sequence, Type, TypeVar
 
 from aiohttp.typedefs import Handler as HTTPHandler
-from gwproto import HardwareLayout, ShNode
+from gwproto import HardwareLayout, Message, ShNode
 from gwproto.messages import EventT
 from paho.mqtt.client import MQTTMessageInfo
 from result import Result
@@ -18,7 +18,6 @@ from result import Result
 from gwproactor.config.proactor_settings import ProactorSettings
 from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
 from gwproactor.logger import ProactorLogger
-from gwproactor.message import Message
 from gwproactor.stats import ProactorStats
 
 T = TypeVar("T")
@@ -39,11 +38,11 @@ class CommunicatorInterface(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _send(self, message: Message) -> NoReturn:
+    def _send(self, message: Message[Any]) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def process_message(self, message: Message) -> Result[bool, Exception]:
+    def process_message(self, message: Message[Any]) -> Result[bool, Exception]:
         raise NotImplementedError
 
     @property
@@ -71,7 +70,7 @@ class Communicator(CommunicatorInterface, ABC):
     def name(self) -> str:
         return self._name
 
-    def _send(self, message: Message) -> None:
+    def _send(self, message: Message[Any]) -> None:
         self._services.send(message)
 
     @property
@@ -105,7 +104,8 @@ class Runnable(ABC):
 
 class ActorInterface(CommunicatorInterface, Runnable, ABC):
     """Pure interface for a proactor sub-object (an Actor) which can communicate
-    and has a GridWorks ShNode."""
+    and has a GridWorks ShNode.
+    """
 
     @property
     @abstractmethod
@@ -132,7 +132,19 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
         if module_name not in sys.modules:
             importlib.import_module(module_name)
         actor_class = getattr(sys.modules[module_name], actor_class_name)
+        if not issubclass(actor_class, ActorInterface):
+            raise ValueError(  # noqa: TRY004
+                f"ERROR. Imported class <{actor_class}> "
+                f"from module <{module_name}> "
+                f"with via requested name <{actor_class_name} "
+                "does not implement ActorInterface",
+            )
         actor = actor_class(name, services)
+        if not isinstance(actor, ActorInterface):
+            raise ValueError(  # noqa: TRY004
+                f"ERROR. Constructed object with type {type(actor)} "
+                f"is not instance of ActorInterface",
+            )
         actor.init()
         return actor
 
@@ -142,12 +154,12 @@ INVALID_IO_TASK_HANDLE = -1
 
 class IOLoopInterface(CommunicatorInterface, Runnable, ABC):
     """Interface to an asyncio event loop running a seperate thread meant io-only
-    routines which have minimal CPU bound work."""
+    routines which have minimal CPU bound work.
+    """
 
     @abstractmethod
-    def add_io_coroutine(self, coro: Coroutine, name: str = "") -> int:
-        """
-        Add a couroutine that will be run as a task in the io event loop.
+    def add_io_coroutine(self, coro: Coroutine[Any, Any, Any], name: str = "") -> int:
+        """Add a couroutine that will be run as a task in the io event loop.
 
         May be called before or after IOLoopInterface.start(). No tasks will actually
         run until IOLoopInterface.start() is called.
@@ -161,6 +173,7 @@ class IOLoopInterface(CommunicatorInterface, Runnable, ABC):
         Returns:
             an integer handle which may be passed to cancel_io_coroutine() to cancel
             the task running the coroutine.
+
         """
 
     @abstractmethod
@@ -172,6 +185,7 @@ class IOLoopInterface(CommunicatorInterface, Runnable, ABC):
 
         Args:
             handle: The handle returned by previous call to add_io_routine().
+
         """
 
 
@@ -187,20 +201,20 @@ class ServicesInterface(CommunicatorInterface):
         raise NotImplementedError
 
     @abstractmethod
-    def send(self, message: Message) -> None:
+    def send(self, message: Message[Any]) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def send_threadsafe(self, message: Message) -> None:
+    def send_threadsafe(self, message: Message[Any]) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def add_task(self, task: asyncio.Task) -> None:
+    def add_task(self, task: asyncio.Task[Any]) -> None:
         raise NotImplementedError
 
     @property
     @abstractmethod
-    def async_receive_queue(self) -> Optional[asyncio.Queue]:
+    def async_receive_queue(self) -> Optional[asyncio.Queue[Any]]:
         raise NotImplementedError
 
     @property
@@ -215,11 +229,16 @@ class ServicesInterface(CommunicatorInterface):
 
     @abstractmethod
     def add_web_server_config(
-        self, name: str, host: str, port: int, **kwargs: Any
+        self,
+        name: str,
+        host: str,
+        port: int,
+        **kwargs: Any,
     ) -> None:
         """Adds configuration for web server which will be started when start() is called.
 
-        Not thread safe."""
+        Not thread safe.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -241,7 +260,7 @@ class ServicesInterface(CommunicatorInterface):
         raise NotImplementedError
 
     @abstractmethod
-    def generate_event(self, event: EventT) -> None:
+    def generate_event(self, event: EventT) -> Result[bool, Exception]:
         raise NotImplementedError
 
     @property
@@ -256,7 +275,11 @@ class ServicesInterface(CommunicatorInterface):
 
     @abstractmethod
     def publish_message(
-        self, link_name: str, message: Message, qos: int = 0, context: Any = None
+        self,
+        link_name: str,
+        message: Message[Any],
+        qos: int = 0,
+        context: Any = None,
     ) -> MQTTMessageInfo:
         raise NotImplementedError
 

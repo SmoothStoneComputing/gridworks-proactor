@@ -1,7 +1,8 @@
 import argparse
 import logging
 import logging.handlers
-from typing import Optional
+from pathlib import Path
+from typing import Any, Optional
 
 import pytest
 
@@ -24,7 +25,7 @@ def test_get_default_logging_config(
     root = logging.getLogger()
     old_root_level = root.getEffectiveLevel()
     pytest_root_handlers = len(root.handlers)
-    errors = []
+    errors: list[Exception] = []
 
     setup_logging(argparse.Namespace(message_summary=True), settings, errors=errors)
     assert len(errors) == 0
@@ -32,7 +33,7 @@ def test_get_default_logging_config(
     # root logger changes
     assert root.getEffectiveLevel() == old_root_level
     assert len(root.handlers) == pytest_root_handlers + 2
-    stream_handler: Optional[logging.StreamHandler] = None
+    stream_handler: Optional[logging.StreamHandler[Any]] = None
     file_handler: Optional[logging.handlers.RotatingFileHandler] = None
     for i in range(-1, -3, -1):
         handler = root.handlers[i]
@@ -83,12 +84,12 @@ def test_get_default_logging_config(
             settings.logging.formatter.use_utc,
         )
         exp_msg = f"{exp_time} {msg % (i, logger.name)}\n"
-        assert capsys.readouterr().err == exp_msg  # noqa
+        assert capsys.readouterr().err == exp_msg  # type: ignore[attr-defined]
         text += exp_msg
         caplog.clear()
 
     # Check file contents
-    log_path = settings.paths.log_dir / DEFAULT_LOG_FILE_NAME
+    log_path = Path(settings.paths.log_dir) / DEFAULT_LOG_FILE_NAME
     with log_path.open() as f:
         log_contents = f.read()
     assert log_contents == text
@@ -99,7 +100,11 @@ def test_rollover() -> None:
     paths.mkdirs()
 
     def _log_dir_size() -> int:
-        return sum(f.stat().st_size for f in paths.log_dir.glob("**/*") if f.is_file())
+        return sum(
+            f.stat().st_size
+            for f in Path(paths.log_dir).glob("**/*")
+            if bool(f.is_file())
+        )
 
     bytes_per_log_file = 50
     num_log_files = 3
@@ -111,7 +116,7 @@ def test_rollover() -> None:
             )
         )
     )
-    errors = []
+    errors: list[Exception] = []
     setup_logging(
         argparse.Namespace(verbose=True),
         settings,
@@ -124,4 +129,4 @@ def test_rollover() -> None:
     for _ in range(300):
         logger.info("12345678901234567890")
     assert _log_dir_size() <= bytes_per_log_file * num_log_files
-    assert len(list(paths.log_dir.glob("**/*"))) == num_log_files
+    assert len(list(Path(paths.log_dir).glob("**/*"))) == num_log_files

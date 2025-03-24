@@ -1,5 +1,6 @@
 import logging
 import time
+import typing
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Iterable
@@ -39,14 +40,15 @@ class RotatingFileHandlerSettings(BaseModel):
     level: int = logging.NOTSET
 
     def create(
-        self, log_dir: Path | str, formatter: logging.Formatter
+        self, log_dir: Path | str, formatter: logging.Formatter | None
     ) -> RotatingFileHandler:
         handler = logging.handlers.RotatingFileHandler(
-            filename=log_dir / self.filename,
+            filename=Path(log_dir) / self.filename,
             maxBytes=self.bytes_per_log_file,
             backupCount=self.num_log_files - 1,
         )
-        handler.setFormatter(formatter)
+        if formatter is not None:
+            handler.setFormatter(formatter)
         if self.level != logging.NOTSET:
             handler.setLevel(self.level)
         return handler
@@ -87,11 +89,12 @@ class LoggerLevels(BaseModel):
         except:  # noqa: E722
             if hasattr(v, "upper"):
                 v = v.upper()
-            int_v = logging.getLevelName(v)
-            if not isinstance(int_v, int):
+            got_v = logging.getLevelName(v)
+            if not isinstance(got_v, int):
                 raise ValueError(  # noqa: B904, TRY004
                     f"Could not convert level ({v}/{type(v)}) to an int, either by cast or by logging.getLevelName()"
                 )
+            int_v = got_v
         return int_v
 
 
@@ -102,7 +105,7 @@ class LoggingSettings(BaseModel):
     formatter: FormatterSettings = FormatterSettings()
     file_handler: RotatingFileHandlerSettings = RotatingFileHandlerSettings()
 
-    def qualified_logger_names(self) -> dict[str, str]:
+    def qualified_logger_names(self) -> typing.Mapping[str, str]:
         return dict(
             self.levels.qualified_logger_names(self.base_log_name),
             base=self.base_log_name,
@@ -122,4 +125,4 @@ class LoggingSettings(BaseModel):
         return self.base_log_level <= logging.INFO
 
     def message_summary_enabled(self) -> bool:
-        return self.levels.message_summary <= logging.INFO
+        return typing.cast(int, self.levels.message_summary) <= logging.INFO

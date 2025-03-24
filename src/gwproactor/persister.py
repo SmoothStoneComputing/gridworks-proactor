@@ -161,7 +161,7 @@ class SimpleDirectoryWriter(StubPersister):
         self._base_dir = Path(base_dir).resolve()
 
     @classmethod
-    def _make_name(cls, dt: datetime, uid: str) -> str:
+    def _make_name(cls, dt: datetime.datetime, uid: str) -> str:
         return f"{dt.isoformat()}.uid[{uid}].json"
 
     def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:
@@ -194,7 +194,7 @@ class SimpleDirectoryWriter(StubPersister):
 
 class TimedRollingFilePersister(PersisterInterface):
     DEFAULT_MAX_BYTES: int = 500 * 1024 * 1024
-    FILENAME_RGX: re.Pattern = re.compile(r"(?P<dt>.*)\.uid\[(?P<uid>.*)].json$")
+    FILENAME_RGX: re.Pattern[str] = re.compile(r"(?P<dt>.*)\.uid\[(?P<uid>.*)].json$")
     REINDEX_PAT_SECONDS = 1.0
 
     _base_dir: Path
@@ -371,7 +371,7 @@ class TimedRollingFilePersister(PersisterInterface):
             if path.exists():
                 try:
                     with path.open("rb") as f:
-                        content: bytes = f.read()
+                        content = f.read()
                 except Exception as e:  # pragma: no cover  # noqa: BLE001
                     problems.add_error(e).add_error(
                         ReadFailed("Open or read failed", uid=uid, path=path)
@@ -411,7 +411,7 @@ class TimedRollingFilePersister(PersisterInterface):
         # The next line is correct, though PyCharm gives a false-positive warning.
         # paths is a list of tuples, which the dict constructor will treat
         # as a list of key-values pairs, which is the intended behavior.
-        self._pending = dict(sorted(paths, key=lambda item: item.path))  # noqa
+        self._pending = dict(sorted(paths, key=lambda item: item.path))  # type: ignore[attr-defined]
         if problems:
             return Err(problems)
         return Ok()

@@ -70,11 +70,24 @@ def test_ca_private_key_path() -> Path:
 def _copy_keys(test_cert_dir: Path, dst_paths: TLSPaths) -> None:
     ca_cert_path = test_ca_certificate_path()
     ca_private_key_path = test_ca_private_key_path()
+    if (
+        dst_paths.cert_path is None
+        or dst_paths.private_key_path is None
+        or dst_paths.ca_cert_path is None
+    ):
+        raise ValueError(
+            f"ERROR. _copy_keys dst_paths ({dst_paths}) must have non-None paths"
+        )
     src_paths = TLSPaths(
         ca_cert_path=ca_cert_path,
-        cert_path=test_cert_dir / dst_paths.cert_path.name,
-        private_key_path=test_cert_dir / "private" / dst_paths.private_key_path.name,
+        cert_path=test_cert_dir / Path(dst_paths.cert_path).name,
+        private_key_path=test_cert_dir
+        / "private"
+        / Path(dst_paths.private_key_path).name,
     )
+    assert isinstance(src_paths.ca_cert_path, Path)
+    assert isinstance(src_paths.cert_path, Path)
+    assert isinstance(src_paths.private_key_path, Path)
     if not src_paths.cert_path.exists() or not src_paths.private_key_path.exists():
         print(
             f"One or more TLS test keys at {test_cert_dir} does not exist. Recreating."

@@ -1,3 +1,4 @@
+# type: ignore  # noqa: PGH003
 """Nox sessions."""
 # ruff: noqa: S101
 
@@ -8,7 +9,7 @@ import sys
 from pathlib import Path
 from textwrap import dedent
 
-import nox
+import nox  # noqa
 
 try:
     from nox_poetry import Session, session
@@ -133,9 +134,18 @@ def precommit(session: Session) -> None:
 @session(python=python_versions)
 def mypy(session: Session) -> None:
     """Type-check using mypy."""
-    args = session.posargs or ["src", "tests", "docs/conf.py"]
+    args = session.posargs or [
+        "--config-file",
+        "pyproject.toml",
+        "src",
+        "tests",
+        "docs/conf.py",
+    ]
     session.install(".")
-    session.install("mypy", "pytest")
+    session.install(
+        "mypy", "pytest", "types-paho-mqtt", "typer", "gridworks-cert", "freezegun"
+    )
+    session.run("mypy", "--version")
     session.run("mypy", *args)
     if not session.posargs:
         session.run("mypy", f"--python-executable={sys.executable}", "noxfile.py")

@@ -65,15 +65,15 @@ class MQTTAdmin:
         self.state = AppState.not_started
         self.client = PahoMQTTClient("-".join(str(uuid.uuid4()).split("-")[:-1]))
         self.client.username_pw_set(
-            username=self.mqtt_config.username,
+            username=self.mqtt_config.username,  # type: ignore[arg-type]
             password=self.mqtt_config.password.get_secret_value(),
         )
         tls_config = self.mqtt_config.tls
         if tls_config.use_tls:
             self.client.tls_set(
-                ca_certs=tls_config.paths.ca_cert_path,
-                certfile=tls_config.paths.cert_path,
-                keyfile=tls_config.paths.private_key_path,
+                ca_certs=str(tls_config.paths.ca_cert_path),
+                certfile=str(tls_config.paths.cert_path),
+                keyfile=str(tls_config.paths.private_key_path),
                 cert_reqs=tls_config.cert_reqs,
                 tls_version=ssl.PROTOCOL_TLS_CLIENT,
                 ciphers=tls_config.ciphers,
@@ -83,7 +83,7 @@ class MQTTAdmin:
         self.client.on_connect = self.on_connect
         self.client.on_connect_fail = self.on_connect_fail
         self.client.on_disconnect = self.on_disconnect
-        self.client.on_subscribe = self.on_subscribe
+        self.client.on_subscribe = self.on_subscribe  # type: ignore[assignment]
 
     def run(self) -> None:
         if not self.json:
@@ -94,7 +94,9 @@ class MQTTAdmin:
         )
         self.client.loop_forever()
 
-    def on_connect(self, _: Any, _userdata: Any, _flags: dict, _rc: int) -> None:
+    def on_connect(
+        self, _: Any, _userdata: Any, _flags: dict[str, Any], _rc: int
+    ) -> None:
         topic = MQTTTopic.encode(
             envelope_type=Message.type_name(),
             src=self.settings.target_gnode,
@@ -159,7 +161,7 @@ class MQTTAdmin:
             ack_message = Message[Ack].model_validate_json(message.payload)
             if ack_message.Payload.AckMessageID == self.command_message_id:
                 self.state = AppState.awaiting_report
-                message = Message[AdminCommandReadRelays](
+                out_message = Message[AdminCommandReadRelays](
                     Src=self.mqtt_config.long_name,
                     Dst=self.settings.target_gnode,
                     MessageId=str(uuid.uuid4()),
@@ -171,14 +173,14 @@ class MQTTAdmin:
                         ),
                     ),
                 )
-                self.command_message_id = message.Payload.MessageId
-                topic = message.mqtt_topic()
+                self.command_message_id = out_message.Payload.MessageId
+                topic = out_message.mqtt_topic()
                 if not self.json:
                     rich.print("Subscribed. Sending:")
                     rich.print(message)
                     rich.print(f"at topic <{topic}>")
                 self.client.publish(
-                    topic=topic, payload=message.model_dump_json().encode()
+                    topic=topic, payload=out_message.model_dump_json().encode()
                 )
             else:
                 if not self.json:

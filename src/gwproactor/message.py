@@ -2,7 +2,7 @@
 
 import uuid
 from enum import Enum
-from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar
+from typing import Any, Generic, Literal, Optional, Sequence, TypeVar
 
 from gwproto import as_enum
 from gwproto.message import Header, Message, ensure_arg
@@ -97,7 +97,7 @@ class MQTTReceiptMessage(MQTTClientMessage[MQTTReceiptPayload]):
 
 class MQTTSubackPayload(MQTTClientsPayload):
     mid: int
-    granted_qos: List[int]
+    granted_qos: Sequence[int]
 
 
 class MQTTSubackMessage(MQTTClientMessage[MQTTSubackPayload]):
@@ -106,7 +106,7 @@ class MQTTSubackMessage(MQTTClientMessage[MQTTSubackPayload]):
         client_name: str,
         userdata: Optional[Any],
         mid: int,
-        granted_qos: List[int],
+        granted_qos: Sequence[int],
     ) -> None:
         super().__init__(
             message_type=MessageType.mqtt_suback,
@@ -124,7 +124,7 @@ class MQTTCommEventPayload(MQTTClientsPayload):
 
 
 class MQTTConnectPayload(MQTTCommEventPayload):
-    flags: Dict
+    flags: dict[str, Any]
 
 
 class MQTTConnectMessage(MQTTClientMessage[MQTTConnectPayload]):
@@ -132,7 +132,7 @@ class MQTTConnectMessage(MQTTClientMessage[MQTTConnectPayload]):
         self,
         client_name: str,
         userdata: Optional[Any],
-        flags: Dict,
+        flags: dict[str, Any],
         rc: int,
     ) -> None:
         super().__init__(

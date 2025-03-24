@@ -1,7 +1,8 @@
 # ruff: noqa: PLR2004, ERA001
+# mypy: disable-error-code="union-attr"
 
 import logging
-from typing import Any, Type
+from typing import Any, Generic, Type
 
 import pytest
 from gwproto import MQTTTopic
@@ -9,13 +10,19 @@ from paho.mqtt.client import MQTT_ERR_CONN_LOST
 
 from gwproactor.links import StateName
 from gwproactor_test.certs import uses_tls
-from gwproactor_test.comm_test_helper import CommTestHelper
+from gwproactor_test.comm_test_helper import (
+    ChildSettingsT,
+    ChildT,
+    CommTestHelper,
+    ParentSettingsT,
+    ParentT,
+)
 from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-class ProactorCommBasicTests:
-    CTH: Type[CommTestHelper]
+class ProactorCommBasicTests(Generic[ParentT, ChildT, ParentSettingsT, ChildSettingsT]):
+    CTH: Type[CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]]
 
     async def test_no_parent(self) -> None:
         async with self.CTH(add_child=True) as h:

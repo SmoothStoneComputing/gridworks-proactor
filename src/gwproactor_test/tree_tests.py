@@ -1,10 +1,19 @@
 # ruff: noqa: PLR2004, ERA001
+# mypy: disable-error-code="union-attr,attr-defined"
+
+
 import typing
 from typing import Type
 
 import pytest
 
 from gwproactor.links import StateName
+from gwproactor_test.comm_test_helper import (
+    ChildSettingsT,
+    ChildT,
+    ParentSettingsT,
+    ParentT,
+)
 from gwproactor_test.dummies.tree.messages import RelayInfoReported
 from gwproactor_test.recorder import RecorderLinkStats
 from gwproactor_test.tree_comm_test_helper import TreeCommTestHelper
@@ -12,14 +21,16 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-class ProactorTreeCommBasicTests:
-    CTH: Type[TreeCommTestHelper]
+class ProactorTreeCommBasicTests(
+    typing.Generic[ParentT, ChildT, ParentSettingsT, ChildSettingsT]
+):
+    CTH: Type[TreeCommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]]
 
     async def test_tree_no_parent(self) -> None:
         async with self.CTH() as h:
             # add child 1
             h.add_child()
-            child1 = h.child1
+            child1 = h.child1  # noqa
             stats1 = child1.stats
             stats1to2 = stats1.link(child1.downstream_client)
             stats1toAtn = stats1.link(child1.upstream_client)

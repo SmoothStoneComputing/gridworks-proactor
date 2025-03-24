@@ -174,10 +174,12 @@ def get_exp_formatted_time(
     time_used = (
         time.gmtime(record.created) if use_utc else time.localtime(record.created)
     )
-    return formatter.default_msec_format % (
-        time.strftime(formatter.default_time_format, time_used),
-        record.msecs,
-    )
+    if formatter.default_msec_format is not None:
+        return formatter.default_msec_format % (
+            time.strftime(formatter.default_time_format, time_used),
+            record.msecs,
+        )
+    return ""
 
 
 def _test_formatter_settings(settings: FormatterSettings) -> None:

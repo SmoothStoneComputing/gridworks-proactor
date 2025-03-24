@@ -387,7 +387,9 @@ class LinkState:
     def active_for_recv(self) -> bool:
         return self.curr_state.active_for_recv()
 
-    def _handle(self, result: Result) -> Result[Transition, InvalidCommStateInput]:
+    def _handle(
+        self, result: Result[Transition, InvalidCommStateInput]
+    ) -> Result[Transition, InvalidCommStateInput]:
         match result:
             case Ok(transition):
                 transition.link_name = self.name

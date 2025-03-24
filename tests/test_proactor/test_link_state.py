@@ -79,7 +79,10 @@ class _Case:
         got: Result[Transition, InvalidCommStateInput],
     ) -> None:
         assert links[name].name == name
-        assert links.link(name).name == name
+        link = links.link(name)
+        assert link is not None
+        assert link is not None
+        assert link.name == name
         if self.ok:
             got_transition = got.unwrap()
             assert_transition(got_transition, self.exp(got_transition.link_name))
@@ -152,12 +155,13 @@ class _State:
         }
 
     def set_case(self, case: _Case | list[_Case]) -> None:
+        cases: list[_Case]
         if isinstance(case, _Case):
             start = case.start
             input_ = case.input
             cases = [case]
         else:
-            cases: list[_Case] = case
+            cases = case[:]
             starts = [case.start for case in cases]
             inputs = [case.input for case in cases]
             if any(start != cases[0].start for start in starts):
@@ -178,14 +182,15 @@ class _State:
 class _Cases:
     states: dict[StateName, _State]
 
-    def __init__(self, cases: Optional[list[_Case]] = None) -> None:
+    def __init__(self, cases: Optional[list[_Case | list[_Case]]] = None) -> None:
         # Disallow all transitions by default.
         self.states = {
             state: _State(state) for state in StateName if state != StateName.none
         }
         # Set explicit cases
-        for case in cases:
-            self.set_case(case)
+        if cases is not None:
+            for case in cases:
+                self.set_case(case)
 
     def set_case(self, case: _Case | list[_Case]) -> None:
         if isinstance(case, _Case):
@@ -303,5 +308,5 @@ all_cases = _Cases(
 
 
 @pytest.mark.parametrize("case", all_cases.cases(), ids=_Case.__str__)
-def test_transitions(case) -> None:  # noqa: ANN001
+def test_transitions(case: _Case) -> None:  # noqa: ANN001
     case._test()  # noqa: SLF001

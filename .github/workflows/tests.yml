@@ -13,6 +13,8 @@ jobs:
       matrix:
         include:
           - { python: "3.12", os: "ubuntu-latest", session: "pre-commit" }
+          - { python: "3.12", os: "ubuntu-latest", session: "mypy" }
+          - { python: "3.11", os: "ubuntu-latest", session: "mypy" }
           - { python: "3.11", os: "ubuntu-latest", session: "tests" }
           - { python: "3.12", os: "ubuntu-latest", session: "tests", coverage: true }
           # mosuqitto github action only supported on ubuntu
@@ -182,7 +184,7 @@ jobs:
 
       - name: Upload coverage data
         if: always() && matrix.session == 'tests' && matrix.coverage == true
-        uses: "actions/upload-artifact@v4.4.0"
+        uses: "actions/upload-artifact@v4.6.1"
         with:
           name: coverage-data
           path: ".coverage.*"
@@ -191,7 +193,7 @@ jobs:
 
       - name: Upload documentation
         if: matrix.session == 'docs-build'
-        uses: "actions/upload-artifact@v4.4.0"
+        uses: "actions/upload-artifact@v4.6.1"
         with:
           name: docs
           path: docs/_build
@@ -200,6 +202,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: tests
     steps:
+      ###############################
+      # Work around pipx issue #1331 with absolute path to constraint.txt
+      # https://github.com/pypa/pipx/issues/1331#issuecomment-2043163012
+      - name: Set PIP_ARGS on Windows
+        run: echo "PIP_ARGS=--constraint=$env:GITHUB_WORKSPACE/.github/workflows/constraints.txt" | Out-File -FilePath $env:GITHUB_ENV -Append
+        if: runner.os == 'Windows'
+
+      - name: Set PIP_ARGS on not-Windows
+        run: echo "PIP_ARGS=--constraint=$GITHUB_WORKSPACE/.github/workflows/constraints.txt" >> "$GITHUB_ENV"
+        if: runner.os != 'Windows'
+      ###############################
+
       - name: Check out the repository
         uses: actions/checkout@v4
 
@@ -225,7 +239,7 @@ jobs:
           nox --version
 
       - name: Download coverage data
-        uses: "actions/download-artifact@v4.1.8"
+        uses: "actions/download-artifact@v4.1.9"
         with:
           name: coverage-data
 
@@ -238,4 +252,4 @@ jobs:
           nox --session=coverage -- xml
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.4.0

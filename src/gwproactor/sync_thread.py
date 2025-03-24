@@ -6,6 +6,7 @@ import queue
 import threading
 import time
 import traceback
+import typing
 from abc import ABC
 from typing import Any, Optional
 
@@ -28,7 +29,7 @@ async def async_polling_thread_join(
     if t is None:
         return None
     if timeout_seconds is None:
-        timeout_seconds = JOIN_NEVER_TIMEOUT
+        timeout_seconds = JOIN_NEVER_TIMEOUT  # type: ignore[unreachable]
     end = time.time() + timeout_seconds
     remaining = timeout_seconds
     returned_e: Optional[Exception] = None
@@ -61,7 +62,7 @@ def responsive_sleep(
         and (now := time.time()) < end_time
     ):
         time.sleep(min(end_time - now, step_duration))
-    return getattr(obj, running_field_name) == running_field
+    return typing.cast(bool, getattr(obj, running_field_name)) == running_field
 
 
 class AsyncQueueWriter:
@@ -71,10 +72,10 @@ class AsyncQueueWriter:
     """
 
     _loop: Optional[asyncio.AbstractEventLoop] = None
-    _async_queue: Optional[asyncio.Queue] = None
+    _async_queue: Optional[asyncio.Queue[Any]] = None
 
     def set_async_loop(
-        self, loop: asyncio.AbstractEventLoop, async_queue: asyncio.Queue
+        self, loop: asyncio.AbstractEventLoop, async_queue: asyncio.Queue[Any]
     ) -> None:
         self._loop = loop
         self._async_queue = async_queue
@@ -95,14 +96,14 @@ class SyncAsyncQueueWriter:
     """
 
     _loop: Optional[asyncio.AbstractEventLoop] = None
-    _async_queue: Optional[asyncio.Queue] = None
-    sync_queue: Optional[queue.Queue]
+    _async_queue: Optional[asyncio.Queue[Any]] = None
+    sync_queue: Optional[queue.Queue[Any]]
 
-    def __init__(self, sync_queue: Optional[queue.Queue] = None) -> None:
+    def __init__(self, sync_queue: Optional[queue.Queue[Any]] = None) -> None:
         self.sync_queue = sync_queue
 
     def set_async_loop(
-        self, loop: asyncio.AbstractEventLoop, async_queue: asyncio.Queue
+        self, loop: asyncio.AbstractEventLoop, async_queue: asyncio.Queue[Any]
     ) -> None:
         self._loop = loop
         self._async_queue = async_queue
@@ -111,6 +112,10 @@ class SyncAsyncQueueWriter:
         self, item: Any, *, block: bool = True, timeout: Optional[float] = None
     ) -> None:
         """Write to synchronous queue in a threadsafe way."""
+        if self.sync_queue is None:
+            raise ValueError(
+                "SyncAsyncQueueWriter sync_queue is None and cannot be written to"
+            )
         self.sync_queue.put(item, block=block, timeout=timeout)
 
     def put_to_async_queue(self, item: Any) -> None:
@@ -125,6 +130,10 @@ class SyncAsyncQueueWriter:
         self, *, block: bool = True, timeout: Optional[float] = None
     ) -> Any:
         """Read from synchronous queue in a threadsafe way."""
+        if self.sync_queue is None:
+            raise ValueError(
+                "SyncAsyncQueueWriter sync_queue is None and cannot be written to"
+            )
         return self.sync_queue.get(block=block, timeout=timeout)
 
 
@@ -187,12 +196,12 @@ class SyncAsyncInteractionThread(threading.Thread, ABC):
         self.running = False
 
     def set_async_loop(
-        self, loop: asyncio.AbstractEventLoop, async_queue: asyncio.Queue
+        self, loop: asyncio.AbstractEventLoop, async_queue: asyncio.Queue[Any]
     ) -> None:
         self._channel.set_async_loop(loop, async_queue)
 
     def set_async_loop_and_start(
-        self, loop: asyncio.AbstractEventLoop, async_queue: asyncio.Queue
+        self, loop: asyncio.AbstractEventLoop, async_queue: asyncio.Queue[Any]
     ) -> None:
         self.set_async_loop(loop, async_queue)
         self.start()
@@ -236,7 +245,7 @@ class SyncAsyncInteractionThread(threading.Thread, ABC):
                         handled = self._handle_exception(e)
                     except Exception as e2:  # noqa: BLE001
                         handled = False
-                        handle_exception_str = traceback.format_exception(e2)
+                        handle_exception_str = "".join(traceback.format_exception(e2))
                     if not handled:
                         self.running = False
                         reason = (
@@ -253,11 +262,15 @@ class SyncAsyncInteractionThread(threading.Thread, ABC):
                         )
 
     def time_to_pat(self) -> bool:
-        return time.time() >= (self._last_pat_time + (self.pat_timeout / 2))
+        return self.pat_timeout is not None and time.time() >= (
+            self._last_pat_time + (self.pat_timeout / 2)
+        )
 
     def pat_watchdog(self) -> None:
         self._last_pat_time = time.time()
         self._put_to_async_queue(PatInternalWatchdogMessage(src=self.name))
 
     async def async_join(self, timeout: Optional[float] = None) -> None:  # noqa: ASYNC109
+        if timeout is None:
+            timeout = JOIN_NEVER_TIMEOUT
         await async_polling_thread_join(self, timeout)

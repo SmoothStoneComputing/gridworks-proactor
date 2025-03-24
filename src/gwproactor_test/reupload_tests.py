@@ -1,18 +1,27 @@
 # ruff: noqa: ERA001
+# mypy: disable-error-code="union-attr"
+
 
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Type
+from typing import Generic, Type
 
 import pytest
 from gwproto import MQTTTopic
+from result import Err
 
 from gwproactor import Proactor
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
 from gwproactor.persister import TimedRollingFilePersister
-from gwproactor_test.comm_test_helper import CommTestHelper
+from gwproactor_test.comm_test_helper import (
+    ChildSettingsT,
+    ChildT,
+    CommTestHelper,
+    ParentSettingsT,
+    ParentT,
+)
 from gwproactor_test.wait import await_for
 
 
@@ -44,14 +53,14 @@ class _EventGen:
 
     def _generate_event(self, member_name: str) -> _EventEntry:
         event = DBGEvent(Command=DBGPayload(), Msg=f"event {len(self)} {member_name}")
-        ret = self.persister.persist(
+        match self.persister.persist(
             event.MessageId, event.model_dump_json(indent=2).encode()
-        )
-        if ret.is_err():
-            raise ret.err()
+        ):
+            case Err(exception):
+                raise exception
         entry = _EventEntry(
             event.MessageId,
-            self.persister.get_path(event.MessageId),
+            self.persister.get_path(event.MessageId),  # type: ignore[arg-type]
         )
         getattr(self, member_name).append(entry)
         return entry
@@ -96,8 +105,8 @@ class _EventGen:
 
 
 @pytest.mark.asyncio
-class ProactorReuploadTests:
-    CTH: Type[CommTestHelper]
+class ProactorReuploadTests(Generic[ParentT, ChildT, ParentSettingsT, ChildSettingsT]):
+    CTH: Type[CommTestHelper[ParentT, ChildT, ParentSettingsT, ChildSettingsT]]
 
     @pytest.mark.asyncio
     async def test_reupload_basic(self) -> None:
@@ -426,7 +435,7 @@ class ProactorReuploadTests:
             assert child_links.num_reuploaded_unacked == 0
             assert not child_links.reuploading()
 
-            generator = _EventGen(child)
+            generator = _EventGen(child)  # type: ignore[arg-type]
             generator.generate(num_corrupt=10)
             generator.generate(num_ok=10)
             generator.generate(num_empty=10)

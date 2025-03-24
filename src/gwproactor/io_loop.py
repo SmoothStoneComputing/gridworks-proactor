@@ -2,18 +2,18 @@ import asyncio
 import contextlib
 import threading
 import time
-from typing import Coroutine, Optional, Sequence
+from typing import Any, Coroutine, Optional, Sequence
 
 from gwproto import Message
 from result import Result
 
 from gwproactor import ProactorLogger
-from gwproactor.actors.actor import MonitoredName
 from gwproactor.message import KnownNames, PatInternalWatchdogMessage, ShutdownMessage
 from gwproactor.proactor_interface import (
     INVALID_IO_TASK_HANDLE,
     Communicator,
     IOLoopInterface,
+    MonitoredName,
     ServicesInterface,
 )
 from gwproactor.problems import Problems
@@ -23,9 +23,8 @@ from gwproactor.sync_thread import SyncAsyncInteractionThread
 class IOLoop(Communicator, IOLoopInterface):
     _io_loop: asyncio.AbstractEventLoop
     _io_thread: Optional[threading.Thread] = None
-    _tasks: dict[int, Optional[asyncio.Task]]
-    _id2task: dict[asyncio.Task, int]
-    _completed_tasks: dict[int, asyncio.Task]
+    _tasks: dict[int, Optional[asyncio.Task[Any]]]
+    _task2id: dict[asyncio.Task[Any], int]
     _lock: threading.RLock
     _stop_requested: bool = False
     _next_id = INVALID_IO_TASK_HANDLE + 1
@@ -38,11 +37,10 @@ class IOLoop(Communicator, IOLoopInterface):
         self._lg = services.logger
         self._lock = threading.RLock()
         self._tasks = {}
-        self._id2task = {}
-        self._completed_tasks = {}
+        self._task2id = {}
         self._io_loop = asyncio.new_event_loop()
 
-    def add_io_coroutine(self, coro: Coroutine, name: str = "") -> int:
+    def add_io_coroutine(self, coro: Coroutine[Any, Any, Any], name: str = "") -> int:
         with self._lock:
             if self._stop_requested:
                 return INVALID_IO_TASK_HANDLE
@@ -56,9 +54,11 @@ class IOLoop(Communicator, IOLoopInterface):
         with self._lock:
             task = self._tasks.pop(handle, None)
         if task is not None:
-            self._io_loop.call_soon_threadsafe(task.cancel)
+            self._io_loop.call_soon_threadsafe(task.cancel, "IOLoop.cancel_io_routine")
 
-    def _add_task(self, coro: Coroutine, name: str, task_id: int) -> None:
+    def _add_task(
+        self, coro: Coroutine[Any, Any, Any], name: str, task_id: int
+    ) -> None:
         if not name:
             name = coro.__name__
         task = self._io_loop.create_task(
@@ -67,7 +67,7 @@ class IOLoop(Communicator, IOLoopInterface):
         )
         with self._lock:
             self._tasks[task_id] = task
-            self._id2task[task] = task_id
+            self._task2id[task] = task_id
 
     def start(self) -> None:
         self._io_thread = threading.Thread(
@@ -75,7 +75,7 @@ class IOLoop(Communicator, IOLoopInterface):
         )
         self._io_thread.start()
 
-    def _started_tasks(self) -> list[asyncio.Task]:
+    def _started_tasks(self) -> list[asyncio.Task[Any]]:
         with self._lock:
             return [task for task in self._tasks.values() if task is not None]
 
@@ -84,7 +84,7 @@ class IOLoop(Communicator, IOLoopInterface):
             self._stop_requested = True
             tasks = self._started_tasks()
         for task in tasks:
-            self._io_loop.call_soon_threadsafe(task.cancel)
+            self._io_loop.call_soon_threadsafe(task.cancel, "IOLoop.stop")
 
     async def join(self) -> None:
         pass
@@ -134,11 +134,14 @@ class IOLoop(Communicator, IOLoopInterface):
                         tasks, timeout=1.0, return_when="FIRST_COMPLETED"
                     )
                     if self._stop_requested:
-                        break
+                        break  # type: ignore[unreachable]
                     with self._lock:
                         for task in done:
-                            task_id = self._id2task.pop(task)
-                            self._completed_tasks[task_id] = self._tasks.pop(task_id)
+                            task_id = self._task2id.pop(task)
+                            # Suppress false positive warning from PyCharm
+                            # (https://youtrack.jetbrains.com/issue/PY-51101/False-positive-Coroutine-...-is-not-awaited-for-a-non-coroutine-call)
+                            # noinspection PyAsyncCall
+                            self._tasks.pop(task_id)
                     errors = []
                     for task in done:
                         if not task.cancelled():
@@ -166,10 +169,10 @@ class IOLoop(Communicator, IOLoopInterface):
             self._last_pat_time = time.time()
             self._services.send_threadsafe(PatInternalWatchdogMessage(src=self.name))
 
-    def process_message(self, message: Message) -> Result[bool, Exception]:  # noqa: ARG002
+    def process_message(self, message: Message[Any]) -> Result[bool, Exception]:  # noqa: ARG002
         raise ValueError("IOLoop does not currently process any messages")
 
-    def _send(self, message: Message) -> None:
+    def _send(self, message: Message[Any]) -> None:
         """Ensure this routine from base class does not make unsafe call."""
         self._services.send_threadsafe(message)
 

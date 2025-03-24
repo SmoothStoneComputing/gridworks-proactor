@@ -3,9 +3,10 @@ import asyncio
 import contextlib
 import subprocess  # noqa: S404
 import time
-from typing import Optional
+from typing import Any, Optional
 
 from gwproto import Message
+from result import Ok, Result
 
 from gwproactor.message import (
     InternalShutdownMessage,
@@ -27,7 +28,7 @@ class _MonitoredName(MonitoredName):
 
 
 class WatchdogManager(Communicator, Runnable):
-    _watchdog_task: Optional[asyncio.Task] = None
+    _watchdog_task: Optional[asyncio.Task[Any]] = None
     _seconds_per_pat: float
     _monitored_names: dict[str, _MonitoredName]
     _pat_external_watchdog_process_args: list[str]
@@ -65,7 +66,7 @@ class WatchdogManager(Communicator, Runnable):
             with contextlib.suppress(asyncio.CancelledError):
                 await self._watchdog_task
 
-    def process_message(self, message: Message) -> None:
+    def process_message(self, message: Message[Any]) -> Result[bool, Exception]:
         # self.lg.path("++WatchdogManager.process_message")
         path_dbg = 0
         match message.Payload:
@@ -81,6 +82,7 @@ class WatchdogManager(Communicator, Runnable):
                     f"WatchdogManager does not handle message payloads of type {type(message.Payload)}"
                 )
         # self.lg.path(f"--WatchdogManager.process_message  0x{path_dbg:08X}")
+        return Ok()
 
     def _pat_internal_watchdog(self, name: str) -> None:
         if name not in self._monitored_names:

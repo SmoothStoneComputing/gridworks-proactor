@@ -72,7 +72,7 @@ def setup_logging(  # noqa: C901, PLR0912, PLR0915
 
     """
     if errors is None:
-        errors: list[Exception] = []
+        errors = []
     else:
         errors.clear()
     config_finished = False

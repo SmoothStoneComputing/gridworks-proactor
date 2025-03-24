@@ -5,13 +5,15 @@ from typing import Optional, Sequence
 from gwproto.messages import ProblemEvent
 from gwproto.messages import Problems as ProblemType
 
+_EFFECTIVELY_NO_MAX = 1000000000
+
 
 class Problems(ValueError):
     MAX_PROBLEMS = 10
 
     errors: list[BaseException]
     warnings: list[BaseException]
-    max_problems: Optional[int] = MAX_PROBLEMS
+    max_problems: int = MAX_PROBLEMS
 
     def __init__(
         self,
@@ -22,6 +24,8 @@ class Problems(ValueError):
     ) -> None:
         self.errors = [] if errors is None else list(errors)
         self.warnings = [] if warnings is None else list(warnings)
+        if max_problems is None:
+            max_problems = _EFFECTIVELY_NO_MAX
         self.max_problems = max_problems
         super().__init__(msg)
 

@@ -60,5 +60,5 @@ class RelayReportReceivedEvent(RelayReportEvent):
     mismatch: bool = False
     mismatch_count: int = 0
     TypeName: Literal["gridworks.event.relay.report.received"] = (
-        "gridworks.event.relay.report.received"
+        "gridworks.event.relay.report.received"  # type: ignore[assignment]
     )

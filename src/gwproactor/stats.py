@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 from gwproto import Message
 
@@ -76,7 +76,7 @@ class ProactorStats:
         for link_name in link_names:
             self.add_link(link_name)
 
-    def add_message(self, message: Message) -> None:
+    def add_message(self, message: Message[Any]) -> None:
         self.num_received_by_type[message.Header.MessageType] += 1
 
     def add_mqtt_message(self, message: Message[MQTTReceiptPayload]) -> None:
