@@ -8,8 +8,9 @@ from abc import ABC
 from typing import Any, Generic, Sequence, TypeVar
 
 from gwproto import Message, ShNode
-from result import Result
+from result import Ok, Result
 
+from gwproactor.callbacks import ProactorCallbackInterface
 from gwproactor.proactor_interface import (
     ActorInterface,
     Communicator,
@@ -89,3 +90,22 @@ class SyncThreadActor(Actor, Generic[SyncThreadT]):
                 MonitoredName(self.name, self._sync_thread.pat_timeout)
             )
         return monitored_names
+
+
+class PrimeActor(ProactorCallbackInterface, Actor):
+    def __init__(self, name: str, services: ServicesInterface) -> None:
+        super().__init__(name, services)
+        services.add_callbacks(self)
+        services.add_communicator(self)
+
+    def process_message(self, _: Message[Any]) -> Result[bool, Exception]:
+        return Ok(value=True)
+
+    def start(self) -> None:
+        pass
+
+    def stop(self) -> None:
+        pass
+
+    async def join(self) -> None:
+        pass

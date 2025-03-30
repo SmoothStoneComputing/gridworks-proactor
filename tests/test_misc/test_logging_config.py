@@ -21,7 +21,7 @@ from gwproactor.config import (
 
 def test_logger_levels() -> None:
     # Check if fields have been added or renamed
-    assert set(LoggerLevels().model_fields.keys()) == {
+    assert set(LoggerLevels().__pydantic_fields__.keys()) == {
         "message_summary",
         "lifecycle",
         "comm_event",
@@ -57,7 +57,8 @@ def test_logger_levels() -> None:
     # qualified_names()
     base_name = "foo"
     assert levels.qualified_logger_names(base_name) == {
-        field_name: f"{base_name}.{field_name}" for field_name in levels.model_fields
+        field_name: f"{base_name}.{field_name}"
+        for field_name in levels.__pydantic_fields__
     }
 
     # logger_names_to_levels()
@@ -82,7 +83,7 @@ def test_logger_levels() -> None:
 
 def test_logging_settings() -> None:
     # Check if loggers have been added or renamed
-    assert set(LoggingSettings().levels.model_fields.keys()) == {
+    assert set(LoggingSettings().levels.__pydantic_fields__.keys()) == {
         "message_summary",
         "lifecycle",
         "comm_event",
@@ -116,7 +117,7 @@ def test_logging_settings() -> None:
     logging_settings = LoggingSettings()
     exp_logger_names = {
         field_name: f"gridworks.{field_name}"
-        for field_name in logging_settings.levels.model_fields
+        for field_name in logging_settings.levels.__pydantic_fields__
     }
     exp_logger_names["base"] = logging_settings.base_log_name
     assert logging_settings.qualified_logger_names() == exp_logger_names

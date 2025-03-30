@@ -76,15 +76,21 @@ class MQTTClientWrapper:
             )
         tls_config = self._client_config.tls
         if tls_config.use_tls:
-            self._client.tls_set(
-                ca_certs=str(tls_config.paths.ca_cert_path),
-                certfile=str(tls_config.paths.cert_path),
-                keyfile=str(tls_config.paths.private_key_path),
-                cert_reqs=tls_config.cert_reqs,
-                tls_version=ssl.PROTOCOL_TLS_CLIENT,
-                ciphers=tls_config.ciphers,
-                keyfile_password=tls_config.keyfile_password.get_secret_value(),
-            )
+            try:
+                self._client.tls_set(
+                    ca_certs=str(tls_config.paths.ca_cert_path),
+                    certfile=str(tls_config.paths.cert_path),
+                    keyfile=str(tls_config.paths.private_key_path),
+                    cert_reqs=tls_config.cert_reqs,
+                    tls_version=ssl.PROTOCOL_TLS_CLIENT,
+                    ciphers=tls_config.ciphers,
+                    keyfile_password=tls_config.keyfile_password.get_secret_value(),
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"ERROR. Client.tls_set() caught exception <{e}> "
+                    f"from tls_config: {tls_config}"
+                ) from e
 
         self._client.on_message = self.on_message
         self._client.on_connect = self.on_connect

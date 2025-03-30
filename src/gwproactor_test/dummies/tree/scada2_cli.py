@@ -25,7 +25,8 @@ def run(
     verbose: bool = False,
     message_summary: bool = False,
 ) -> None:
-    asyncio.run(
+    raise NotImplementedError("Reimplement CLIs using App class")
+    asyncio.run(  # type: ignore[unreachable]
         run_async_main(
             name=DUMMY_SCADA2_NAME,
             proactor_type=DummyScada2,

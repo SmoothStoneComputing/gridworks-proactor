@@ -19,7 +19,7 @@ LOGGING_FORMAT = "%(asctime)s %(message)s"
 
 def missing_tls_paths(paths: TLSPaths) -> list[tuple[str, Optional[Path]]]:
     missing = []
-    for path_name in paths.model_fields:
+    for path_name in paths.__pydantic_fields__:
         path = getattr(paths, path_name)
         if path is None or not Path(path).exists():
             missing.append((path_name, path))
@@ -30,7 +30,7 @@ def check_tls_paths_present(
     model: BaseModel | BaseSettings, *, raise_error: bool = True
 ) -> str:
     missing_str = ""
-    for k in model.model_fields:
+    for k in model.__pydantic_fields__:
         v = getattr(model, k)
         if isinstance(v, MQTTClient) and v.tls.use_tls:
             missing_paths = missing_tls_paths(v.tls.paths)
@@ -130,7 +130,7 @@ def get_proactor(  # noqa: PLR0913
         logger.info(settings.model_dump_json(indent=2))
         rich.print(settings)
         check_tls_paths_present(settings)
-        proactor = proactor_type(name=name, settings=settings)
+        proactor = proactor_type(name=name, settings=settings)  # type: ignore[call-arg]
         if run_in_thread:
             logger.info("run_async_actors_main() starting")
             proactor.run_in_thread()

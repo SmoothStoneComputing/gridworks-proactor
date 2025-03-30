@@ -15,6 +15,7 @@ from gwproto.messages import EventT
 from paho.mqtt.client import MQTTMessageInfo
 from result import Result
 
+from gwproactor.callbacks import ProactorCallbackInterface
 from gwproactor.config.proactor_settings import ProactorSettings
 from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
 from gwproactor.logger import ProactorLogger
@@ -48,11 +49,6 @@ class CommunicatorInterface(ABC):
     @property
     @abstractmethod
     def monitored_names(self) -> Sequence[MonitoredName]:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def services(self) -> "ServicesInterface":
         raise NotImplementedError
 
 
@@ -198,6 +194,10 @@ class ServicesInterface(CommunicatorInterface):
     """Interface to system services (the proactor)"""
 
     @abstractmethod
+    def add_communicator(self, communicator: CommunicatorInterface) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
     def get_communicator(self, name: str) -> Optional[CommunicatorInterface]:
         raise NotImplementedError
 
@@ -289,6 +289,14 @@ class ServicesInterface(CommunicatorInterface):
         raise NotImplementedError
 
     @property
+    def upstream_client(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def downstream_client(self) -> str:
+        raise NotImplementedError
+
+    @property
     @abstractmethod
     def settings(self) -> ProactorSettings:
         raise NotImplementedError
@@ -311,4 +319,12 @@ class ServicesInterface(CommunicatorInterface):
     def get_external_watchdog_builder_class(
         self,
     ) -> type[ExternalWatchdogCommandBuilder]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_callbacks(self, callbacks: ProactorCallbackInterface) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_callbacks(self, callbacks_id: int) -> None:
         raise NotImplementedError

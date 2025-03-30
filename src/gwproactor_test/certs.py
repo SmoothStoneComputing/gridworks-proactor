@@ -1,6 +1,6 @@
 """Generate or copy test certificates for MQTT using TLS."""
 
-# ruff: noqa: T201
+# ruff: noqa: T201, S101
 
 import os
 import shutil
@@ -121,7 +121,7 @@ def _copy_keys(test_cert_dir: Path, dst_paths: TLSPaths) -> None:
 def mqtt_client_fields(model: BaseModel | BaseSettings) -> list[tuple[str, MQTTClient]]:
     clients: list[tuple[str, MQTTClient]] = [
         (field_name, getattr(model, field_name))
-        for field_name in model.model_fields
+        for field_name in model.__pydantic_fields__
         if isinstance(getattr(model, field_name), MQTTClient)
     ]
     clients.extend(

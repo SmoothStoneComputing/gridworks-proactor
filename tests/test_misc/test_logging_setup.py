@@ -51,12 +51,12 @@ def test_get_default_logging_config(
     logger_names = settings.logging.qualified_logger_names()
 
     # Check if loggers have been added or renamed
-    assert set(LoggingSettings().levels.model_fields.keys()) == {
+    assert set(LoggingSettings().levels.__pydantic_fields__.keys()) == {
         "message_summary",
         "lifecycle",
         "comm_event",
     }
-    for field_name in settings.logging.levels.model_fields:
+    for field_name in settings.logging.levels.__pydantic_fields__:
         logger_level = logging.getLogger(logger_names[field_name]).level
         settings_level = getattr(settings.logging.levels, field_name)
         assert logger_level == settings_level

@@ -16,8 +16,9 @@ NUM_INITIAL_EVENT_REUPLOADS: int = 5
 
 class ProactorSettings(BaseSettings):
     paths: Paths = Field(default=typing.cast(Paths, {}), validate_default=True)
-    logging: LoggingSettings = LoggingSettings()
+    mqtt: dict[str, MQTTClient] = {}
     mqtt_link_poll_seconds: float = MQTT_LINK_POLL_SECONDS
+    logging: LoggingSettings = LoggingSettings()
     ack_timeout_seconds: float = ACK_TIMEOUT_SECONDS
     num_initial_event_reuploads: int = NUM_INITIAL_EVENT_REUPLOADS
     model_config = SettingsConfigDict(env_prefix="PROACTOR_", env_nested_delimiter="__")
@@ -53,8 +54,20 @@ class ProactorSettings(BaseSettings):
             raise ValueError(  # noqa: TRY004
                 f"ERROR. 'paths' member must be instance of Paths. Got: {type(self.paths)}"
             )
-        for field_name in self.model_fields:
-            v = getattr(self, field_name)
-            if isinstance(v, MQTTClient):
-                v.update_tls_paths(Path(self.paths.certs_dir), field_name)
+        self.update_tls_paths()
         return self
+
+    def add_mqtt_client(self, name: str, client: MQTTClient) -> Self:
+        if name in self.mqtt:
+            raise ValueError(f"MQTT client with name <{name}> is already present")
+        self.mqtt[name] = client
+        self.mqtt[name].update_tls_paths(Path(self.paths.certs_dir), name)
+        return self
+
+    def update_tls_paths(self) -> Self:
+        for client_name, client in self.mqtt.items():
+            client.update_tls_paths(Path(self.paths.certs_dir), client_name)
+        return self
+
+    def uses_tls(self) -> bool:
+        return any(client.tls.use_tls for client in self.mqtt.values())

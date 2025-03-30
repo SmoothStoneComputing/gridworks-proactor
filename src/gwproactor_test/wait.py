@@ -37,11 +37,11 @@ class StopWatch:
         return False
 
 
-async def await_for(  # noqa: C901
+async def await_for(  # noqa: C901, PLR0912, PLR0913
     f: Union[Predicate, AwaitablePredicate],
     timeout: float,  # noqa: ASYNC109
     tag: str = "",
-    raise_timeout: bool = True,
+    raise_timeout: bool = True,  # noqa: FBT001, FBT002
     retry_duration: float = 0.1,
     err_str_f: Optional[ErrorStringFunction] = None,
     logger: Optional[logging.Logger | logging.LoggerAdapter[logging.Logger]] = None,
@@ -121,7 +121,7 @@ def wait_for(
     f: Callable[[], bool],
     timeout: float,
     tag: str = "",
-    raise_timeout: bool = True,
+    raise_timeout: bool = True,  # noqa: FBT001, FBT002
     retry_duration: float = 0.1,
 ) -> bool:
     """Call function f() until it returns True or a timeout is reached. For async tests use await await_for() instead.
