@@ -184,7 +184,7 @@ jobs:
 
       - name: Upload coverage data
         if: always() && matrix.session == 'tests' && matrix.coverage == true
-        uses: "actions/upload-artifact@v4.6.1"
+        uses: "actions/upload-artifact@v4.6.2"
         with:
           name: coverage-data
           path: ".coverage.*"
@@ -193,7 +193,7 @@ jobs:
 
       - name: Upload documentation
         if: matrix.session == 'docs-build'
-        uses: "actions/upload-artifact@v4.6.1"
+        uses: "actions/upload-artifact@v4.6.2"
         with:
           name: docs
           path: docs/_build
