@@ -1,10 +1,12 @@
+import copy
 import typing
 from pathlib import Path
 from typing import Any, Self
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from gwproactor.config.links import LinkSettings
 from gwproactor.config.logging import LoggingSettings
 from gwproactor.config.mqtt import MQTTClient
 from gwproactor.config.paths import Paths
@@ -16,7 +18,8 @@ NUM_INITIAL_EVENT_REUPLOADS: int = 5
 
 class ProactorSettings(BaseSettings):
     paths: Paths = Field(default=typing.cast(Paths, {}), validate_default=True)
-    mqtt: dict[str, MQTTClient] = {}
+    mqtt_brokers: dict[str, MQTTClient] = {}
+    links: dict[str, LinkSettings] = {}
     mqtt_link_poll_seconds: float = MQTT_LINK_POLL_SECONDS
     logging: LoggingSettings = LoggingSettings()
     ack_timeout_seconds: float = ACK_TIMEOUT_SECONDS
@@ -47,6 +50,68 @@ class ProactorSettings(BaseSettings):
             values["paths"]["name"] = name
         return values
 
+    @classmethod
+    def update_sub_models(
+        cls,
+        values: dict[str, Any],
+        dict_name: str,
+        defaults: typing.Mapping[str, BaseModel],
+    ) -> dict[str, Any]:
+        """Update a dict of models
+
+        This is meant to be called in a 'pre=True' root validator of a derived class.
+        """
+        if defaults:
+            if dict_name not in values:
+                values[dict_name] = copy.deepcopy(defaults)
+            else:
+                for name, default_value in defaults.items():
+                    if name not in values[dict_name]:
+                        values[dict_name][name] = default_value.model_copy(deep=True)
+                    else:
+                        values[dict_name][name] = default_value.model_copy(
+                            update=default_value.model_validate(
+                                **values[dict_name][name]
+                            ).model_dump(exclude_unset=True)
+                        )
+        return values
+
+    @classmethod
+    def update_brokers(
+        cls, values: dict[str, Any], defaults: dict[str, MQTTClient]
+    ) -> dict[str, Any]:
+        """Update default mqtt brokers.
+
+        This is meant to be called in a 'pre=True' root validator of a derived class.
+        """
+        return cls.update_sub_models(
+            values, dict_name="mqtt_brokers", defaults=defaults
+        )
+
+    @classmethod
+    def update_links(
+        cls, values: dict[str, Any], defaults: dict[str, LinkSettings]
+    ) -> dict[str, Any]:
+        """Update default links.
+
+        This is meant to be called in a 'pre=True' root validator of a derived class.
+        """
+        return cls.update_sub_models(values, dict_name="links", defaults=defaults)
+
+    @classmethod
+    def update_brokers_and_links(
+        cls,
+        values: dict[str, Any],
+        default_brokers: dict[str, MQTTClient],
+        default_links: dict[str, LinkSettings],
+    ) -> dict[str, Any]:
+        """Update default mqtt brokers and default links.
+
+        This is meant to be called in a 'pre=True' root validator of a derived class.
+        """
+        values = cls.update_brokers(values, defaults=default_brokers)
+        return cls.update_links(values, defaults=default_links)
+
     @model_validator(mode="after")
     def post_root_validator(self) -> Self:
         """Update unset paths of any member MQTTClient's TLS paths based on ProactorSettings 'paths' member."""
@@ -55,19 +120,25 @@ class ProactorSettings(BaseSettings):
                 f"ERROR. 'paths' member must be instance of Paths. Got: {type(self.paths)}"
             )
         self.update_tls_paths()
+        for link_name, link in self.links.items():
+            if link.enabled and link.broker_name not in self.mqtt_brokers:
+                raise ValueError(
+                    f"ERROR. Link <{link_name}> is enabled but uses "
+                    f"missing broker <{link.broker_name}>. "
+                )
         return self
 
-    def add_mqtt_client(self, name: str, client: MQTTClient) -> Self:
-        if name in self.mqtt:
+    def add_mqtt_broker(self, name: str, client: MQTTClient) -> Self:
+        if name in self.mqtt_brokers:
             raise ValueError(f"MQTT client with name <{name}> is already present")
-        self.mqtt[name] = client
-        self.mqtt[name].update_tls_paths(Path(self.paths.certs_dir), name)
+        self.mqtt_brokers[name] = client
+        self.mqtt_brokers[name].update_tls_paths(Path(self.paths.certs_dir), name)
         return self
 
     def update_tls_paths(self) -> Self:
-        for client_name, client in self.mqtt.items():
+        for client_name, client in self.mqtt_brokers.items():
             client.update_tls_paths(Path(self.paths.certs_dir), client_name)
         return self
 
     def uses_tls(self) -> bool:
-        return any(client.tls.use_tls for client in self.mqtt.values())
+        return any(client.tls.use_tls for client in self.mqtt_brokers.values())

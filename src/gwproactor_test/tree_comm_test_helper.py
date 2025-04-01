@@ -9,6 +9,7 @@ from gwproactor.app import App
 from gwproactor.config import MQTTClient
 from gwproactor_test.comm_test_helper import (
     CommTestHelper,
+    get_option_value,
 )
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
 from gwproactor_test.dummies.tree.scada1 import DummyScada1App
@@ -28,25 +29,39 @@ class TreeCommTestHelper(CommTestHelper):
         *,
         add_child1: bool = False,
         start_child1: bool = False,
-        child1_verbose: bool = False,
+        child1_verbose: Optional[bool] = None,
         child2_app: Optional[App] = None,
-        child2_verbose: bool = False,
+        child2_verbose: Optional[bool] = None,
         add_child2: bool = False,
         start_child2: bool = False,
-        child2_on_screen: bool = False,
+        child2_on_screen: Optional[bool] = None,
         **kwargs: Any,
     ) -> None:
         kwargs["add_child"] = add_child1 or kwargs.get("add_child", False)
         kwargs["start_child"] = start_child1 or kwargs.get("start_child", False)
-        kwargs["child_verbose"] = child1_verbose or kwargs.get("child_verbose", False)
+        if child1_verbose is None:
+            kwargs["child_verbose"] = get_option_value(
+                parameter_value=child1_verbose,
+                option_name="--child1-verbose",
+                request=kwargs["request"],
+            )
         kwargs["child_app"] = kwargs.get(
             "child_app", kwargs.get("child1_app", DummyScada1App())
         )
         kwargs["parent_app"] = kwargs.get("parent_app", DummyAtnApp())
+        kwargs["request"] = kwargs.get("request")
         super().__init__(**kwargs)
         self.child2_app = DummyScada2App() if child2_app is None else child2_app
-        self.child2_verbose = child2_verbose
-        self.child2_on_screen = child2_on_screen
+        self.child2_verbose = get_option_value(
+            parameter_value=child2_verbose,
+            option_name="--child2-verbose",
+            request=kwargs["request"],
+        )
+        self.child2_on_screen = get_option_value(
+            parameter_value=child2_on_screen,
+            option_name="--child2-on-screen",
+            request=kwargs["request"],
+        )
         self.setup_child2_logging()
         if add_child2 or start_child2:
             self.add_child2()

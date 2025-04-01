@@ -1,15 +1,15 @@
 import typing
 from collections import defaultdict
+from pathlib import Path
 from typing import Optional
 
 import rich
 from gwproto import Message
 
-from gwproactor import Proactor, ProactorSettings, ServicesInterface
+from gwproactor import ProactorSettings, ServicesInterface
 from gwproactor.actors.actor import PrimeActor
-from gwproactor.config import MQTTClient
-from gwproactor.config.proactor_config import ProactorConfig, ProactorName
-from gwproactor.links.link_settings import LinkSettings
+from gwproactor.config import Paths, paths
+from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import TimedRollingFilePersister
 from gwproactor_test.dummies import DUMMY_SCADA2_NAME
@@ -18,16 +18,14 @@ from gwproactor_test.dummies.tree.admin_messages import (
     AdminCommandSetRelay,
     AdminSetRelayEvent,
 )
-from gwproactor_test.dummies.tree.admin_settings import AdminLinkSettings
-from gwproactor_test.dummies.tree.codecs import AdminCodec, DummyCodec
+from gwproactor_test.dummies.tree.codecs import ScadaCodecFactory
 from gwproactor_test.dummies.tree.messages import (
     RelayInfo,
     RelayReportEvent,
     SetRelay,
 )
-from gwproactor_test.dummies.tree.scada1_settings import AtnLinkSettings
 from gwproactor_test.dummies.tree.scada2_settings import (
-    Scada1LinkSettings,
+    DummyScada2Settings,
 )
 from gwproactor_test.instrumented_app import TestApp
 
@@ -142,33 +140,6 @@ class DummyScada2(PrimeActor):
 
 
 class DummyScada2App(TestApp):
-    ATN_LINK: str = "atn_link"
-    SCADA1_LINK: str = "scada1_link"
-
-    atn_link: AtnLinkSettings
-    scada1_link: Scada1LinkSettings
-    admin_link: AdminLinkSettings
-
-    def __init__(
-        self,
-        *,
-        name: Optional[ProactorName] = None,
-        settings: Optional[ProactorSettings] = None,
-        config: Optional[ProactorConfig] = None,
-    ) -> None:
-        super().__init__(
-            name=name, settings=settings, config=config, prime_actor_type=DummyScada2
-        )
-        self.atn_link = AtnLinkSettings(
-            **self.config.settings.mqtt[self.ATN_LINK].model_dump()
-        )
-        self.scada1_link = Scada1LinkSettings(
-            **self.config.settings.mqtt[self.SCADA1_LINK].model_dump()
-        )
-        self.admin_link = AdminLinkSettings(
-            **self.config.settings.mqtt[DummyScada2.ADMIN_LINK].model_dump()
-        )
-
     @classmethod
     def get_name(cls) -> ProactorName:
         return ProactorName(
@@ -178,40 +149,19 @@ class DummyScada2App(TestApp):
         )
 
     @classmethod
-    def get_mqtt_clients(cls) -> dict[str, MQTTClient]:
-        return {
-            cls.ATN_LINK: MQTTClient(),
-            cls.SCADA1_LINK: MQTTClient(),
-            DummyScada2.ADMIN_LINK: MQTTClient(),
-        }
+    def get_prime_actor_type(cls) -> typing.Type[DummyScada2]:
+        return DummyScada2
+
+    @classmethod
+    def get_settings(cls, paths_name: Optional[str | Path] = None) -> ProactorSettings:
+        if paths_name is None:
+            paths_name = paths.DEFAULT_NAME_DIR
+        return DummyScada2Settings(paths=Paths(name=paths_name))
+
+    @classmethod
+    def get_codec_factory(cls) -> ScadaCodecFactory:
+        return ScadaCodecFactory()
 
     @classmethod
     def make_persister(cls, settings: ProactorSettings) -> TimedRollingFilePersister:
         return TimedRollingFilePersister(settings.paths.event_dir)
-
-    def connect_proactor(self, proactor: Proactor) -> None:
-        proactor.links.add_mqtt_link(
-            LinkSettings(
-                client_name=self.scada1_link.client_name,
-                gnode_name=self.scada1_link.long_name,
-                spaceheat_name=self.scada1_link.short_name,
-                mqtt=self.scada1_link,
-                codec=DummyCodec(
-                    src_name=self.scada1_link.long_name,
-                    dst_name=DUMMY_SCADA2_SHORT_NAME,
-                    model_name="Scada1ToScada2Message",
-                ),
-                upstream=True,
-            ),
-        )
-        if self.admin_link.enabled:
-            proactor.links.add_mqtt_link(
-                LinkSettings(
-                    client_name=self.admin_link.client_name,
-                    gnode_name=self.admin_link.long_name,
-                    spaceheat_name=self.admin_link.short_name,
-                    mqtt=self.admin_link,
-                    codec=AdminCodec(),
-                ),
-            )
-        proactor.links.log_subscriptions("construction")

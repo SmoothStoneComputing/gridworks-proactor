@@ -1,36 +1,13 @@
-from gwproto import MQTTCodec, create_message_model
+from gwproto import HardwareLayout, MQTTCodec, create_message_model
 
+from gwproactor import ProactorSettings
+from gwproactor.codecs import CodecFactory
+from gwproactor.config.proactor_config import ProactorName
+from gwproactor_test.dummies.names import DUMMY_ADMIN_NAME
 from gwproactor_test.dummies.tree.admin_messages import (
     AdminCommandReadRelays,
     AdminCommandSetRelay,
 )
-
-
-class DummyCodec(MQTTCodec):
-    src_name: str
-    dst_name: str
-
-    def __init__(self, src_name: str, dst_name: str, model_name: str) -> None:
-        self.src_name = src_name
-        self.dst_name = dst_name
-        super().__init__(
-            create_message_model(
-                model_name=model_name,
-                module_names=[
-                    "gwproto.messages",
-                    "gwproactor.message",
-                    "gwproactor_test.dummies.tree.messages",
-                ],
-            )
-        )
-
-    def validate_source_and_destination(self, src: str, dst: str) -> None:
-        if src != self.src_name or dst != self.dst_name:
-            raise ValueError(
-                "ERROR validating src and/or dst\n"
-                f"  exp: {self.src_name} -> {self.dst_name}\n"
-                f"  got: {src} -> {dst}"
-            )
 
 
 class AdminCodec(MQTTCodec):
@@ -43,3 +20,21 @@ class AdminCodec(MQTTCodec):
         )
 
     def validate_source_and_destination(self, src: str, dst: str) -> None: ...
+
+
+class ScadaCodecFactory(CodecFactory):
+    def get_codec(
+        self,
+        link_name: str,
+        proactor_name: ProactorName,
+        proactor_settings: ProactorSettings,
+        layout: HardwareLayout,  # noqa: ARG002
+    ) -> MQTTCodec:
+        if link_name == DUMMY_ADMIN_NAME:
+            return AdminCodec()
+        return super().get_codec(
+            link_name=link_name,
+            proactor_name=proactor_name,
+            proactor_settings=proactor_settings,
+            layout=layout,
+        )

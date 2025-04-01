@@ -17,6 +17,17 @@ from gwproactor_test.instrumented_proactor import InstrumentedProactor
 from gwproactor_test.logger_guard import LoggerGuards
 
 
+def get_option_value(
+    *,
+    parameter_value: Optional[bool],
+    option_name: str,
+    request: Optional[typing.Any],
+) -> bool:
+    if parameter_value is not None or request is None:
+        return bool(parameter_value)
+    return bool(request.config.getoption(option_name))
+
+
 class CommTestHelper:
     parent_app: App
     child_app: App
@@ -32,22 +43,39 @@ class CommTestHelper:
         *,
         child_app: Optional[App] = None,
         parent_app: Optional[App] = None,
-        verbose: bool = False,
-        child_verbose: bool = False,
-        parent_verbose: bool = False,
+        verbose: Optional[bool] = None,
+        child_verbose: Optional[bool] = None,
+        parent_verbose: Optional[bool] = None,
         lifecycle_logging: bool = False,
         add_child: bool = False,
         add_parent: bool = False,
         start_child: bool = False,
         start_parent: bool = False,
-        parent_on_screen: bool = False,
+        parent_on_screen: Optional[bool] = None,
+        request: typing.Any = None,
     ) -> None:
         self.child_app = DummyChildApp() if child_app is None else child_app
         self.parent_app = ParentApp() if parent_app is None else parent_app
-        self.verbose = verbose
-        self.child_verbose = child_verbose
-        self.parent_verbose = parent_verbose
-        self.parent_on_screen = parent_on_screen
+        self.verbose = get_option_value(
+            parameter_value=verbose,
+            option_name="--comm-test-verbose",
+            request=request,
+        )
+        self.child_verbose = get_option_value(
+            parameter_value=child_verbose,
+            option_name="--child-verbose",
+            request=request,
+        )
+        self.parent_verbose = get_option_value(
+            parameter_value=parent_verbose,
+            option_name="--parent-verbose",
+            request=request,
+        )
+        self.parent_on_screen = get_option_value(
+            parameter_value=parent_on_screen,
+            option_name="--parent-on-screen",
+            request=request,
+        )
         self.lifecycle_logging = lifecycle_logging
         self.setup_logging()
         if add_child or start_child:

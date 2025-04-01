@@ -1,21 +1,22 @@
 # ruff: noqa: PLR2004, ERA001
 
 import asyncio
+from typing import Any
 
 import pytest
 from gwproto import MQTTTopic
 
-from gwproactor import ProactorSettings
+from gwproactor.config import Paths
 from gwproactor.links import StateName
 from gwproactor_test.comm_test_helper import (
     CommTestHelper,
 )
-from gwproactor_test.dummies import DummyChildApp
+from gwproactor_test.dummies import DUMMY_CHILD_NAME, DummyChildApp, DummyChildSettings
 from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_response_timeout() -> None:
+async def test_response_timeout(request: Any) -> None:
     """
     Test:
         (awaiting_peer -> response_timeout -> awaiting_peer)
@@ -25,6 +26,7 @@ async def test_response_timeout() -> None:
     async with CommTestHelper(
         add_child=True,
         add_parent=True,
+        request=request,
     ) as h:
         child = h.child
         link = child.links.link(child.upstream_client)
@@ -115,7 +117,7 @@ async def test_response_timeout() -> None:
 
 
 @pytest.mark.asyncio
-async def test_ping() -> None:
+async def test_ping(request: Any) -> None:
     """
     Test:
         ping sent peridoically if no messages sent
@@ -125,7 +127,13 @@ async def test_ping() -> None:
     async with CommTestHelper(
         add_child=True,
         add_parent=True,
-        child_app=DummyChildApp(settings=ProactorSettings(mqtt_link_poll_seconds=0.1)),
+        child_app=DummyChildApp(
+            settings=DummyChildSettings(
+                paths=Paths(name=DUMMY_CHILD_NAME),
+                mqtt_link_poll_seconds=0.1,
+            )
+        ),
+        request=request,
     ) as h:
         parent = h.parent
         parent_stats = parent.stats.link(parent.downstream_client)

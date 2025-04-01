@@ -127,7 +127,9 @@ def mqtt_client_fields(model: BaseModel | BaseSettings) -> list[tuple[str, MQTTC
     clients.extend(
         [
             (field_name, field_value)
-            for field_name, field_value in getattr(model, "mqtt", {}).items()
+            for field_name, field_value in getattr(
+                model, "mqtt", getattr(model, "mqtt_brokers", {})
+            ).items()
             if isinstance(field_value, MQTTClient)
         ]
     )

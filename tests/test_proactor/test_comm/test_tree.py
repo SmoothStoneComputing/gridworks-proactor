@@ -1,5 +1,5 @@
 # ruff: noqa: PLR2004, ERA001
-
+from typing import Any
 
 import pytest
 
@@ -10,8 +10,8 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_tree_no_parent() -> None:
-    async with TreeCommTestHelper() as h:
+async def test_tree_no_parent(request: Any) -> None:
+    async with TreeCommTestHelper(request=request) as h:
         # add child 1
         h.add_child()
         child1 = h.child1  # noqa
@@ -72,10 +72,11 @@ async def test_tree_no_parent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_tree_message_exchange() -> None:
+async def test_tree_message_exchange(request: Any) -> None:
     async with TreeCommTestHelper(
         start_child1=True,
         start_child2=True,
+        request=request,
     ) as h:
         child1 = h.child
         stats1 = child1.stats.link(child1.downstream_client)
@@ -99,6 +100,7 @@ async def test_tree_message_exchange() -> None:
         # exchange messages
         assert stats2.num_received_by_type["gridworks.dummy.set.relay"] == 0
         relay_name = "scada2.relay1"
+        h.child.logger.info("SETTING RELAY")
         h.child_app.prime_actor.set_relay(relay_name, True)  # type: ignore[union-attr]
 
         # wait for response to be received
@@ -117,8 +119,8 @@ async def test_tree_message_exchange() -> None:
 
 
 @pytest.mark.asyncio
-async def test_tree_parent_comm() -> None:
-    async with TreeCommTestHelper(add_child=True) as h:
+async def test_tree_parent_comm(request: Any) -> None:
+    async with TreeCommTestHelper(add_child=True, request=request) as h:
         h.start_child1()
         await await_for(
             h.child1.mqtt_quiescent,
@@ -149,25 +151,12 @@ async def test_tree_parent_comm() -> None:
 
 
 @pytest.mark.asyncio
-async def test_tree_event_forward() -> None:
-    # child1_settings = DummyScada1Settings(
-    #     logging=LoggingSettings(
-    #         levels=LoggerLevels(
-    #             message_summary=logging.INFO,
-    #         )
-    #     ),
-    #     mqtt_link_poll_seconds=5,
-    # )
+async def test_tree_event_forward(request: Any) -> None:
     async with TreeCommTestHelper(
-        # child_settings=child1_settings,
         start_child=True,
         start_child2=True,
         start_parent=True,
-        # verbose=True,
-        # child1_verbose=True,
-        # child2_verbose=True,
-        child2_on_screen=False,
-        parent_on_screen=False,
+        request=request,
     ) as h:
         link1to2 = h.child1.links.link(h.child1.downstream_client)
         link2to1 = h.child2.links.link(h.child2.upstream_client)

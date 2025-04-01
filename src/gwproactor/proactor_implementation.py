@@ -201,6 +201,10 @@ class Proactor(ServicesInterface, Runnable):
     def subscription_name(self) -> str:
         return self._name.subscription_name
 
+    @cached_property
+    def name_object(self) -> ProactorName:
+        return self._name
+
     @property
     def callback_functions(self) -> ProactorCallbackFunctions:
         return self._callbacks.callback_functions

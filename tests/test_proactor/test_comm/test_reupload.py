@@ -3,19 +3,21 @@
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 from gwproto import MQTTTopic
 from result import Err
 
-from gwproactor import Proactor, ProactorSettings
+from gwproactor import Proactor
+from gwproactor.config import Paths
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
 from gwproactor.persister import TimedRollingFilePersister
 from gwproactor_test.comm_test_helper import (
     CommTestHelper,
 )
-from gwproactor_test.dummies import DummyChildApp
+from gwproactor_test.dummies import DUMMY_CHILD_NAME, DummyChildApp, DummyChildSettings
 from gwproactor_test.wait import await_for
 
 
@@ -99,7 +101,7 @@ class _EventGen:
 
 
 @pytest.mark.asyncio
-async def test_reupload_basic() -> None:
+async def test_reupload_basic(request: Any) -> None:
     """
     Test:
         reupload not requiring flow control
@@ -107,7 +109,7 @@ async def test_reupload_basic() -> None:
     async with CommTestHelper(
         start_child=True,
         add_parent=True,
-        verbose=False,
+        request=request,
     ) as h:
         child = h.child
         child.disable_derived_events()
@@ -151,20 +153,22 @@ async def test_reupload_basic() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reupload_flow_control_simple() -> None:
+async def test_reupload_flow_control_simple(request: Any) -> None:
     """
     Test:
         reupload requiring flow control
     """
-    from gwproactor import ProactorSettings
 
     async with CommTestHelper(
         start_child=True,
         add_parent=True,
         child_app=DummyChildApp(
-            settings=ProactorSettings(num_initial_event_reuploads=5)
+            settings=DummyChildSettings(
+                paths=Paths(name=DUMMY_CHILD_NAME),
+                num_initial_event_reuploads=5,
+            )
         ),
-        verbose=False,
+        request=request,
     ) as h:
         child = h.child
         child.disable_derived_events()
@@ -215,7 +219,7 @@ async def test_reupload_flow_control_simple() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reupload_flow_control_detail() -> None:
+async def test_reupload_flow_control_detail(request: Any) -> None:
     """
     Test:
         reupload requiring flow control
@@ -224,11 +228,12 @@ async def test_reupload_flow_control_detail() -> None:
         start_child=True,
         add_parent=True,
         child_app=DummyChildApp(
-            settings=ProactorSettings(num_initial_event_reuploads=5)
+            settings=DummyChildSettings(
+                paths=Paths(name=DUMMY_CHILD_NAME),
+                num_initial_event_reuploads=5,
+            )
         ),
-        child_verbose=False,
-        verbose=False,
-        # parent_on_screen=True,
+        request=request,
     ) as h:
         child = h.child
         child.disable_derived_events()
@@ -395,11 +400,11 @@ async def test_reupload_flow_control_detail() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reupload_errors() -> None:
+async def test_reupload_errors(request: Any) -> None:
     async with CommTestHelper(
         start_child=True,
         add_parent=True,
-        child_verbose=False,
+        request=request,
     ) as h:
         child = h.child
         child.disable_derived_events()

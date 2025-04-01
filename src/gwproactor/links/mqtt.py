@@ -21,7 +21,7 @@ from paho.mqtt.client import MQTT_ERR_SUCCESS, MQTTMessage, MQTTMessageInfo
 from paho.mqtt.client import Client as PahoMQTTClient
 
 from gwproactor import config
-from gwproactor.links.link_settings import LinkSettings
+from gwproactor.links.link_settings import LinkConfig
 from gwproactor.message import (
     MQTTConnectFailMessage,
     MQTTConnectMessage,
@@ -283,7 +283,7 @@ class MQTTClients:
         self._send_queue = AsyncQueueWriter()
         self.clients = {}
 
-    def add_client(self, settings: LinkSettings) -> None:
+    def add_client(self, settings: LinkConfig) -> None:
         if settings.client_name in self.clients:
             raise ValueError(
                 f"ERROR. MQTT client named {settings.client_name} already exists"

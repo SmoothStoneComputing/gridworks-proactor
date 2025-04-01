@@ -4,8 +4,10 @@ from typing import Optional, Self, Type, TypeVar
 
 from gwproactor import Proactor, ProactorSettings
 from gwproactor.actors.actor import PrimeActor
-from gwproactor.config import MQTTClient, Paths, paths
+from gwproactor.codecs import CodecFactory
+from gwproactor.config import Paths, paths
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
+from gwproactor.links.link_settings import LinkConfig
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.stats import ProactorStats
 
@@ -17,6 +19,7 @@ class App(abc.ABC):
     proactor: Optional[Proactor] = None
     prime_actor_type: Optional[type[PrimeActor]] = None
     prime_actor: Optional[PrimeActor] = None
+    codec_factory: CodecFactory
 
     def __init__(
         self,
@@ -25,13 +28,21 @@ class App(abc.ABC):
         settings: Optional[ProactorSettings] = None,
         config: Optional[ProactorConfig] = None,
         prime_actor_type: Optional[Type[PrimeActor]] = None,
+        codec_factory: Optional[CodecFactory] = None,
     ) -> None:
         self.config = (
             self.make_proactor_config(name=name, settings=settings)
             if config is None
             else config
         )
-        self.prime_actor_type = prime_actor_type
+        self.prime_actor_type = (
+            self.get_prime_actor_type()
+            if prime_actor_type is None
+            else prime_actor_type
+        )
+        self.codec_factory = (
+            self.get_codec_factory() if codec_factory is None else codec_factory
+        )
 
     @classmethod
     @abc.abstractmethod
@@ -39,8 +50,12 @@ class App(abc.ABC):
         raise NotImplementedError
 
     @classmethod
-    def get_mqtt_clients(cls) -> dict[str, MQTTClient]:
-        return {}
+    def get_prime_actor_type(cls) -> Optional[Type[PrimeActor]]:
+        return None
+
+    @classmethod
+    def get_codec_factory(cls) -> CodecFactory:
+        return CodecFactory()
 
     @classmethod
     def get_settings(cls, paths_name: Optional[str | Path] = None) -> ProactorSettings:
@@ -68,8 +83,6 @@ class App(abc.ABC):
             if settings is None
             else settings
         )
-        for client_name, client_config in cls.get_mqtt_clients().items():
-            settings.add_mqtt_client(client_name, client_config)
         return ProactorConfig(
             name=name,
             settings=settings,
@@ -81,18 +94,34 @@ class App(abc.ABC):
     def instantiate_proactor(cls, config: ProactorConfig) -> Proactor:
         return Proactor(config)
 
-    @abc.abstractmethod
-    def connect_proactor(self, proactor: Proactor) -> None:
-        raise NotImplementedError
+    def assemble_links(self, proactor: Proactor) -> None:
+        for link_name, link_settings in proactor.settings.links.items():
+            if link_settings.enabled:
+                proactor.links.add_mqtt_link(
+                    LinkConfig(
+                        client_name=link_name,
+                        gnode_name=link_settings.peer_long_name,
+                        spaceheat_name=link_settings.peer_short_name,
+                        subscription_name=link_settings.link_subscription_short_name,
+                        mqtt=proactor.settings.mqtt_brokers[link_name],
+                        codec=self.codec_factory.get_codec(
+                            link_name=link_name,
+                            proactor_name=proactor.name_object,
+                            proactor_settings=proactor.settings,
+                            layout=proactor.hardware_layout,
+                        ),
+                        upstream=link_settings.upstream,
+                        downstream=link_settings.downstream,
+                    ),
+                )
 
     def instantiate(self) -> Self:
         self.proactor = self.instantiate_proactor(self.config)
-        self.connect_proactor(self.proactor)
+        self.assemble_links(self.proactor)
         if self.prime_actor_type is not None:
             self.prime_actor = self.prime_actor_type(
                 self.config.name.long_name,
                 self.proactor,
             )
-
         self.proactor.links.log_subscriptions("construction")
         return self

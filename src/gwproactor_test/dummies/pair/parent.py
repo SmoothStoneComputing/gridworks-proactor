@@ -1,42 +1,23 @@
 """Scada implementation"""
 
+from pathlib import Path
 from typing import Any, Optional
 
-from gwproto import Message, MQTTCodec, create_message_model
+from gwproto import Message
 from result import Ok, Result
 
-from gwproactor import Proactor, ProactorSettings
+from gwproactor import ProactorSettings
 from gwproactor.actors.actor import PrimeActor
-from gwproactor.config import MQTTClient
+from gwproactor.config import Paths, paths
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
-from gwproactor.links.link_settings import LinkSettings
 from gwproactor.message import DBGPayload
 from gwproactor.persister import PersisterInterface, SimpleDirectoryWriter
 from gwproactor_test.dummies.names import (
-    CHILD_SHORT_NAME,
-    DUMMY_CHILD_NAME,
     DUMMY_PARENT_NAME,
     PARENT_SHORT_NAME,
 )
+from gwproactor_test.dummies.pair.parent_config import DummyParentSettings
 from gwproactor_test.instrumented_app import TestApp
-
-
-class ParentMQTTCodec(MQTTCodec):
-    def __init__(self) -> None:
-        super().__init__(
-            create_message_model(
-                model_name="ParentMessageDecoder",
-                module_names=["gwproto.messages", "gwproactor.message"],
-            )
-        )
-
-    def validate_source_and_destination(self, src: str, dst: str) -> None:
-        if src != DUMMY_CHILD_NAME or dst != PARENT_SHORT_NAME:
-            raise ValueError(
-                "ERROR validating src and/or dst\n"
-                f"  exp: {DUMMY_CHILD_NAME} -> {PARENT_SHORT_NAME}\n"
-                f"  got: {src} -> {dst}"
-            )
 
 
 class DummyParent(PrimeActor):
@@ -54,8 +35,6 @@ class DummyParent(PrimeActor):
 
 
 class ParentApp(TestApp):
-    CHILD_MQTT: str = "child"
-
     def __init__(
         self,
         *,
@@ -76,23 +55,11 @@ class ParentApp(TestApp):
         )
 
     @classmethod
-    def get_mqtt_clients(cls) -> dict[str, MQTTClient]:
-        return {ParentApp.CHILD_MQTT: MQTTClient()}
+    def get_settings(cls, paths_name: Optional[str | Path] = None) -> ProactorSettings:
+        if paths_name is None:
+            paths_name = paths.DEFAULT_NAME_DIR
+        return DummyParentSettings(paths=Paths(name=paths_name))
 
     @classmethod
     def make_persister(cls, settings: ProactorSettings) -> PersisterInterface:
         return SimpleDirectoryWriter(settings.paths.event_dir)
-
-    def connect_proactor(self, proactor: Proactor) -> None:
-        if self.proactor is None:
-            raise RuntimeError("connect_proactor called before instantiate()")
-        proactor.links.add_mqtt_link(
-            LinkSettings(
-                client_name=self.CHILD_MQTT,
-                gnode_name=DUMMY_CHILD_NAME,
-                spaceheat_name=CHILD_SHORT_NAME,
-                mqtt=proactor.settings.mqtt[self.CHILD_MQTT],
-                codec=ParentMQTTCodec(),
-                downstream=True,
-            )
-        )
