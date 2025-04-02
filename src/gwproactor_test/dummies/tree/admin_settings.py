@@ -29,7 +29,7 @@ class DummyAdminSettings(ProactorSettings):
     @model_validator(mode="before")
     @classmethod
     def pre_root_validator(cls, values: dict[str, Any]) -> dict[str, Any]:
-        return ProactorSettings.update_paths_name(values, DUMMY_ADMIN_NAME)
+        return ProactorSettings.update_paths_name_validator(values, DUMMY_ADMIN_NAME)
 
     @model_validator(mode="after")
     def validate_(self) -> Self:

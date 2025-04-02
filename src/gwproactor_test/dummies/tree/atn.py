@@ -1,21 +1,20 @@
 """Scada implementation"""
 
-import typing
-from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from gwproto import Message
+from gwproto import HardwareLayout, Message
 from gwproto.messages import EventBase
 
 from gwproactor import ProactorSettings
 from gwproactor.actors.actor import PrimeActor
-from gwproactor.config import Paths, paths
+from gwproactor.config import MQTTClient, Paths
+from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import PersisterInterface, SimpleDirectoryWriter
-from gwproactor_test.dummies.names import DUMMY_ATN_NAME, DUMMY_ATN_SHORT_NAME
-from gwproactor_test.dummies.tree.atn_settings import DummyAtnSettings
-from gwproactor_test.instrumented_app import TestApp
+from gwproactor_test.dummies import DUMMY_SCADA1_NAME
+from gwproactor_test.dummies.names import DUMMY_ATN_NAME
+from gwproactor_test.instrumented_app import InstrumentedApp
 
 
 class DummyAtn(PrimeActor):
@@ -38,25 +37,42 @@ class DummyAtn(PrimeActor):
         )
 
 
-class DummyAtnApp(TestApp):
-    @classmethod
-    def get_name(cls) -> ProactorName:
-        return ProactorName(
-            long_name=DUMMY_ATN_NAME,
-            short_name=DUMMY_ATN_SHORT_NAME,
-            paths_name=DUMMY_ATN_NAME,
+class DummyAtnApp(InstrumentedApp):
+    SCADA1_LINK: str = DUMMY_SCADA1_NAME
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(
+            paths=Paths(name=DUMMY_ATN_NAME), prime_actor_type=DummyAtn, **kwargs
         )
 
-    @classmethod
-    def get_prime_actor_type(cls) -> typing.Type[DummyAtn]:
-        return DummyAtn
+    def _get_name(self, layout: HardwareLayout) -> ProactorName:
+        return ProactorName(
+            long_name=layout.atn_g_node_alias,
+            short_name="a",
+        )
+
+    def _get_mqtt_broker_settings(
+        self,
+        name: ProactorName,  # noqa: ARG002
+        layout: HardwareLayout,  # noqa: ARG002
+    ) -> dict[str, MQTTClient]:
+        return {self.SCADA1_LINK: MQTTClient()}
+
+    def _get_link_settings(
+        self,
+        name: ProactorName,  # noqa: ARG002
+        layout: HardwareLayout,
+        brokers: dict[str, MQTTClient],  # noqa: ARG002
+    ) -> dict[str, LinkSettings]:
+        return {
+            self.SCADA1_LINK: LinkSettings(
+                broker_name=self.SCADA1_LINK,
+                peer_long_name=layout.scada_g_node_alias,
+                peer_short_name="s",
+                downstream=True,
+            )
+        }
 
     @classmethod
-    def get_settings(cls, paths_name: Optional[str | Path] = None) -> ProactorSettings:
-        if paths_name is None:
-            paths_name = paths.DEFAULT_NAME_DIR
-        return DummyAtnSettings(paths=Paths(name=paths_name))
-
-    @classmethod
-    def make_persister(cls, settings: ProactorSettings) -> PersisterInterface:
+    def _make_persister(cls, settings: ProactorSettings) -> PersisterInterface:
         return SimpleDirectoryWriter(settings.paths.event_dir)

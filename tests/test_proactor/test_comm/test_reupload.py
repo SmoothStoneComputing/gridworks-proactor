@@ -10,14 +10,13 @@ from gwproto import MQTTTopic
 from result import Err
 
 from gwproactor import Proactor
-from gwproactor.config import Paths
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
 from gwproactor.persister import TimedRollingFilePersister
 from gwproactor_test.comm_test_helper import (
     CommTestHelper,
 )
-from gwproactor_test.dummies import DUMMY_CHILD_NAME, DummyChildApp, DummyChildSettings
+from gwproactor_test.dummies import DummyChildApp
 from gwproactor_test.wait import await_for
 
 
@@ -159,12 +158,13 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
         reupload requiring flow control
     """
 
+    from gwproactor import ProactorSettings
+
     async with CommTestHelper(
         start_child=True,
         add_parent=True,
         child_app=DummyChildApp(
-            settings=DummyChildSettings(
-                paths=Paths(name=DUMMY_CHILD_NAME),
+            proactor_settings=ProactorSettings(
                 num_initial_event_reuploads=5,
             )
         ),
@@ -224,12 +224,13 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
     Test:
         reupload requiring flow control
     """
+    from gwproactor import ProactorSettings
+
     async with CommTestHelper(
         start_child=True,
         add_parent=True,
         child_app=DummyChildApp(
-            settings=DummyChildSettings(
-                paths=Paths(name=DUMMY_CHILD_NAME),
+            proactor_settings=ProactorSettings(
                 num_initial_event_reuploads=5,
             )
         ),

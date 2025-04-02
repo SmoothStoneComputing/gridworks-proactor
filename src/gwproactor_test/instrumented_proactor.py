@@ -150,7 +150,7 @@ class RecorderLinks(LinkManager):
             cast(
                 RecorderLinkStats, self._stats.link(event.PeerName)
             ).comm_events.append(event)
-        if event.Src != self.publication_name:
+        if event.Src != self.publication_name and event.Src in self._stats.links:
             cast(RecorderLinkStats, self._stats.link(event.Src)).forwarded[
                 event.TypeName
             ] += 1

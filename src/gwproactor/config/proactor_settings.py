@@ -33,11 +33,20 @@ class ProactorSettings(BaseSettings):
             v = Paths()
         return v
 
+    def update_paths_name(self, name: str | Path) -> Self:
+        self.paths = Paths(
+            name=name, **self.paths.model_dump(exclude={"name"}, exclude_unset=True)
+        )
+        self.update_tls_paths()
+        return self
+
     @classmethod
-    def update_paths_name(cls, values: dict[str, Any], name: str) -> dict[str, Any]:
+    def update_paths_name_validator(
+        cls, values: dict[str, Any], name: str
+    ) -> dict[str, Any]:
         """Update paths member with a new 'name' attribute, e.g., a name known by a derived class.
 
-        This is meant to be called in a 'pre=True' root validator of a derived class.
+        This may be called in a mode="before" root validator of a derived class.
         """
         if "paths" not in values:
             values["paths"] = Paths(name=name)
@@ -128,16 +137,34 @@ class ProactorSettings(BaseSettings):
                 )
         return self
 
-    def add_mqtt_broker(self, name: str, client: MQTTClient) -> Self:
+    def add_mqtt_broker(
+        self, name: str, client: typing.Optional[MQTTClient] = None
+    ) -> Self:
         if name in self.mqtt_brokers:
             raise ValueError(f"MQTT client with name <{name}> is already present")
-        self.mqtt_brokers[name] = client
+        self.mqtt_brokers[name] = MQTTClient() if client is None else client
         self.mqtt_brokers[name].update_tls_paths(Path(self.paths.certs_dir), name)
+        return self
+
+    def add_link(self, name: str, link: LinkSettings) -> Self:
+        if name in self.links:
+            raise ValueError(f"Link with name <{name}> is already present")
+        if link.enabled and link.broker_name not in self.mqtt_brokers:
+            raise ValueError(
+                f"ERROR. Link <{name}> is enabled but uses "
+                f"missing broker <{link.broker_name}>. "
+            )
+        self.links[name] = link
         return self
 
     def update_tls_paths(self) -> Self:
         for client_name, client in self.mqtt_brokers.items():
             client.update_tls_paths(Path(self.paths.certs_dir), client_name)
+        return self
+
+    def update_paths(self, paths: Paths) -> Self:
+        self.paths = paths.model_copy(deep=True)
+        self.update_tls_paths()
         return self
 
     def uses_tls(self) -> bool:

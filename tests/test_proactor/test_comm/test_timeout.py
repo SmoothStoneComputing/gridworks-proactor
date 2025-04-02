@@ -6,12 +6,11 @@ from typing import Any
 import pytest
 from gwproto import MQTTTopic
 
-from gwproactor.config import Paths
 from gwproactor.links import StateName
 from gwproactor_test.comm_test_helper import (
     CommTestHelper,
 )
-from gwproactor_test.dummies import DUMMY_CHILD_NAME, DummyChildApp, DummyChildSettings
+from gwproactor_test.dummies import DummyChildApp
 from gwproactor_test.wait import await_for
 
 
@@ -124,12 +123,13 @@ async def test_ping(request: Any) -> None:
         ping not sent if messages are sent
         ping restores comm
     """
+    from gwproactor import ProactorSettings
+
     async with CommTestHelper(
         add_child=True,
         add_parent=True,
         child_app=DummyChildApp(
-            settings=DummyChildSettings(
-                paths=Paths(name=DUMMY_CHILD_NAME),
+            proactor_settings=ProactorSettings(
                 mqtt_link_poll_seconds=0.1,
             )
         ),

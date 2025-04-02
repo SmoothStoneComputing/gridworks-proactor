@@ -8,7 +8,6 @@ from gwproto import HardwareLayout
 
 from gwproactor import ProactorLogger, ProactorSettings
 from gwproactor.callbacks import ProactorCallbackFunctions
-from gwproactor.config import Paths
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.stats import ProactorStats
 
@@ -17,7 +16,6 @@ from gwproactor.stats import ProactorStats
 class ProactorName:
     long_name: str
     short_name: str
-    paths_name: str
 
     @cached_property
     def name(self) -> str:
@@ -53,11 +51,7 @@ class ProactorConfig:
         hardware_layout: Optional[HardwareLayout] = None,
     ) -> None:
         self.name = name
-        self.settings = (
-            ProactorSettings(paths=Paths(name=name.paths_name))
-            if settings is None
-            else settings
-        )
+        self.settings = ProactorSettings() if settings is None else settings
         self.callback_functions = (
             ProactorCallbackFunctions() if callbacks is None else callbacks
         )

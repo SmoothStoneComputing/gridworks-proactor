@@ -1,19 +1,18 @@
 import typing
-from pathlib import Path
-from typing import Optional
 
 import rich
-from gwproto import Message
+from gwproto import HardwareLayout, Message
 from gwproto.messages import EventBase
 
 from gwproactor import ProactorSettings, ServicesInterface
 from gwproactor.actors.actor import PrimeActor
-from gwproactor.config import Paths, paths
+from gwproactor.config import MQTTClient, Paths
+from gwproactor.config.links import CodecSettings, LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import TimedRollingFilePersister
-from gwproactor_test.dummies import DUMMY_SCADA1_NAME
-from gwproactor_test.dummies.names import DUMMY_SCADA1_SHORT_NAME
+from gwproactor_test.dummies import DUMMY_ATN_NAME, DUMMY_SCADA1_NAME, DUMMY_SCADA2_NAME
+from gwproactor_test.dummies.names import DUMMY_ADMIN_NAME, DUMMY_ADMIN_SHORT_NAME
 from gwproactor_test.dummies.tree.admin_messages import (
     AdminCommandReadRelays,
     AdminCommandSetRelay,
@@ -29,7 +28,7 @@ from gwproactor_test.dummies.tree.messages import (
     SetRelayMessage,
 )
 from gwproactor_test.dummies.tree.scada1_settings import DummyScada1Settings
-from gwproactor_test.instrumented_app import TestApp
+from gwproactor_test.instrumented_app import InstrumentedApp
 
 
 class DummyScada1(PrimeActor):
@@ -223,29 +222,66 @@ class DummyScada1(PrimeActor):
         return DummyScada1Settings.ADMIN_LINK
 
 
-class DummyScada1App(TestApp):
-    @classmethod
-    def get_name(cls) -> ProactorName:
-        return ProactorName(
-            long_name=DUMMY_SCADA1_NAME,
-            short_name=DUMMY_SCADA1_SHORT_NAME,
-            paths_name=DUMMY_SCADA1_NAME,
+class DummyScada1App(InstrumentedApp):
+    ATN_LINK: str = DUMMY_ATN_NAME
+    SCADA2_LINK: str = DUMMY_SCADA2_NAME
+    ADMIN_LINK: str = DUMMY_ADMIN_NAME
+
+    def __init__(self, **kwargs: typing.Any) -> None:
+        super().__init__(
+            paths=Paths(name=DUMMY_SCADA1_NAME), prime_actor_type=DummyScada1, **kwargs
         )
 
-    @classmethod
-    def get_prime_actor_type(cls) -> typing.Type[DummyScada1]:
-        return DummyScada1
+    def _get_name(self, layout: HardwareLayout) -> ProactorName:
+        return ProactorName(
+            long_name=layout.scada_g_node_alias,
+            short_name="s",
+        )
+
+    def _get_mqtt_broker_settings(
+        self,
+        name: ProactorName,  # noqa: ARG002
+        layout: HardwareLayout,  # noqa: ARG002
+    ) -> dict[str, MQTTClient]:
+        return {
+            link_name: MQTTClient()
+            for link_name in [self.ATN_LINK, self.SCADA2_LINK, self.ADMIN_LINK]
+        }
+
+    def _get_link_settings(
+        self,
+        name: ProactorName,  # noqa: ARG002
+        layout: HardwareLayout,
+        brokers: dict[str, MQTTClient],  # noqa: ARG002
+    ) -> dict[str, LinkSettings]:
+        return {
+            self.ATN_LINK: LinkSettings(
+                broker_name=self.ATN_LINK,
+                peer_long_name=layout.atn_g_node_alias,
+                peer_short_name="a",
+                upstream=True,
+            ),
+            self.SCADA2_LINK: LinkSettings(
+                broker_name=self.SCADA2_LINK,
+                peer_long_name=layout.scada_g_node_alias + ".s2",
+                peer_short_name="s2",
+                downstream=True,
+                codec=CodecSettings(
+                    message_modules=["gwproactor_test.dummies.tree.messages"]
+                ),
+            ),
+            self.ADMIN_LINK: LinkSettings(
+                broker_name=self.ADMIN_LINK,
+                peer_long_name=DUMMY_ADMIN_NAME,
+                peer_short_name=DUMMY_ADMIN_SHORT_NAME,
+                link_subscription_short_name=layout.scada_g_node_alias,
+            ),
+        }
 
     @classmethod
-    def get_settings(cls, paths_name: Optional[str | Path] = None) -> ProactorSettings:
-        if paths_name is None:
-            paths_name = paths.DEFAULT_NAME_DIR
-        return DummyScada1Settings(paths=Paths(name=paths_name))
-
-    @classmethod
-    def get_codec_factory(cls) -> ScadaCodecFactory:
+    def _get_codec_factory(cls) -> ScadaCodecFactory:
         return ScadaCodecFactory()
 
     @classmethod
-    def make_persister(cls, settings: ProactorSettings) -> TimedRollingFilePersister:
+    def _make_persister(cls, settings: ProactorSettings) -> TimedRollingFilePersister:
         return TimedRollingFilePersister(settings.paths.event_dir)

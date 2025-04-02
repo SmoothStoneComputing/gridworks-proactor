@@ -3,10 +3,9 @@ create forward references for implementation hiearchies
 """
 
 import asyncio
-import importlib
-import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from types import ModuleType
 from typing import Any, Coroutine, Optional, Sequence, Type, TypeVar
 
 from aiohttp.typedefs import Handler as HTTPHandler
@@ -128,15 +127,13 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
         name: str,
         actor_class_name: str,
         services: "ServicesInterface",
-        module_name: str,
+        actors_module: ModuleType,
     ) -> "ActorInterface":
-        if module_name not in sys.modules:
-            importlib.import_module(module_name)
-        actor_class = getattr(sys.modules[module_name], actor_class_name)
+        actor_class = getattr(actors_module, actor_class_name)
         if not issubclass(actor_class, ActorInterface):
             raise ValueError(  # noqa: TRY004
                 f"ERROR. Imported class <{actor_class}> "
-                f"from module <{module_name}> "
+                f"from module <{actors_module.__name__}> "
                 f"with via requested name <{actor_class_name} "
                 "does not implement ActorInterface",
             )

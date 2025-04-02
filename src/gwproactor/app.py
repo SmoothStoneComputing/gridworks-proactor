@@ -1,11 +1,15 @@
 import abc
 from pathlib import Path
-from typing import Optional, Self, Type, TypeVar
+from types import ModuleType
+from typing import Optional, Self, Sequence, TypeVar
 
-from gwproactor import Proactor, ProactorSettings
+from gwproto import HardwareLayout, ShNode
+
+from gwproactor import ActorInterface, Proactor, ProactorSettings
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.codecs import CodecFactory
-from gwproactor.config import Paths, paths
+from gwproactor.config import MQTTClient, Paths
+from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
 from gwproactor.links.link_settings import LinkConfig
 from gwproactor.persister import PersisterInterface, StubPersister
@@ -16,85 +20,90 @@ PrimeActorT = TypeVar("PrimeActorT", bound=PrimeActor)
 
 class App(abc.ABC):
     config: ProactorConfig
-    proactor: Optional[Proactor] = None
+    proactor_type: type[Proactor] = Proactor
     prime_actor_type: Optional[type[PrimeActor]] = None
-    prime_actor: Optional[PrimeActor] = None
     codec_factory: CodecFactory
+    actors_module: Optional[ModuleType] = None
+    proactor: Optional[Proactor] = None
+    prime_actor: Optional[PrimeActor] = None
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
-        name: Optional[ProactorName] = None,
-        settings: Optional[ProactorSettings] = None,
-        config: Optional[ProactorConfig] = None,
-        prime_actor_type: Optional[Type[PrimeActor]] = None,
+        paths: Optional[Paths] = None,
+        proactor_settings: Optional[ProactorSettings] = None,
+        proactor_type: type[Proactor] = Proactor,
+        prime_actor_type: Optional[type[PrimeActor]] = None,
         codec_factory: Optional[CodecFactory] = None,
+        actors_module: Optional[ModuleType] = None,
     ) -> None:
-        self.config = (
-            self.make_proactor_config(name=name, settings=settings)
-            if config is None
-            else config
-        )
-        self.prime_actor_type = (
-            self.get_prime_actor_type()
-            if prime_actor_type is None
-            else prime_actor_type
-        )
-        self.codec_factory = (
-            self.get_codec_factory() if codec_factory is None else codec_factory
-        )
+        self.proactor_type = proactor_type
+        self.prime_actor_type = prime_actor_type
+        self.codec_factory = CodecFactory() if codec_factory is None else codec_factory
+        self.actors_module = actors_module
+        self.config = self._make_proactor_config(paths, proactor_settings)
 
-    @classmethod
-    @abc.abstractmethod
-    def get_name(cls) -> ProactorName:
-        raise NotImplementedError
-
-    @classmethod
-    def get_prime_actor_type(cls) -> Optional[Type[PrimeActor]]:
-        return None
-
-    @classmethod
-    def get_codec_factory(cls) -> CodecFactory:
-        return CodecFactory()
-
-    @classmethod
-    def get_settings(cls, paths_name: Optional[str | Path] = None) -> ProactorSettings:
-        if paths_name is None:
-            paths_name = paths.DEFAULT_NAME_DIR
-        return ProactorSettings(paths=Paths(name=paths_name))
-
-    @classmethod
-    def make_persister(cls, settings: ProactorSettings) -> PersisterInterface:  # noqa: ARG003
-        return StubPersister()
-
-    @classmethod
-    def make_stats(cls) -> ProactorStats:
-        return ProactorStats()
-
-    @classmethod
-    def make_proactor_config(
-        cls,
-        name: Optional[ProactorName] = None,
-        settings: Optional[ProactorSettings] = None,
+    def _make_proactor_config(
+        self,
+        paths: Optional[Paths] = None,
+        proactor_settings: Optional[ProactorSettings] = None,
     ) -> ProactorConfig:
-        name = cls.get_name() if name is None else name
         settings = (
-            cls.get_settings(paths_name=name.paths_name)
-            if settings is None
-            else settings
+            ProactorSettings()
+            if proactor_settings is None
+            else proactor_settings.model_copy(deep=True)
         )
+        if paths is not None:
+            settings.update_paths(paths)
+        layout = self._load_hardware_layout(settings.paths.hardware_layout)
+        name = self._get_name(layout)
+        brokers = self._get_mqtt_broker_settings(name, layout)
+        for broker_name, broker_settings in brokers.items():
+            settings.add_mqtt_broker(broker_name, broker_settings)
+        for link_name, link in self._get_link_settings(name, layout, brokers).items():
+            settings.add_link(link_name, link)
         return ProactorConfig(
             name=name,
             settings=settings,
-            event_persister=cls.make_persister(settings),
-            stats=cls.make_stats(),
+            event_persister=self._make_persister(settings),
+            stats=self._make_stats(),
+            hardware_layout=layout,
         )
 
-    @classmethod
-    def instantiate_proactor(cls, config: ProactorConfig) -> Proactor:
-        return Proactor(config)
+    def instantiate(self) -> Self:
+        self.proactor = self.proactor_type(self.config)
+        self._connect_links(self.proactor)
+        if self.prime_actor_type is not None:
+            self.prime_actor = self.prime_actor_type(
+                self.config.name.long_name,
+                self.proactor,
+            )
+        self._load_actors()
+        self.proactor.links.log_subscriptions("construction")
+        return self
 
-    def assemble_links(self, proactor: Proactor) -> None:
+    @abc.abstractmethod
+    def _get_name(self, layout: HardwareLayout) -> ProactorName:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _get_mqtt_broker_settings(
+        self,
+        name: ProactorName,
+        layout: HardwareLayout,
+    ) -> dict[str, MQTTClient]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _get_link_settings(
+        self,
+        name: ProactorName,
+        layout: HardwareLayout,
+        brokers: dict[str, MQTTClient],
+    ) -> dict[str, LinkSettings]:
+        raise NotImplementedError
+
+    def _connect_links(self, proactor: Proactor) -> None:
         for link_name, link_settings in proactor.settings.links.items():
             if link_settings.enabled:
                 proactor.links.add_mqtt_link(
@@ -115,13 +124,44 @@ class App(abc.ABC):
                     ),
                 )
 
-    def instantiate(self) -> Self:
-        self.proactor = self.instantiate_proactor(self.config)
-        self.assemble_links(self.proactor)
-        if self.prime_actor_type is not None:
-            self.prime_actor = self.prime_actor_type(
-                self.config.name.long_name,
-                self.proactor,
+    @property
+    def _layout(self) -> HardwareLayout:
+        if self.proactor is None:
+            raise ValueError("hardware_layout access before proactor instantiated")
+        return self.proactor.hardware_layout
+
+    # noinspection PyMethodMayBeStatic
+    def _load_hardware_layout(self, layout_path: str | Path) -> HardwareLayout:
+        return HardwareLayout.load(layout_path)
+
+    def _make_persister(self, settings: ProactorSettings) -> PersisterInterface:  # noqa: ARG002, ARG003
+        return StubPersister()
+
+    def _make_stats(self) -> ProactorStats:
+        return ProactorStats()
+
+    def _get_actor_nodes(self) -> Sequence[ShNode]:
+        if self.prime_actor is None:
+            return []
+        return [
+            node
+            for node in self._layout.nodes.values()
+            if (
+                node.has_actor
+                and self._layout.parent_node(node) == self.prime_actor.node
             )
-        self.proactor.links.log_subscriptions("construction")
-        return self
+        ]
+
+    def _load_actors(self) -> None:
+        if self.proactor is None:
+            raise ValueError("_load_actors called before proactor instantiated")
+        if self.actors_module is not None:
+            for node in self._get_actor_nodes():
+                self.proactor.add_communicator(
+                    ActorInterface.load(
+                        node.Name,
+                        str(node.actor_class),
+                        self.proactor,
+                        actors_module=self.actors_module,
+                    )
+                )

@@ -142,7 +142,8 @@ class Proactor(ServicesInterface, Runnable):
                 name=server_config.web_server_gt.Name,
                 host=server_config.web_server_gt.Host,
                 port=server_config.web_server_gt.Port,
-                **server_config.web_server_gt.Kwargs,
+                enabled=server_config.web_server_gt.Enabled,
+                server_kwargs=server_config.web_server_gt.Kwargs,
             )
 
     def send(self, message: Message[Any]) -> None:
@@ -191,7 +192,7 @@ class Proactor(ServicesInterface, Runnable):
 
     @cached_property
     def paths_name(self) -> str:
-        return self._name.paths_name
+        return str(self.settings.paths.name)
 
     @cached_property
     def publication_name(self) -> str:
