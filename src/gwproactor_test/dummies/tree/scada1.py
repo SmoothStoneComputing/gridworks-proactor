@@ -27,7 +27,6 @@ from gwproactor_test.dummies.tree.messages import (
     SetRelay,
     SetRelayMessage,
 )
-from gwproactor_test.dummies.tree.scada1_settings import DummyScada1Settings
 from gwproactor_test.instrumented_app import InstrumentedApp
 
 
@@ -219,7 +218,7 @@ class DummyScada1(PrimeActor):
 
     @property
     def admin_client(self) -> str:
-        return DummyScada1Settings.ADMIN_LINK
+        return DUMMY_ADMIN_NAME
 
 
 class DummyScada1App(InstrumentedApp):
