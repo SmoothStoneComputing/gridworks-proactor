@@ -9,7 +9,6 @@ from gwproactor.config.proactor_config import ProactorName
 from gwproactor.links import QOS
 from gwproactor.persister import PersisterInterface, TimedRollingFilePersister
 from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
-from gwproactor_test.dummies.pair.child_config import DummyChildSettings
 from gwproactor_test.instrumented_app import InstrumentedApp
 
 
@@ -58,6 +57,4 @@ class DummyChildApp(InstrumentedApp):
             MQTTTopic.encode_subscription(Message.type_name(), "1", "a"),
             MQTTTopic.encode_subscription(Message.type_name(), "2", "b"),
         ]:
-            proactor.links.subscribe(
-                DummyChildSettings.PARENT_MQTT, topic, QOS.AtMostOnce
-            )
+            proactor.links.subscribe(self.PARENT_MQTT, topic, QOS.AtMostOnce)
