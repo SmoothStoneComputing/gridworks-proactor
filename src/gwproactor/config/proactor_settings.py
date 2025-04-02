@@ -162,10 +162,36 @@ class ProactorSettings(BaseSettings):
             client.update_tls_paths(Path(self.paths.certs_dir), client_name)
         return self
 
-    def update_paths(self, paths: Paths) -> Self:
-        self.paths = paths.model_copy(deep=True)
-        self.update_tls_paths()
+    def update_paths(
+        self,
+        *,
+        name: typing.Optional[str] = None,
+        paths: typing.Optional[Paths] = None,
+    ) -> Self:
+        if name is not None or paths is not None:
+            name_update = {}
+            if name is not None:
+                name_update["name"] = name
+            self.paths = (self.paths if paths is None else paths).copy(**name_update)
+            self.update_tls_paths()
         return self
 
     def uses_tls(self) -> bool:
         return any(client.tls.use_tls for client in self.mqtt_brokers.values())
+
+    def check_tls_paths_present(self, *, raise_error: bool = True) -> str:
+        missing_str = ""
+        for broker_name, broker in self.mqtt_brokers.items():
+            if broker.tls.use_tls:
+                missing_paths = broker.tls.paths.missing_paths()
+                if missing_paths:
+                    missing_str += f"broker {broker_name}\n"
+                    for path_name, path in missing_paths:
+                        missing_str += f"  {path_name:20s}  {path}\n"
+        if missing_str:
+            error_str = f"ERROR. TLS usage requested but the following files are missing:\n{missing_str}"
+            if raise_error:
+                raise ValueError(error_str)
+        else:
+            error_str = ""
+        return error_str

@@ -58,6 +58,14 @@ class TLSPaths(BaseModel):
             mode=mode, parents=parents, exist_ok=exist_ok
         )
 
+    def missing_paths(self) -> list[tuple[str, Optional[Path]]]:
+        missing = []
+        for path_name in self.__pydantic_fields__:
+            path = getattr(self, path_name)
+            if path is None or not Path(path).exists():
+                missing.append((path_name, path))
+        return missing
+
 
 class Paths(BaseModel):
     # Relative offsets used under home directories

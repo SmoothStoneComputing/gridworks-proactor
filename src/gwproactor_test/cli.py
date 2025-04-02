@@ -11,9 +11,9 @@ from gwproactor_test import test_ca_certificate_path, test_ca_private_key_path
 from gwproactor_test.certs import mqtt_client_fields
 from gwproactor_test.dummies.tree import admin_cli, atn1_cli, scada1_cli, scada2_cli
 from gwproactor_test.dummies.tree.admin_settings import DummyAdminSettings
-from gwproactor_test.dummies.tree.atn_settings import DummyAtnSettings
-from gwproactor_test.dummies.tree.scada1_settings import DummyScada1Settings
-from gwproactor_test.dummies.tree.scada2_settings import DummyScada2Settings
+from gwproactor_test.dummies.tree.atn import DummyAtnApp
+from gwproactor_test.dummies.tree.scada1 import DummyScada1App
+from gwproactor_test.dummies.tree.scada2 import DummyScada2App
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -30,23 +30,24 @@ app.add_typer(admin_cli.app, name="admin", help="Use dummy admin")
 
 @app.command()
 def gen_dummy_certs(
-    dry_run: bool = False,
-    env_file: str = ".env",
+    dry_run: bool = False, env_file: str = ".env", only: str = ""
 ) -> None:
     """Generate certs for dummy proactors."""
     console = rich.console.Console()
     env_file = dotenv.find_dotenv(env_file)
     ca_cert_path = test_ca_certificate_path()
     ca_private_key_path = test_ca_private_key_path()
-    for settings in [
-        DummyAtnSettings(_env_file=env_file),
-        DummyScada1Settings(_env_file=env_file),
-        DummyScada2Settings(_env_file=env_file),
-        DummyAdminSettings(_env_file=env_file),
+    for app_name, settings in [
+        ("atn", DummyAtnApp(env_file=env_file).config.settings),
+        ("scada1", DummyScada1App(env_file=env_file).config.settings),
+        ("scada2", DummyScada2App(env_file=env_file).config.settings),
+        ("admin", DummyAdminSettings(_env_file=env_file)),  # noqa
     ]:
-        commands = []
+        if only and only != app_name:
+            continue
+        commands_ = []
         for _, client_config in mqtt_client_fields(settings):
-            commands.append(
+            commands_.append(
                 [
                     "gwcert",
                     "key",
@@ -61,12 +62,12 @@ def gen_dummy_certs(
             )
         if dry_run:
             console.print(f"Showing key generation commands for {type(settings)}")
-            for command in commands:
+            for command in commands_:
                 console.print(f"  {' '.join(command)}", soft_wrap=True)
             console.print("\n\n\n")
         else:
             console.print(f"Generating keys with for {type(settings)}")
-            for command in commands:
+            for command in commands_:
                 console.print("Generating keys with command:")
                 console.print(f"  {' '.join(command)}", soft_wrap=True)
                 try:

@@ -2,13 +2,8 @@ import asyncio
 
 import typer
 
-from gwproactor.command_line_utils import (
-    print_settings,
-    run_async_main,
-)
-from gwproactor_test.dummies import DUMMY_ATN_NAME
+from gwproactor.app import run_async_main
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
-from gwproactor_test.dummies.tree.atn_settings import DummyAtnSettings
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -25,12 +20,9 @@ def run(
     verbose: bool = False,
     message_summary: bool = False,
 ) -> None:
-    raise NotImplementedError("Reimplement CLIs using App class")
-    asyncio.run(  # type: ignore[unreachable]
+    asyncio.run(
         run_async_main(
-            name=DUMMY_ATN_NAME,
-            proactor_type=DummyAtnApp,
-            settings_type=DummyAtnSettings,
+            app_type=DummyAtnApp,
             env_file=env_file,
             dry_run=dry_run,
             verbose=verbose,
@@ -43,7 +35,7 @@ def run(
 def config(
     env_file: str = ".env",
 ) -> None:
-    print_settings(settings_type=DummyAtnSettings, env_file=env_file)
+    DummyAtnApp.print_settings(env_file=env_file)
 
 
 @app.callback()

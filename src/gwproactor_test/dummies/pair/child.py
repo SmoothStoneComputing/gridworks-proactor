@@ -3,7 +3,7 @@ from typing import Any
 from gwproto import HardwareLayout, Message, MQTTTopic
 
 from gwproactor import Proactor, ProactorSettings
-from gwproactor.config import MQTTClient, Paths
+from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.links import QOS
@@ -17,7 +17,8 @@ class DummyChildApp(InstrumentedApp):
     PARENT_MQTT: str = DUMMY_PARENT_NAME
 
     def __init__(self, **kwargs: Any) -> None:
-        super().__init__(paths=Paths(name=DUMMY_CHILD_NAME), **kwargs)
+        kwargs["paths_name"] = DUMMY_CHILD_NAME
+        super().__init__(**kwargs)
 
     def _get_name(self, layout: HardwareLayout) -> ProactorName:
         return ProactorName(

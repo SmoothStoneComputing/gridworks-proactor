@@ -6,7 +6,7 @@ from gwproto.messages import EventBase
 
 from gwproactor import ProactorSettings, ServicesInterface
 from gwproactor.actors.actor import PrimeActor
-from gwproactor.config import MQTTClient, Paths
+from gwproactor.config import MQTTClient
 from gwproactor.config.links import CodecSettings, LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import MQTTReceiptPayload
@@ -228,9 +228,10 @@ class DummyScada1App(InstrumentedApp):
     ADMIN_LINK: str = DUMMY_ADMIN_NAME
 
     def __init__(self, **kwargs: typing.Any) -> None:
-        super().__init__(
-            paths=Paths(name=DUMMY_SCADA1_NAME), prime_actor_type=DummyScada1, **kwargs
-        )
+        kwargs["paths_name"] = DUMMY_SCADA1_NAME
+        kwargs["prime_actor_type"] = DummyScada1
+        kwargs["codec_factory"] = ScadaCodecFactory()
+        super().__init__(**kwargs)
 
     def _get_name(self, layout: HardwareLayout) -> ProactorName:
         return ProactorName(
@@ -277,10 +278,6 @@ class DummyScada1App(InstrumentedApp):
                 link_subscription_short_name=layout.scada_g_node_alias,
             ),
         }
-
-    @classmethod
-    def _get_codec_factory(cls) -> ScadaCodecFactory:
-        return ScadaCodecFactory()
 
     @classmethod
     def _make_persister(cls, settings: ProactorSettings) -> TimedRollingFilePersister:

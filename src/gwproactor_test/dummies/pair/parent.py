@@ -7,7 +7,7 @@ from result import Ok, Result
 
 from gwproactor import ProactorSettings
 from gwproactor.actors.actor import PrimeActor
-from gwproactor.config import MQTTClient, Paths
+from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import DBGPayload
@@ -34,9 +34,9 @@ class ParentApp(InstrumentedApp):
     CHILD_MQTT: str = DUMMY_CHILD_NAME
 
     def __init__(self, **kwargs: Any) -> None:
-        super().__init__(
-            paths=Paths(name=DUMMY_PARENT_NAME), prime_actor_type=DummyParent, **kwargs
-        )
+        kwargs["paths_name"] = DUMMY_PARENT_NAME
+        kwargs["prime_actor_type"] = DummyParent
+        super().__init__(**kwargs)
 
     def _get_name(self, layout: HardwareLayout) -> ProactorName:
         return ProactorName(

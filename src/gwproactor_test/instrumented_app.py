@@ -9,10 +9,14 @@ from gwproactor.actors.actor import PrimeActor
 from gwproactor.app import App
 from gwproactor.codecs import CodecFactory
 from gwproactor.config import DEFAULT_LAYOUT_FILE, Paths
-from gwproactor_test.certs import copy_keys, uses_tls
+from gwproactor_test.certs import copy_keys, set_test_certificate_cache_dir, uses_tls
 from gwproactor_test.instrumented_proactor import InstrumentedProactor, RecorderStats
 
 TEST_HARDWARE_LAYOUT_PATH = Path(__file__).parent / "config" / DEFAULT_LAYOUT_FILE
+
+set_test_certificate_cache_dir(
+    Path(__file__).parent.parent.parent / "tests/.certificate_cache"
+)
 
 
 class InstrumentedApp(App, abc.ABC):
@@ -21,23 +25,29 @@ class InstrumentedApp(App, abc.ABC):
     def __init__(
         self,
         *,
+        paths_name: Optional[str] = None,
         paths: Optional[Paths] = None,
         proactor_settings: Optional[ProactorSettings] = None,
         prime_actor_type: Optional[type[PrimeActor]] = None,
         codec_factory: Optional[CodecFactory] = None,
         actors_module: Optional[ModuleType] = None,
+        env_file: Optional[str | Path] = None,
         src_layout_path: Optional[str | Path] = TEST_HARDWARE_LAYOUT_PATH,
     ) -> None:
         if src_layout_path is not None:
             paths = Paths() if paths is None else paths
+            if paths_name is not None:
+                paths = paths.copy(name=paths_name)
             self._copy_layout(Path(src_layout_path), paths)
         super().__init__(
+            paths_name=paths_name,
             paths=paths,
             proactor_settings=proactor_settings,
             proactor_type=InstrumentedProactor,
             prime_actor_type=prime_actor_type,
             codec_factory=codec_factory,
             actors_module=actors_module,
+            env_file=env_file,
         )
         self._copy_keys()
 
