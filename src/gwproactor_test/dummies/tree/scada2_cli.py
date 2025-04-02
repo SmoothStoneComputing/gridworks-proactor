@@ -2,7 +2,7 @@ import asyncio
 
 import typer
 
-from gwproactor.app import run_async_main
+from gwproactor.command_line_utils import run_async_main
 from gwproactor_test.dummies.tree.scada2 import DummyScada2App
 
 app = typer.Typer(

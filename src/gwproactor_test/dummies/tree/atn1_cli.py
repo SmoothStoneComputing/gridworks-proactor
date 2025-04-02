@@ -2,7 +2,7 @@ import asyncio
 
 import typer
 
-from gwproactor.app import run_async_main
+from gwproactor.command_line_utils import run_async_main
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
 
 app = typer.Typer(

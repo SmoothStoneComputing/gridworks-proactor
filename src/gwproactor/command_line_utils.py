@@ -3,113 +3,53 @@ import logging
 import sys
 import traceback
 from pathlib import Path
-from typing import Optional, Type, TypeVar
+from types import ModuleType
+from typing import Optional
 
 import dotenv
 import rich
-from pydantic import BaseModel
-from pydantic_settings import BaseSettings
 
-from gwproactor import Proactor, ProactorSettings, setup_logging
-from gwproactor.config import MQTTClient
-from gwproactor.config.paths import TLSPaths
-
-LOGGING_FORMAT = "%(asctime)s %(message)s"
+from gwproactor import ProactorSettings, setup_logging
+from gwproactor.actors.actor import PrimeActor
+from gwproactor.app import App
+from gwproactor.codecs import CodecFactory
+from gwproactor.config import Paths
 
 
-def missing_tls_paths(paths: TLSPaths) -> list[tuple[str, Optional[Path]]]:
-    missing = []
-    for path_name in paths.__pydantic_fields__:
-        path = getattr(paths, path_name)
-        if path is None or not Path(path).exists():
-            missing.append((path_name, path))
-    return missing
-
-
-def check_tls_paths_present(
-    model: BaseModel | BaseSettings, *, raise_error: bool = True
-) -> str:
-    missing_str = ""
-    for k in model.__pydantic_fields__:
-        v = getattr(model, k)
-        if isinstance(v, MQTTClient) and v.tls.use_tls:
-            missing_paths = missing_tls_paths(v.tls.paths)
-            if missing_paths:
-                missing_str += f"client {k}\n"
-                for path_name, path in missing_paths:
-                    missing_str += f"  {path_name:20s}  {path}\n"
-    if missing_str:
-        error_str = f"ERROR. TLS usage requested but the following files are missing:\n{missing_str}"
-        if raise_error:
-            raise ValueError(error_str)
-    else:
-        error_str = ""
-    return error_str
-
-
-ProactorT = TypeVar("ProactorT", bound=Proactor)
-ProactorSettingsT = TypeVar("ProactorSettingsT", bound=ProactorSettings)
-
-
-def get_settings(
+def get_app(  # noqa: PLR0913
     *,
-    settings_type: Optional[Type[ProactorSettingsT]] = None,
-    settings: Optional[ProactorSettingsT] = None,
-    env_file: str | Path = ".env",
-) -> ProactorSettingsT:
-    if settings_type is None:
-        if settings is None:
-            raise ValueError("ERROR. Specifiy exactly one of (settings_type, settings)")
-    else:
-        if settings is not None:
-            raise ValueError("ERROR. Specify exactly one of (settings_type, settings)")
-        settings = settings_type(_env_file=str(env_file))
-    return settings
-
-
-def print_settings(
-    *,
-    settings_type: Optional[Type[ProactorSettingsT]] = None,
-    settings: Optional[ProactorSettingsT] = None,
-    env_file: str | Path = ".env",
-) -> None:
-    dotenv_file = dotenv.find_dotenv(str(env_file))
-    rich.print(
-        f"Env file: <{dotenv_file}>  exists:{env_file and Path(dotenv_file).exists()}"
-    )
-    settings = get_settings(
-        settings_type=settings_type, settings=settings, env_file=dotenv_file
-    )
-    rich.print(settings)
-    missing_tls_paths_ = check_tls_paths_present(settings, raise_error=False)
-    if missing_tls_paths_:
-        rich.print(missing_tls_paths_)
-
-
-def get_proactor(  # noqa: PLR0913
-    name: str,
-    proactor_type: Type[ProactorT],
-    *,
-    settings_type: Optional[Type[ProactorSettingsT]] = None,
-    settings: Optional[ProactorSettingsT] = None,
+    paths_name: Optional[str] = None,
+    paths: Optional[Paths] = None,
+    proactor_settings: Optional[ProactorSettings] = None,
+    app_type: type[App] = App,
+    prime_actor_type: Optional[type[PrimeActor]] = None,
+    codec_factory: Optional[CodecFactory] = None,
+    actors_module: Optional[ModuleType] = None,
+    env_file: Optional[str | Path] = ".env",
     dry_run: bool = False,
     verbose: bool = False,
     message_summary: bool = False,
-    env_file: str | Path = ".env",
     run_in_thread: bool = False,
     add_screen_handler: bool = True,
-) -> ProactorT:
+) -> App:
     dotenv_file = dotenv.find_dotenv(str(env_file))
     dotenv_file_debug_str = (
         f"Env file: <{dotenv_file}>  exists:{Path(dotenv_file).exists()}"
     )
-    settings = get_settings(
-        settings_type=settings_type, settings=settings, env_file=dotenv_file
+    app = app_type(
+        paths_name=paths_name,
+        paths=paths,
+        proactor_settings=proactor_settings,
+        prime_actor_type=prime_actor_type,
+        codec_factory=codec_factory,
+        actors_module=actors_module,
+        env_file=env_file,
     )
+    settings = app.config.settings
     if dry_run:
         rich.print(dotenv_file_debug_str)
         rich.print(settings)
-        missing_tls_paths_ = check_tls_paths_present(settings, raise_error=False)
+        missing_tls_paths_ = settings.check_tls_paths_present(raise_error=False)
         if missing_tls_paths_:
             rich.print(missing_tls_paths_)
         rich.print("Dry run. Doing nothing.")
@@ -129,48 +69,61 @@ def get_proactor(  # noqa: PLR0913
         logger.info("Settings:")
         logger.info(settings.model_dump_json(indent=2))
         rich.print(settings)
-        check_tls_paths_present(settings)
-        proactor = proactor_type(name=name, settings=settings)  # type: ignore[call-arg]
+        settings.check_tls_paths_present()
+        app.instantiate()
         if run_in_thread:
             logger.info("run_async_actors_main() starting")
-            proactor.run_in_thread()
-    return proactor
+            app.run_in_thread()
+    return app
 
 
 async def run_async_main(  # noqa: PLR0913
-    name: str,
-    proactor_type: Type[ProactorT],
     *,
-    settings_type: Optional[Type[ProactorSettingsT]] = None,
-    settings: Optional[ProactorSettingsT] = None,
-    env_file: str | Path = ".env",
+    paths_name: Optional[str] = None,
+    paths: Optional[Paths] = None,
+    proactor_settings: Optional[ProactorSettings] = None,
+    app_type: type[App] = App,
+    prime_actor_type: Optional[type[PrimeActor]] = None,
+    codec_factory: Optional[CodecFactory] = None,
+    actors_module: Optional[ModuleType] = None,
+    env_file: Optional[str | Path] = ".env",
     dry_run: bool = False,
     verbose: bool = False,
     message_summary: bool = False,
+    add_screen_handler: bool = True,
 ) -> None:
-    settings = get_settings(
-        settings_type=settings_type,
-        settings=settings,
-        env_file=dotenv.find_dotenv(str(env_file)),
+    settings = app_type.get_settings(
+        paths_name=paths_name,
+        paths=paths,
+        settings=proactor_settings,
+        env_file=env_file,
     )
     exception_logger: logging.Logger | logging.LoggerAdapter[logging.Logger] = (
         logging.getLogger(settings.logging.base_log_name)
     )
     try:
-        proactor = get_proactor(
-            name=name,
-            proactor_type=proactor_type,
-            settings=settings,
+        app = get_app(
+            paths_name=paths_name,
+            paths=paths,
+            proactor_settings=proactor_settings,
+            app_type=app_type,
+            prime_actor_type=prime_actor_type,
+            codec_factory=codec_factory,
+            actors_module=actors_module,
+            env_file=env_file,
             dry_run=dry_run,
             verbose=verbose,
             message_summary=message_summary,
+            run_in_thread=False,
+            add_screen_handler=add_screen_handler,
         )
-        # noinspection PyTypeChecker
-        exception_logger = proactor.logger
+        if app.proactor is None:
+            raise RuntimeError("ERROR. app.proactor is unexpectedly None")  # noqa: TRY301
+        exception_logger = app.config.logger
         try:
-            await proactor.run_forever()
+            await app.proactor.run_forever()
         finally:
-            proactor.stop()
+            app.proactor.stop()
     except SystemExit:
         pass
     except KeyboardInterrupt:
