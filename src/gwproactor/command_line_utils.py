@@ -9,11 +9,12 @@ from typing import Optional
 import dotenv
 import rich
 
-from gwproactor import ProactorSettings, setup_logging
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.app import App
 from gwproactor.codecs import CodecFactory
 from gwproactor.config import Paths
+from gwproactor.config.proactor_settings import ProactorSettings
+from gwproactor.logging_setup import setup_logging
 
 
 def get_app(  # noqa: PLR0913

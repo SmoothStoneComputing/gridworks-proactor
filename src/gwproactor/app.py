@@ -1,4 +1,5 @@
 import abc
+import threading
 from pathlib import Path
 from types import ModuleType
 from typing import Optional, Self, Sequence, TypeVar
@@ -7,14 +8,16 @@ import dotenv
 import rich
 from gwproto import HardwareLayout, ShNode
 
-from gwproactor import ActorInterface, Proactor, ProactorSettings
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.codecs import CodecFactory
 from gwproactor.config import MQTTClient, Paths
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
+from gwproactor.config.proactor_settings import ProactorSettings
 from gwproactor.links.link_settings import LinkConfig
 from gwproactor.persister import PersisterInterface, StubPersister
+from gwproactor.proactor_implementation import Proactor
+from gwproactor.proactor_interface import ActorInterface
 from gwproactor.stats import ProactorStats
 
 PrimeActorT = TypeVar("PrimeActorT", bound=PrimeActor)
@@ -92,9 +95,10 @@ class App(abc.ABC):
         self.proactor.links.log_subscriptions("construction")
         return self
 
-    def run_in_thread(self) -> None:
+    def run_in_thread(self, *, daemon: bool = True) -> threading.Thread:
         if self.proactor is None:
             raise ValueError("ERROR. Call instantiate() before run_in_thread()")
+        return self.proactor.run_in_thread(daemon=daemon)
 
     @abc.abstractmethod
     def _get_name(self, layout: HardwareLayout) -> ProactorName:

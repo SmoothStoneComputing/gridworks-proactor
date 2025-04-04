@@ -6,8 +6,9 @@ from typing import Any, Mapping, Optional
 
 from gwproto import HardwareLayout
 
-from gwproactor import ProactorLogger, ProactorSettings
 from gwproactor.callbacks import ProactorCallbackFunctions
+from gwproactor.config.proactor_settings import ProactorSettings
+from gwproactor.logger import ProactorLogger
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.stats import ProactorStats
 

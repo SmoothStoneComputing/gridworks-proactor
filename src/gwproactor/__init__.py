@@ -16,7 +16,14 @@ Particular questions:
 """
 
 from gwproactor.actors import Actor, SyncThreadActor, SyncThreadT
+from gwproactor.actors.actor import PrimeActor
+from gwproactor.app import App
+from gwproactor.callbacks import ProactorCallbackFunctions, ProactorCallbackInterface
+from gwproactor.codecs import CodecFactory, ProactorCodec
+from gwproactor.command_line_utils import get_app, run_async_main
 from gwproactor.config import ProactorSettings
+from gwproactor.config.links import CodecSettings, LinkSettings
+from gwproactor.config.proactor_config import ProactorConfig, ProactorName
 from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
 from gwproactor.links.mqtt import QOS, MQTTClients, MQTTClientWrapper, Subscription
 from gwproactor.logger import ProactorLogger
@@ -44,15 +51,25 @@ __all__ = [
     "QOS",
     "Actor",
     "ActorInterface",
+    "App",
     "AsyncQueueWriter",
+    "CodecFactory",
+    "CodecSettings",
     "Communicator",
     "CommunicatorInterface",
     "ExternalWatchdogCommandBuilder",
+    "LinkSettings",
     "MQTTClientWrapper",
     "MQTTClients",
     "MonitoredName",
+    "PrimeActor",
     "Proactor",
+    "ProactorCallbackFunctions",
+    "ProactorCallbackInterface",
+    "ProactorCodec",
     "ProactorLogger",
+    "ProactorConfig",
+    "ProactorName",
     "ProactorSettings",
     "Problems",
     "Runnable",
@@ -63,6 +80,8 @@ __all__ = [
     "SyncThreadActor",
     "SyncThreadT",
     "format_exceptions",
+    "get_app",
     "responsive_sleep",
+    "run_async_main",
     "setup_logging",
 ]

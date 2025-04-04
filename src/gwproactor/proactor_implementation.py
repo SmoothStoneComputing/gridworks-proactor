@@ -26,13 +26,13 @@ from gwproto.named_types.web_server_gt import WebServerGt
 from paho.mqtt.client import MQTTMessageInfo
 from result import Err, Ok, Result
 
-from gwproactor import ProactorSettings
 from gwproactor.callbacks import (
     CallbackManager,
     ProactorCallbackFunctions,
     ProactorCallbackInterface,
 )
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
+from gwproactor.config.proactor_settings import ProactorSettings
 from gwproactor.external_watchdog import (
     ExternalWatchdogCommandBuilder,
     SystemDWatchdogCommandBuilder,

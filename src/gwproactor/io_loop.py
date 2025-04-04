@@ -7,7 +7,7 @@ from typing import Any, Coroutine, Optional, Sequence
 from gwproto import Message
 from result import Result
 
-from gwproactor import ProactorLogger
+from gwproactor.logger import ProactorLogger
 from gwproactor.message import KnownNames, PatInternalWatchdogMessage, ShutdownMessage
 from gwproactor.proactor_interface import (
     INVALID_IO_TASK_HANDLE,

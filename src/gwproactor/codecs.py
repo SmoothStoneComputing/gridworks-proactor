@@ -3,8 +3,8 @@ from typing import Any, ClassVar, Optional, Sequence
 
 from gwproto import HardwareLayout, Message, MQTTCodec, create_message_model
 
-from gwproactor import ProactorSettings
 from gwproactor.config.proactor_config import ProactorName
+from gwproactor.config.proactor_settings import ProactorSettings
 
 
 class ProactorCodec(MQTTCodec):
