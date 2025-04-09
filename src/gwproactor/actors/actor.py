@@ -11,6 +11,7 @@ from gwproto import Message, ShNode
 from result import Ok, Result
 
 from gwproactor.callbacks import ProactorCallbackInterface
+from gwproactor.codecs import CodecFactory
 from gwproactor.proactor_interface import (
     ActorInterface,
     Communicator,
@@ -109,3 +110,7 @@ class PrimeActor(ProactorCallbackInterface, Actor):
 
     async def join(self) -> None:
         pass
+
+    @classmethod
+    def get_codec_factory(cls) -> CodecFactory:
+        return CodecFactory()

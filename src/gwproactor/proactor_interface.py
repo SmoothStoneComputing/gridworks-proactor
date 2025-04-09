@@ -207,7 +207,19 @@ class ServicesInterface(CommunicatorInterface):
         raise NotImplementedError
 
     @abstractmethod
+    async def await_processing(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
+        raise NotImplementedError
+
+    @abstractmethod
     def send_threadsafe(self, message: Message[Any]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def wait_for_processing_threadsafe(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
         raise NotImplementedError
 
     @abstractmethod

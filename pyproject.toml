@@ -30,7 +30,7 @@ xdg = "^6.0.0"
 paho-mqtt = "^1.6.1"
 result = "^0.9.0"
 gridworks-protocol = "^1.2.3"
-#gridworks-protocol = { path = "../gridworks-protocol", develop = true }
+# gridworks-protocol = { path = "../gridworks-protocol", develop = true }
 #gridworks-protocol = { git = "https://github.com/thegridelectric/gridworks-protocol.git", branch = "dev" }
 aiohttp = "^3.11.11"
 yarl = "^1.9.2"
@@ -41,6 +41,7 @@ gridworks-cert = { version = ">=0.4.2", optional = true }
 freezegun = { version = "^1.5.1", optional = true }
 pydantic-settings = "^2.4.0"
 typer = { version = "^0.15.2", optional = true }
+rich = "^14.0.0"
 
 [tool.poetry.group.dev.dependencies]
 Pygments = ">=2.10.0"
@@ -189,5 +190,13 @@ ignore = [
     "PLR0915",
     "PT011",
     "S101",
+]
+"hacking/**/*.py" = [
+    "DTZ005",
+    "FBT001",
+    "PLW0603",
+    "PERF203",
+    "SIM105",
+    "T201",
 ]
 

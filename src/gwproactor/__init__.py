@@ -15,7 +15,7 @@ Particular questions:
 * Test support should be implemented / cleaner.
 """
 
-from gwproactor.actors import Actor, SyncThreadActor, SyncThreadT
+from gwproactor.actors import Actor, SyncThreadActor, SyncThreadT, WebEventListener
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.app import App
 from gwproactor.callbacks import ProactorCallbackFunctions, ProactorCallbackInterface
@@ -79,6 +79,7 @@ __all__ = [
     "SyncAsyncQueueWriter",
     "SyncThreadActor",
     "SyncThreadT",
+    "WebEventListener",
     "format_exceptions",
     "get_app",
     "responsive_sleep",

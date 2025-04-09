@@ -75,6 +75,8 @@ T = TypeVar("T")
 
 
 class Proactor(ServicesInterface, Runnable):
+    AWAIT_PROCESSING_FUTURE_ATTRIBUTE: str = "_await_processing_future"
+
     _name: ProactorName
     _settings: ProactorSettings
     _node: ShNode
@@ -86,6 +88,8 @@ class Proactor(ServicesInterface, Runnable):
     _reindex_problems: Optional[Problems] = None
     _loop: Optional[asyncio.AbstractEventLoop] = None
     _receive_queue: Optional[asyncio.Queue[Any]] = None
+    _processing_futures: set[asyncio.Future[Any]]
+    _processing_futures_lock: asyncio.Lock
     _links: LinkManager
     _communicators: Dict[str, CommunicatorInterface]
     _stop_requested: bool
@@ -127,6 +131,8 @@ class Proactor(ServicesInterface, Runnable):
             timer_manager=AsyncioTimerManager(),
             ack_timeout_callback=self._process_ack_timeout,
         )
+        self._processing_futures = set()
+        self._processing_futures_lock = asyncio.Lock()
         self._communicators = {}
         self._tasks = []
         self._stop_requested = False
@@ -160,12 +166,93 @@ class Proactor(ServicesInterface, Runnable):
             )
         self._receive_queue.put_nowait(message)
 
+    async def _add_processing_future(self, future: asyncio.Future[Any]) -> None:
+        async with self._processing_futures_lock:
+            self._processing_futures.add(future)
+
+    async def _clear_processing_future(self, future: asyncio.Future[Any]) -> None:
+        async with self._processing_futures_lock:
+            if future in self._processing_futures:
+                self._processing_futures.remove(future)
+
+    async def _clear_processing_futures(self) -> list[asyncio.Future[Any]]:
+        futures = []
+        async with self._processing_futures_lock:
+            futures = list(self._processing_futures)
+            self._processing_futures.clear()
+        return futures
+
+    async def _get_processing_future(self) -> asyncio.Future[Any]:
+        if self._loop is None:
+            raise RuntimeError(
+                "ERROR. _get_processing_future() called before Proactor started."
+            )
+        future = self._loop.create_future()
+        await self._add_processing_future(future)
+        return future
+
+    async def _attach_future_to_message(
+        self, message: Message[Any]
+    ) -> asyncio.Future[Any]:
+        if self._loop is None:
+            raise RuntimeError(
+                "ERROR. await_processing() called before Proactor started."
+            )
+        future = getattr(message, self.AWAIT_PROCESSING_FUTURE_ATTRIBUTE, None)
+        if future is None:
+            future = await self._get_processing_future()
+            setattr(message, self.AWAIT_PROCESSING_FUTURE_ATTRIBUTE, future)
+        else:
+            if not isinstance(future, asyncio.Future):
+                raise RuntimeError(
+                    "ERROR. await_processing() received message "
+                    f"(type: {message.message_type()}) with "
+                    f"{self.AWAIT_PROCESSING_FUTURE_ATTRIBUTE} attribute "
+                    f"(type: {type(future)}) which is not an instance of "
+                    f"asyncio.Future."
+                )
+            await self._add_processing_future(future)
+        return future
+
+    @classmethod
+    async def _await_processing(
+        cls, future: asyncio.Future[Result[Any, BaseException]]
+    ) -> Result[Any, BaseException]:
+        try:
+            await future
+        except asyncio.CancelledError as canceled:
+            return Err(canceled)
+        e = future.exception()
+        if e is not None:
+            return Err(e)
+        return future.result()
+
+    async def await_processing(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
+        if self._stop_requested:
+            return Ok(value=False)
+        future = await self._attach_future_to_message(message)
+        self.send(message)
+        return await self._await_processing(future)
+
     def send_threadsafe(self, message: Message[Any]) -> None:
         if self._loop is None or self._receive_queue is None:
             raise RuntimeError(
                 "ERROR. send_threadsafe() called before Proactor started."
             )
         self._loop.call_soon_threadsafe(self._receive_queue.put_nowait, message)
+
+    def wait_for_processing_threadsafe(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
+        if self._loop is None:
+            raise RuntimeError(
+                "ERROR. wait_for_send_threadsafe() called before Proactor started."
+            )
+        return asyncio.run_coroutine_threadsafe(
+            self.await_processing(message), self._loop
+        ).result()
 
     def get_communicator(self, name: str) -> Optional[CommunicatorInterface]:
         return self._communicators.get(name, None)
@@ -364,7 +451,7 @@ class Proactor(ServicesInterface, Runnable):
         for monitored in communicator.monitored_names:
             self._watchdog.add_monitored_name(monitored)
 
-    async def process_messages(self) -> None:
+    async def process_messages(self) -> None:  # noqa: C901
         if self._receive_queue is None:
             raise RuntimeError(
                 "ERROR. process_messages() called before Proactor started."
@@ -391,7 +478,13 @@ class Proactor(ServicesInterface, Runnable):
                     )
                 except:  # noqa: E722
                     self._logger.exception("ERROR generating exception event")
-
+        try:
+            message_futures = await self._clear_processing_futures()
+            for future in message_futures:
+                if not future.done():
+                    future.cancel()
+        except:  # noqa: E722
+            ...
         try:
             self.stop()
         except:  # noqa: E722
@@ -491,10 +584,17 @@ class Proactor(ServicesInterface, Runnable):
             case _:
                 path_dbg |= 0x00000400
                 self._callbacks.process_internal_message(message)
+        await self._notify_message_future(message)
         if not isinstance(message.Payload, PatWatchdog):
             self._logger.message_exit(
                 "--Proactor.process_message  path:0x%08X", path_dbg
             )
+
+    async def _notify_message_future(self, message: Message[Any]) -> None:
+        future = getattr(message, self.AWAIT_PROCESSING_FUTURE_ATTRIBUTE, None)
+        if future is not None and isinstance(future, asyncio.Future):
+            await self._clear_processing_future(future)
+            future.set_result(Ok(value=True))
 
     def _decode_mqtt_message(
         self, mqtt_payload: MQTTReceiptPayload

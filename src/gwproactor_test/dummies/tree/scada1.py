@@ -4,7 +4,7 @@ import rich
 from gwproto import HardwareLayout, Message
 from gwproto.messages import EventBase
 
-from gwproactor import ProactorSettings, ServicesInterface
+from gwproactor import ProactorSettings, ServicesInterface, actors
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import CodecSettings, LinkSettings
@@ -230,6 +230,7 @@ class DummyScada1App(InstrumentedApp):
         kwargs["paths_name"] = DUMMY_SCADA1_NAME
         kwargs["prime_actor_type"] = DummyScada1
         kwargs["codec_factory"] = ScadaCodecFactory()
+        kwargs["actors_module"] = actors
         super().__init__(**kwargs)
 
     def _get_name(self, layout: HardwareLayout) -> ProactorName:

@@ -134,7 +134,7 @@
       "Version": "001",
       "WebServer": {
         "Enabled": false,
-        "Host": "0.0.0.0",
+        "Host": "127.0.0.1",
         "Kwargs": {},
         "Name": "default",
         "Port": 8000
@@ -202,6 +202,15 @@
       "DisplayName": "Store Pump",
       "Name": "store-pump",
       "ShNodeId": "c35d9c77-1ebb-4822-b01e-00ff189092f7",
+      "TypeName": "spaceheat.node.gt",
+      "Version": "200"
+    },
+    {
+      "ActorClass": "WebEventListener",
+      "DisplayName": "Event Listener",
+      "ActorHierarchyName": "s.web-event",
+      "Name": "web-event",
+      "ShNodeId": "0273511a-a2cc-40f6-aaf1-933daa58ada2",
       "TypeName": "spaceheat.node.gt",
       "Version": "200"
     }

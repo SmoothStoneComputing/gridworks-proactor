@@ -46,6 +46,11 @@ class App(abc.ABC):
     ) -> None:
         self.proactor_type = proactor_type
         self.prime_actor_type = prime_actor_type
+        if codec_factory is None:
+            if prime_actor_type is not None:
+                codec_factory = prime_actor_type.get_codec_factory()
+            else:
+                codec_factory = CodecFactory()
         self.codec_factory = CodecFactory() if codec_factory is None else codec_factory
         self.actors_module = actors_module
         self.config = self._make_proactor_config(
@@ -88,7 +93,7 @@ class App(abc.ABC):
         self._connect_links(self.proactor)
         if self.prime_actor_type is not None:
             self.prime_actor = self.prime_actor_type(
-                self.config.name.long_name,
+                self.config.name.short_name,
                 self.proactor,
             )
         self._load_actors()
@@ -159,8 +164,8 @@ class App(abc.ABC):
         return ProactorStats()
 
     def _get_actor_nodes(self) -> Sequence[ShNode]:
-        if self.prime_actor is None:
-            return []
+        if self.prime_actor is None or self.prime_actor.node is None:
+            raise ValueError
         return [
             node
             for node in self._layout.nodes.values()
