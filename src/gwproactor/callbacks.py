@@ -1,5 +1,6 @@
+import asyncio
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Sequence
 
 from gwproto import Message
 
@@ -7,7 +8,7 @@ from gwproactor.links import Transition
 from gwproactor.message import MQTTReceiptPayload
 
 PreChildStartCallback = Callable[[], None]
-StartTasksCallback = Callable[[], None]
+StartTasksCallback = Callable[[], Sequence[asyncio.Task[Any]]]
 StartProcessingMessagesCallback = Callable[[], None]
 ProcessMessageCallback = Callable[[Message[Any]], None]
 ProcessMQTTMessageCallback = Callable[[Message[MQTTReceiptPayload], Message[Any]], None]
@@ -28,7 +29,9 @@ class ProactorCallbackFunctions:
 
 class ProactorCallbackInterface:
     def pre_child_start(self) -> None: ...
-    def start_tasks(self) -> None: ...
+    def start_tasks(self) -> Sequence[asyncio.Task[Any]]:
+        return []
+
     def start_processing_messages(self) -> None: ...
     def process_internal_message(self, message: Message[Any]) -> None: ...
     def process_mqtt_message(
@@ -65,8 +68,16 @@ class CallbackManager(ProactorCallbackInterface):
     def pre_child_start(self) -> None:
         self._call_callbacks("pre_child_start")
 
-    def start_tasks(self) -> None:
-        self._call_callbacks("start_tasks")
+    def start_tasks(self) -> Sequence[asyncio.Task[Any]]:
+        tasks: list[asyncio.Task[Any]] = []
+        if (
+            self.callback_functions is not None
+            and self.callback_functions.start_tasks is not None
+        ):
+            tasks.extend(self.callback_functions.start_tasks())
+        for callback_object in self.callback_objects.values():
+            tasks.extend(callback_object.start_tasks())
+        return tasks
 
     def start_processing_messages(self) -> None:
         self._call_callbacks("start_processing_messages")

@@ -498,7 +498,7 @@ class Proactor(ServicesInterface, Runnable):
             asyncio.create_task(self.process_messages(), name="process_messages"),
             *self._links.start_ping_tasks(),
         ]
-        self._callbacks.start_tasks()
+        self._tasks.extend(self._callbacks.start_tasks())
 
     @classmethod
     def _second_caller(cls) -> str:
