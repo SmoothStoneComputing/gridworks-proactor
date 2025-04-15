@@ -13,7 +13,7 @@ from freezegun import freeze_time
 from gwproto.messages import ProblemEvent
 from result import Result
 
-from gwproactor import ExternalWatchdogCommandBuilder, ProactorSettings, Problems
+from gwproactor import AppSettings, ExternalWatchdogCommandBuilder, Problems
 from gwproactor.persister import (
     FileExistedWarning,
     FileMissing,
@@ -231,7 +231,7 @@ def assert_contents(
 
 
 def test_persister_happy_path(tmp_path: Path) -> None:
-    settings = ProactorSettings()
+    settings = AppSettings()
     settings.paths.mkdirs()
     event = ProblemEvent(
         Src="foo",
@@ -341,7 +341,7 @@ def test_persister_happy_path(tmp_path: Path) -> None:
 
 
 def test_persister_max_size() -> None:
-    settings = ProactorSettings()
+    settings = AppSettings()
     settings.paths.mkdirs()
     event = ProblemEvent(
         MessageId=" 0",
@@ -410,7 +410,7 @@ def test_persister_max_size() -> None:
 
 
 def test_persister_roll_day() -> None:
-    settings = ProactorSettings()
+    settings = AppSettings()
     settings.paths.mkdirs()
     event = ProblemEvent(
         MessageId=" 0",
@@ -521,7 +521,7 @@ def test_persister_roll_day() -> None:
 
 
 def test_persister_size_and_roll() -> None:
-    settings = ProactorSettings()
+    settings = AppSettings()
     settings.paths.mkdirs()
     uidi = 1
 
@@ -759,7 +759,7 @@ def test_persister_size_and_roll() -> None:
 
 
 def test_persister_indexing() -> None:
-    settings = ProactorSettings()
+    settings = AppSettings()
     settings.paths.mkdirs()
     uidi = 1
 
@@ -823,7 +823,7 @@ def test_persister_indexing() -> None:
 
 
 def test_persister_problems() -> None:
-    settings = ProactorSettings()
+    settings = AppSettings()
     settings.paths.mkdirs()
     uidi = 1
 

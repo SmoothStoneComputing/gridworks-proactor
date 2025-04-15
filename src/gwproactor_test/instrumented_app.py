@@ -1,12 +1,10 @@
 import abc
 import shutil
 from pathlib import Path
-from types import ModuleType
-from typing import Optional
+from typing import Any, Optional
 
-from gwproactor import ProactorSettings
-from gwproactor.actors.actor import PrimeActor
-from gwproactor.app import App
+from gwproactor import AppSettings
+from gwproactor.app import App, SubTypes
 from gwproactor.codecs import CodecFactory
 from gwproactor.config import DEFAULT_LAYOUT_FILE, Paths
 from gwproactor_test.certs import copy_keys, set_test_certificate_cache_dir, uses_tls
@@ -27,29 +25,35 @@ class InstrumentedApp(App, abc.ABC):
         *,
         paths_name: Optional[str] = None,
         paths: Optional[Paths] = None,
-        proactor_settings: Optional[ProactorSettings] = None,
-        prime_actor_type: Optional[type[PrimeActor]] = None,
+        app_settings: Optional[AppSettings] = None,
         codec_factory: Optional[CodecFactory] = None,
-        actors_module: Optional[ModuleType] = None,
+        sub_types: Optional[SubTypes] = None,
         env_file: Optional[str | Path] = None,
         src_layout_path: Optional[str | Path] = TEST_HARDWARE_LAYOUT_PATH,
+        **kwargs: Any,
     ) -> None:
+        paths_name = paths_name or self.paths_name()
         if src_layout_path is not None:
             paths = Paths() if paths is None else paths
             if paths_name is not None:
-                paths = paths.copy(name=paths_name)
+                paths = paths.duplicate(name=paths_name)
             self._copy_layout(Path(src_layout_path), paths)
         super().__init__(
             paths_name=paths_name,
             paths=paths,
-            proactor_settings=proactor_settings,
-            proactor_type=InstrumentedProactor,
-            prime_actor_type=prime_actor_type,
+            app_settings=app_settings,
             codec_factory=codec_factory,
-            actors_module=actors_module,
+            sub_types=sub_types,
             env_file=env_file,
+            **kwargs,
         )
         self._copy_keys()
+
+    @classmethod
+    def make_subtypes(cls) -> SubTypes:
+        sub_types = super().make_subtypes()
+        sub_types.proactor_type = InstrumentedProactor
+        return sub_types
 
     @classmethod
     def _make_stats(cls) -> RecorderStats:

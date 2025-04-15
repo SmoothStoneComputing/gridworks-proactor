@@ -193,6 +193,7 @@ ignore = [
 ]
 "hacking/**/*.py" = [
     "DTZ005",
+    "ERA001",
     "FBT001",
     "PLW0603",
     "PERF203",

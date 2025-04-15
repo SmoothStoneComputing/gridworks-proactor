@@ -15,7 +15,7 @@ from paho.mqtt.client import MQTTMessageInfo
 from result import Result
 
 from gwproactor.callbacks import ProactorCallbackInterface
-from gwproactor.config.proactor_settings import ProactorSettings
+from gwproactor.config.app_settings import AppSettings
 from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
 from gwproactor.logger import ProactorLogger
 from gwproactor.stats import ProactorStats
@@ -307,7 +307,7 @@ class ServicesInterface(CommunicatorInterface):
 
     @property
     @abstractmethod
-    def settings(self) -> ProactorSettings:
+    def settings(self) -> AppSettings:
         raise NotImplementedError
 
     @property

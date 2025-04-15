@@ -4,7 +4,7 @@ from collections import defaultdict
 import rich
 from gwproto import HardwareLayout, Message
 
-from gwproactor import ProactorSettings, ServicesInterface
+from gwproactor import AppSettings, ServicesInterface
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import CodecSettings, LinkSettings
@@ -135,30 +135,36 @@ class DummyScada2(PrimeActor):
         )
 
 
+class DummyScada2Settings(AppSettings):
+    dummy_scada1: MQTTClient = MQTTClient()
+    dummy_admin: MQTTClient = MQTTClient()
+
+
 class DummyScada2App(InstrumentedApp):
     SCADA1_LINK: str = DUMMY_SCADA1_NAME
     ADMIN_LINK: str = DUMMY_ADMIN_NAME
 
     def __init__(self, **kwargs: typing.Any) -> None:
-        kwargs["paths_name"] = DUMMY_SCADA2_NAME
-        kwargs["prime_actor_type"] = DummyScada2
         kwargs["codec_factory"] = ScadaCodecFactory()
         super().__init__(**kwargs)
+
+    @classmethod
+    def app_settings_type(cls) -> type[DummyScada2Settings]:
+        return DummyScada2Settings
+
+    @classmethod
+    def prime_actor_type(cls) -> type[DummyScada2]:
+        return DummyScada2
+
+    @classmethod
+    def paths_name(cls) -> str:
+        return DUMMY_SCADA2_NAME
 
     def _get_name(self, layout: HardwareLayout) -> ProactorName:
         return ProactorName(
             long_name=layout.scada_g_node_alias + ".s2",
             short_name="s2",
         )
-
-    def _get_mqtt_broker_settings(
-        self,
-        name: ProactorName,  # noqa: ARG002
-        layout: HardwareLayout,  # noqa: ARG002
-    ) -> dict[str, MQTTClient]:
-        return {
-            link_name: MQTTClient() for link_name in [self.SCADA1_LINK, self.ADMIN_LINK]
-        }
 
     def _get_link_settings(
         self,
@@ -185,5 +191,5 @@ class DummyScada2App(InstrumentedApp):
         }
 
     @classmethod
-    def _make_persister(cls, settings: ProactorSettings) -> TimedRollingFilePersister:
+    def _make_persister(cls, settings: AppSettings) -> TimedRollingFilePersister:
         return TimedRollingFilePersister(settings.paths.event_dir)

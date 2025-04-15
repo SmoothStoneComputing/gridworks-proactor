@@ -34,7 +34,7 @@ async def test_tree_no_parent(request: Any) -> None:
             "ERROR waiting child1 links to be active_for_send",
             err_str_f=h.summary_str,
         )
-        assert StateName(link1to2.state) == StateName.awaiting_peer
+        assert StateName(link1to2.state) == StateName.awaiting_peer, h.summary_str()
         assert StateName(link1toAtn.state) == StateName.awaiting_peer
         assert counts1to2["gridworks.event.comm.mqtt.connect"] == 1
         assert counts1to2["gridworks.event.comm.mqtt.fully.subscribed"] == 1

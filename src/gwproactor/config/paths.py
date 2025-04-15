@@ -168,7 +168,18 @@ class Paths(BaseModel):
         Path(self.event_dir).mkdir(mode=mode, parents=parents, exist_ok=exist_ok)
         Path(self.log_dir).mkdir(mode=mode, parents=parents, exist_ok=exist_ok)
 
-    def copy(self, **kwargs: Any) -> "Paths":
-        fields = self.model_dump(exclude_unset=True)
+    def duplicate(
+        self,
+        *,
+        exclude_unset: bool = True,
+        excluded_defaults: bool = True,
+        exclude: Optional[set[str]] = None,
+        **kwargs: Any,
+    ) -> "Paths":
+        fields = self.model_dump(
+            exclude_unset=exclude_unset,
+            exclude_defaults=excluded_defaults,
+            exclude=exclude,
+        )
         fields.update(**kwargs)
         return Paths(**fields)

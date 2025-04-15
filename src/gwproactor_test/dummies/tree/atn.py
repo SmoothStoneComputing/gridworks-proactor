@@ -1,11 +1,11 @@
 """Scada implementation"""
 
-from typing import Any
+from typing import Any, Optional
 
 from gwproto import HardwareLayout, Message
 from gwproto.messages import EventBase
 
-from gwproactor import ProactorSettings
+from gwproactor import AppSettings
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
@@ -37,26 +37,30 @@ class DummyAtn(PrimeActor):
         )
 
 
+class DummyAtnSettings(AppSettings):
+    dummy_scada1: MQTTClient = MQTTClient()
+
+
 class DummyAtnApp(InstrumentedApp):
     SCADA1_LINK: str = DUMMY_SCADA1_NAME
 
-    def __init__(self, **kwargs: Any) -> None:
-        kwargs["paths_name"] = DUMMY_ATN_NAME
-        kwargs["prime_actor_type"] = DummyAtn
-        super().__init__(**kwargs)
+    @classmethod
+    def app_settings_type(cls) -> type[AppSettings]:
+        return DummyAtnSettings
+
+    @classmethod
+    def prime_actor_type(cls) -> type[DummyAtn]:
+        return DummyAtn
+
+    @classmethod
+    def paths_name(cls) -> Optional[str]:
+        return DUMMY_ATN_NAME
 
     def _get_name(self, layout: HardwareLayout) -> ProactorName:
         return ProactorName(
             long_name=layout.atn_g_node_alias,
             short_name="a",
         )
-
-    def _get_mqtt_broker_settings(
-        self,
-        name: ProactorName,  # noqa: ARG002
-        layout: HardwareLayout,  # noqa: ARG002
-    ) -> dict[str, MQTTClient]:
-        return {self.SCADA1_LINK: MQTTClient()}
 
     def _get_link_settings(
         self,
@@ -74,5 +78,5 @@ class DummyAtnApp(InstrumentedApp):
         }
 
     @classmethod
-    def _make_persister(cls, settings: ProactorSettings) -> PersisterInterface:
+    def _make_persister(cls, settings: AppSettings) -> PersisterInterface:
         return SimpleDirectoryWriter(settings.paths.event_dir)

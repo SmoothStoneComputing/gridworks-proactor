@@ -124,13 +124,14 @@ async def test_ping(request: Any) -> None:
         ping restores comm
     """
     from gwproactor import ProactorSettings
+    from gwproactor_test.dummies.pair.child import DummyChildSettings
 
     async with CommTestHelper(
         add_child=True,
         add_parent=True,
         child_app=DummyChildApp(
-            proactor_settings=ProactorSettings(
-                mqtt_link_poll_seconds=0.1,
+            app_settings=DummyChildSettings(
+                proactor=ProactorSettings(mqtt_link_poll_seconds=0.1),
             )
         ),
         request=request,
@@ -185,7 +186,9 @@ async def test_ping(request: Any) -> None:
         )
         messages_from_parent = stats.num_received - start_messages_from_parent
         messages_from_child = parent_stats.num_received - start_messages_from_child
-        exp_pings_nominal = (wait_seconds / parent.settings.mqtt_link_poll_seconds) - 1
+        exp_pings_nominal = (
+            wait_seconds / parent.settings.proactor.mqtt_link_poll_seconds
+        ) - 1
         err_str = (
             f"\npings_from_parent: {pings_from_parent}  ({stats.num_received_by_topic[pings_from_parent_topic]} - {start_pings_from_parent})  on <{pings_from_parent_topic}>\n"
             f"messages_from_parent: {messages_from_parent}\n"

@@ -1,10 +1,11 @@
 import typing
+from types import ModuleType
 
 import rich
 from gwproto import HardwareLayout, Message
 from gwproto.messages import EventBase
 
-from gwproactor import ProactorSettings, ServicesInterface, actors
+from gwproactor import AppSettings, ServicesInterface, actors
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import CodecSettings, LinkSettings
@@ -221,33 +222,42 @@ class DummyScada1(PrimeActor):
         return DUMMY_ADMIN_NAME
 
 
+class DummyScada1Settings(AppSettings):
+    dummy_atn1: MQTTClient = MQTTClient()
+    dummy_scada2: MQTTClient = MQTTClient()
+    dummy_admin: MQTTClient = MQTTClient()
+
+
 class DummyScada1App(InstrumentedApp):
     ATN_LINK: str = DUMMY_ATN_NAME
     SCADA2_LINK: str = DUMMY_SCADA2_NAME
     ADMIN_LINK: str = DUMMY_ADMIN_NAME
 
     def __init__(self, **kwargs: typing.Any) -> None:
-        kwargs["paths_name"] = DUMMY_SCADA1_NAME
-        kwargs["prime_actor_type"] = DummyScada1
         kwargs["codec_factory"] = ScadaCodecFactory()
-        kwargs["actors_module"] = actors
         super().__init__(**kwargs)
+
+    @classmethod
+    def app_settings_type(cls) -> type[DummyScada1Settings]:
+        return DummyScada1Settings
+
+    @classmethod
+    def prime_actor_type(cls) -> type[DummyScada1]:
+        return DummyScada1
+
+    @classmethod
+    def actors_module(cls) -> ModuleType:
+        return actors
+
+    @classmethod
+    def paths_name(cls) -> str:
+        return DUMMY_SCADA1_NAME
 
     def _get_name(self, layout: HardwareLayout) -> ProactorName:
         return ProactorName(
             long_name=layout.scada_g_node_alias,
             short_name="s",
         )
-
-    def _get_mqtt_broker_settings(
-        self,
-        name: ProactorName,  # noqa: ARG002
-        layout: HardwareLayout,  # noqa: ARG002
-    ) -> dict[str, MQTTClient]:
-        return {
-            link_name: MQTTClient()
-            for link_name in [self.ATN_LINK, self.SCADA2_LINK, self.ADMIN_LINK]
-        }
 
     def _get_link_settings(
         self,
@@ -280,5 +290,5 @@ class DummyScada1App(InstrumentedApp):
         }
 
     @classmethod
-    def _make_persister(cls, settings: ProactorSettings) -> TimedRollingFilePersister:
+    def _make_persister(cls, settings: AppSettings) -> TimedRollingFilePersister:
         return TimedRollingFilePersister(settings.paths.event_dir)

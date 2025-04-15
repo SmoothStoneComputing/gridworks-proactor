@@ -21,7 +21,7 @@ from gwproactor.app import App
 from gwproactor.callbacks import ProactorCallbackFunctions, ProactorCallbackInterface
 from gwproactor.codecs import CodecFactory, ProactorCodec
 from gwproactor.command_line_utils import get_app, run_async_main
-from gwproactor.config import ProactorSettings
+from gwproactor.config import AppSettings, ProactorSettings
 from gwproactor.config.links import CodecSettings, LinkSettings
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
 from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
@@ -52,6 +52,7 @@ __all__ = [
     "Actor",
     "ActorInterface",
     "App",
+    "AppSettings",
     "AsyncQueueWriter",
     "CodecFactory",
     "CodecSettings",

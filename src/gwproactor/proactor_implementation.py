@@ -31,8 +31,8 @@ from gwproactor.callbacks import (
     ProactorCallbackFunctions,
     ProactorCallbackInterface,
 )
+from gwproactor.config.app_settings import AppSettings
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
-from gwproactor.config.proactor_settings import ProactorSettings
 from gwproactor.external_watchdog import (
     ExternalWatchdogCommandBuilder,
     SystemDWatchdogCommandBuilder,
@@ -78,7 +78,7 @@ class Proactor(ServicesInterface, Runnable):
     AWAIT_PROCESSING_FUTURE_ATTRIBUTE: str = "_await_processing_future"
 
     _name: ProactorName
-    _settings: ProactorSettings
+    _settings: AppSettings
     _node: ShNode
     _callbacks: CallbackManager
     _layout: HardwareLayout
@@ -124,7 +124,7 @@ class Proactor(ServicesInterface, Runnable):
         self._links = LinkManager(
             publication_name=self.publication_name,
             subscription_name=self.subscription_name,
-            settings=self._settings,
+            settings=self._settings.proactor,
             logger=self._logger,
             stats=self._stats,
             event_persister=self._event_persister,
@@ -302,7 +302,7 @@ class Proactor(ServicesInterface, Runnable):
         return []
 
     @property
-    def settings(self) -> ProactorSettings:
+    def settings(self) -> AppSettings:
         return self._settings
 
     @property

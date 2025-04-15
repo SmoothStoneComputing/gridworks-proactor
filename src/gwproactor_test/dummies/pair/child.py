@@ -1,8 +1,6 @@
-from typing import Any
-
 from gwproto import HardwareLayout, Message, MQTTTopic
 
-from gwproactor import Proactor, ProactorSettings
+from gwproactor import AppSettings, Proactor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
@@ -12,25 +10,26 @@ from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
 from gwproactor_test.instrumented_app import InstrumentedApp
 
 
+class DummyChildSettings(AppSettings):
+    parent: MQTTClient = MQTTClient()
+
+
 class DummyChildApp(InstrumentedApp):
     PARENT_MQTT: str = DUMMY_PARENT_NAME
 
-    def __init__(self, **kwargs: Any) -> None:
-        kwargs["paths_name"] = DUMMY_CHILD_NAME
-        super().__init__(**kwargs)
+    @classmethod
+    def app_settings_type(cls) -> type[DummyChildSettings]:
+        return DummyChildSettings
+
+    @classmethod
+    def paths_name(cls) -> str:
+        return DUMMY_CHILD_NAME
 
     def _get_name(self, layout: HardwareLayout) -> ProactorName:
         return ProactorName(
             long_name=layout.scada_g_node_alias,
             short_name="s",
         )
-
-    def _get_mqtt_broker_settings(
-        self,
-        name: ProactorName,  # noqa: ARG002
-        layout: HardwareLayout,  # noqa: ARG002
-    ) -> dict[str, MQTTClient]:
-        return {self.PARENT_MQTT: MQTTClient()}
 
     def _get_link_settings(
         self,
@@ -48,7 +47,7 @@ class DummyChildApp(InstrumentedApp):
         }
 
     @classmethod
-    def _make_persister(cls, settings: ProactorSettings) -> PersisterInterface:
+    def _make_persister(cls, settings: AppSettings) -> PersisterInterface:
         return TimedRollingFilePersister(settings.paths.event_dir)
 
     def _connect_links(self, proactor: Proactor) -> None:

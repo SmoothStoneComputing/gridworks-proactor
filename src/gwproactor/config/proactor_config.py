@@ -7,7 +7,7 @@ from typing import Any, Mapping, Optional
 from gwproto import HardwareLayout
 
 from gwproactor.callbacks import ProactorCallbackFunctions
-from gwproactor.config.proactor_settings import ProactorSettings
+from gwproactor.config.app_settings import AppSettings
 from gwproactor.logger import ProactorLogger
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.stats import ProactorStats
@@ -33,7 +33,7 @@ class ProactorName:
 
 class ProactorConfig:
     name: ProactorName
-    settings: ProactorSettings
+    settings: AppSettings
     callback_functions: ProactorCallbackFunctions
     logger: ProactorLogger
     event_persister: PersisterInterface
@@ -44,7 +44,7 @@ class ProactorConfig:
         self,
         name: ProactorName,
         *,
-        settings: Optional[ProactorSettings] = None,
+        settings: Optional[AppSettings] = None,
         callbacks: Optional[ProactorCallbackFunctions] = None,
         logger: Optional[ProactorLogger] = None,
         event_persister: Optional[PersisterInterface] = None,
@@ -52,7 +52,7 @@ class ProactorConfig:
         hardware_layout: Optional[HardwareLayout] = None,
     ) -> None:
         self.name = name
-        self.settings = ProactorSettings() if settings is None else settings
+        self.settings = AppSettings() if settings is None else settings
         self.callback_functions = (
             ProactorCallbackFunctions() if callbacks is None else callbacks
         )

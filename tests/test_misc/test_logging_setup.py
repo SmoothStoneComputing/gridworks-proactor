@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 import pytest
 
-from gwproactor import ProactorSettings, setup_logging
+from gwproactor import AppSettings, setup_logging
 from gwproactor.config import (
     DEFAULT_LOG_FILE_NAME,
     LoggingSettings,
@@ -21,7 +21,8 @@ def test_get_default_logging_config(
 ) -> None:
     paths = Paths()
     paths.mkdirs()
-    settings = ProactorSettings(logging=LoggingSettings(base_log_level=logging.INFO))
+    settings = AppSettings(logging=LoggingSettings(base_log_level=logging.INFO))
+    assert paths == settings.paths
     root = logging.getLogger()
     old_root_level = root.getEffectiveLevel()
     pytest_root_handlers = len(root.handlers)
@@ -108,7 +109,7 @@ def test_rollover() -> None:
 
     bytes_per_log_file = 50
     num_log_files = 3
-    settings = ProactorSettings(
+    settings = AppSettings(
         logging=LoggingSettings(
             file_handler=RotatingFileHandlerSettings(
                 bytes_per_log_file=bytes_per_log_file,

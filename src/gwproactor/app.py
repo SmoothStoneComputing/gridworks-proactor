@@ -1,8 +1,9 @@
 import abc
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Optional, Self, Sequence, TypeVar
+from typing import Optional, Self, Sequence
 
 import dotenv
 import rich
@@ -11,24 +12,30 @@ from gwproto import HardwareLayout, ShNode
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.codecs import CodecFactory
 from gwproactor.config import MQTTClient, Paths
+from gwproactor.config.app_settings import AppSettings
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
-from gwproactor.config.proactor_settings import ProactorSettings
 from gwproactor.links.link_settings import LinkConfig
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.proactor_implementation import Proactor
 from gwproactor.proactor_interface import ActorInterface
 from gwproactor.stats import ProactorStats
 
-PrimeActorT = TypeVar("PrimeActorT", bound=PrimeActor)
+
+@dataclass
+class SubTypes:
+    proactor_type: type[Proactor] = Proactor
+    prime_actor_type: Optional[type[PrimeActor]] = None
+    app_settings_type: type[AppSettings] = AppSettings
+    actors_module: Optional[ModuleType] = None
 
 
 class App(abc.ABC):
+    settings: AppSettings
     config: ProactorConfig
-    proactor_type: type[Proactor] = Proactor
-    prime_actor_type: Optional[type[PrimeActor]] = None
+    links: dict[str, LinkSettings]
+    sub_types: SubTypes
     codec_factory: CodecFactory
-    actors_module: Optional[ModuleType] = None
     proactor: Optional[Proactor] = None
     prime_actor: Optional[PrimeActor] = None
 
@@ -37,62 +44,74 @@ class App(abc.ABC):
         *,
         paths_name: Optional[str] = None,
         paths: Optional[Paths] = None,
-        proactor_settings: Optional[ProactorSettings] = None,
-        proactor_type: type[Proactor] = Proactor,
-        prime_actor_type: Optional[type[PrimeActor]] = None,
+        app_settings: Optional[AppSettings] = None,
         codec_factory: Optional[CodecFactory] = None,
-        actors_module: Optional[ModuleType] = None,
+        sub_types: Optional[SubTypes] = None,
         env_file: Optional[str | Path] = None,
     ) -> None:
-        self.proactor_type = proactor_type
-        self.prime_actor_type = prime_actor_type
+        self.sub_types = self.make_subtypes() if sub_types is None else sub_types
+        self.settings = self.get_settings(
+            paths_name=paths_name,
+            paths=paths,
+            settings=app_settings,
+            env_file=env_file,
+            settings_type=self.sub_types.app_settings_type,
+        )
         if codec_factory is None:
-            if prime_actor_type is not None:
-                codec_factory = prime_actor_type.get_codec_factory()
+            if self.sub_types.prime_actor_type is not None:
+                codec_factory = self.sub_types.prime_actor_type.get_codec_factory()
             else:
                 codec_factory = CodecFactory()
         self.codec_factory = CodecFactory() if codec_factory is None else codec_factory
-        self.actors_module = actors_module
-        self.config = self._make_proactor_config(
-            paths_name=paths_name,
-            paths=paths,
-            proactor_settings=proactor_settings,
-            env_file=env_file,
+        self.config = self._make_proactor_config()
+        self.links = self._get_link_settings(
+            name=self.config.name,
+            layout=self.config.layout,
+            brokers=self.settings.brokers(),
         )
+
+    @classmethod
+    def make_subtypes(cls) -> SubTypes:
+        return SubTypes(
+            app_settings_type=cls.app_settings_type(),
+            prime_actor_type=cls.prime_actor_type(),
+            actors_module=cls.actors_module(),
+        )
+
+    @classmethod
+    def app_settings_type(cls) -> type[AppSettings]:
+        return AppSettings
+
+    @classmethod
+    def prime_actor_type(cls) -> Optional[type[PrimeActor]]:
+        return None
+
+    @classmethod
+    def actors_module(cls) -> Optional[ModuleType]:
+        return None
+
+    @classmethod
+    def paths_name(cls) -> Optional[str]:
+        return None
 
     def _make_proactor_config(
         self,
-        paths_name: Optional[str] = None,
-        paths: Optional[Paths] = None,
-        proactor_settings: Optional[ProactorSettings] = None,
-        env_file: Optional[str | Path] = None,
     ) -> ProactorConfig:
-        settings = self.get_settings(
-            paths_name=paths_name,
-            paths=paths,
-            settings=proactor_settings,
-            env_file=env_file,
-        )
-        layout = self._load_hardware_layout(settings.paths.hardware_layout)
+        layout = self._load_hardware_layout(self.settings.paths.hardware_layout)
         name = self._get_name(layout)
-        brokers = self._get_mqtt_broker_settings(name, layout)
-        for broker_name, broker_settings in brokers.items():
-            settings.add_mqtt_broker(broker_name, broker_settings)
-        for link_name, link in self._get_link_settings(name, layout, brokers).items():
-            settings.add_link(link_name, link)
         return ProactorConfig(
             name=name,
-            settings=settings,
-            event_persister=self._make_persister(settings),
+            settings=self.settings,
+            event_persister=self._make_persister(self.settings),
             stats=self._make_stats(),
             hardware_layout=layout,
         )
 
     def instantiate(self) -> Self:
-        self.proactor = self.proactor_type(self.config)
+        self.proactor = self.sub_types.proactor_type(self.config)
         self._connect_links(self.proactor)
-        if self.prime_actor_type is not None:
-            self.prime_actor = self.prime_actor_type(
+        if self.sub_types.prime_actor_type is not None:
+            self.prime_actor = self.sub_types.prime_actor_type(
                 self.config.name.short_name,
                 self.proactor,
             )
@@ -110,14 +129,6 @@ class App(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _get_mqtt_broker_settings(
-        self,
-        name: ProactorName,
-        layout: HardwareLayout,
-    ) -> dict[str, MQTTClient]:
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def _get_link_settings(
         self,
         name: ProactorName,
@@ -127,7 +138,7 @@ class App(abc.ABC):
         raise NotImplementedError
 
     def _connect_links(self, proactor: Proactor) -> None:
-        for link_name, link_settings in proactor.settings.links.items():
+        for link_name, link_settings in self.links.items():
             if link_settings.enabled:
                 proactor.links.add_mqtt_link(
                     LinkConfig(
@@ -135,11 +146,11 @@ class App(abc.ABC):
                         gnode_name=link_settings.peer_long_name,
                         spaceheat_name=link_settings.peer_short_name,
                         subscription_name=link_settings.link_subscription_short_name,
-                        mqtt=proactor.settings.mqtt_brokers[link_name],
+                        mqtt=self.settings.broker(link_name),
                         codec=self.codec_factory.get_codec(
                             link_name=link_name,
+                            link=link_settings,
                             proactor_name=proactor.name_object,
-                            proactor_settings=proactor.settings,
                             layout=proactor.hardware_layout,
                         ),
                         upstream=link_settings.upstream,
@@ -157,7 +168,7 @@ class App(abc.ABC):
     def _load_hardware_layout(self, layout_path: str | Path) -> HardwareLayout:
         return HardwareLayout.load(layout_path)
 
-    def _make_persister(self, settings: ProactorSettings) -> PersisterInterface:  # noqa: ARG002, ARG003
+    def _make_persister(self, settings: AppSettings) -> PersisterInterface:  # noqa: ARG002, ARG003
         return StubPersister()
 
     def _make_stats(self) -> ProactorStats:
@@ -178,14 +189,14 @@ class App(abc.ABC):
     def _load_actors(self) -> None:
         if self.proactor is None:
             raise ValueError("_load_actors called before proactor instantiated")
-        if self.actors_module is not None:
+        if self.sub_types.actors_module is not None:
             for node in self._get_actor_nodes():
                 self.proactor.add_communicator(
                     ActorInterface.load(
                         node.Name,
                         str(node.actor_class),
                         self.proactor,
-                        actors_module=self.actors_module,
+                        actors_module=self.sub_types.actors_module,
                     )
                 )
 
@@ -194,15 +205,18 @@ class App(abc.ABC):
         cls,
         paths_name: Optional[str] = None,
         paths: Optional[Paths] = None,
-        settings: Optional[ProactorSettings] = None,
+        settings: Optional[AppSettings] = None,
+        settings_type: Optional[type[AppSettings]] = None,
         env_file: Optional[str | Path] = None,
-    ) -> ProactorSettings:
+    ) -> AppSettings:
+        if settings_type is None:
+            settings_type = cls.app_settings_type()
         return (
             # https://github.com/koxudaxi/pydantic-pycharm-plugin/issues/1013
-            ProactorSettings(_env_file=env_file)  # noqa
+            settings_type(_env_file=env_file)  # noqa
             if settings is None
             else settings.model_copy(deep=True)
-        ).update_paths(name=paths_name, paths=paths)
+        ).with_paths(name=paths_name if paths_name else cls.paths_name(), paths=paths)
 
     @classmethod
     def print_settings(
@@ -215,8 +229,7 @@ class App(abc.ABC):
             f"Env file: <{dotenv_file}>  exists:{env_file and Path(dotenv_file).exists()}"
         )
         app = cls(env_file=env_file)
-        settings = app.config.settings
-        rich.print(settings)
-        missing_tls_paths_ = settings.check_tls_paths_present(raise_error=False)
+        rich.print(app.settings)
+        missing_tls_paths_ = app.settings.check_tls_paths_present(raise_error=False)
         if missing_tls_paths_:
             rich.print(missing_tls_paths_)

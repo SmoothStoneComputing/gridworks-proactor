@@ -114,3 +114,6 @@ class PrimeActor(ProactorCallbackInterface, Actor):
     @classmethod
     def get_codec_factory(cls) -> CodecFactory:
         return CodecFactory()
+
+
+class NullPrimeActor(PrimeActor): ...

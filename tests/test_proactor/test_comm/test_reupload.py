@@ -159,13 +159,14 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
     """
 
     from gwproactor import ProactorSettings
+    from gwproactor_test.dummies.pair.child import DummyChildSettings
 
     async with CommTestHelper(
         start_child=True,
         add_parent=True,
         child_app=DummyChildApp(
-            proactor_settings=ProactorSettings(
-                num_initial_event_reuploads=5,
+            app_settings=DummyChildSettings(
+                proactor=ProactorSettings(num_initial_event_reuploads=5)
             )
         ),
         request=request,
@@ -188,7 +189,7 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
         assert not child.links.reuploading()
 
         # Generate more events than fit in pipe.
-        events_to_generate = child.settings.num_initial_event_reuploads * 2
+        events_to_generate = child.settings.proactor.num_initial_event_reuploads * 2
         for i in range(events_to_generate):
             child.generate_event(
                 DBGEvent(
@@ -225,13 +226,14 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         reupload requiring flow control
     """
     from gwproactor import ProactorSettings
+    from gwproactor_test.dummies.pair.child import DummyChildSettings
 
     async with CommTestHelper(
         start_child=True,
         add_parent=True,
         child_app=DummyChildApp(
-            proactor_settings=ProactorSettings(
-                num_initial_event_reuploads=5,
+            app_settings=DummyChildSettings(
+                proactor=ProactorSettings(num_initial_event_reuploads=5)
             )
         ),
         request=request,
@@ -256,7 +258,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         assert not child_links.reuploading()
 
         # Generate more events than fit in pipe.
-        events_to_generate = child.settings.num_initial_event_reuploads * 2
+        events_to_generate = child.settings.proactor.num_initial_event_reuploads * 2
         for i in range(events_to_generate):
             child.generate_event(
                 DBGEvent(
@@ -307,7 +309,9 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         # generated _after_ the peer is active (and therefore has its own ack timeout running, so does not need to
         # be managed by reupload).
         last_num_to_reupload = events_to_generate + base_num_pending
-        last_num_reuploaded_unacked = child.settings.num_initial_event_reuploads
+        last_num_reuploaded_unacked = (
+            child.settings.proactor.num_initial_event_reuploads
+        )
         last_num_repuload_pending = (
             last_num_to_reupload - child_links.num_reuploaded_unacked
         )

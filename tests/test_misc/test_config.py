@@ -293,7 +293,7 @@ def test_paths(clean_test_env: Any, tmp_path: Path) -> None:
         hardware_layout="/z/gridworks/scada/hardware-layout.json",
     )
 
-    paths2 = paths.copy(name="foo")
+    paths2 = paths.duplicate(name="foo")
     assert_paths(
         paths2,
         home=tmp_path,

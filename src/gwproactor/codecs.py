@@ -3,8 +3,8 @@ from typing import Any, ClassVar, Optional, Sequence
 
 from gwproto import HardwareLayout, Message, MQTTCodec, create_message_model
 
+from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
-from gwproactor.config.proactor_settings import ProactorSettings
 
 
 class ProactorCodec(MQTTCodec):
@@ -69,16 +69,15 @@ class CodecFactory:
     # noinspection PyMethodMayBeStatic
     def get_codec(
         self,
-        link_name: str,
+        link_name: str,  # noqa: ARG002
+        link: LinkSettings,
         proactor_name: ProactorName,
-        proactor_settings: ProactorSettings,
         layout: HardwareLayout,  # noqa: ARG002
     ) -> MQTTCodec:
-        link_settings = proactor_settings.links[link_name]
         return ProactorCodec(
-            src_name=link_settings.peer_long_name,
+            src_name=link.peer_long_name,
             dst_name=proactor_name.short_name,
-            model_name=link_settings.codec.model_name,
-            module_names=link_settings.codec.message_modules,
-            use_default_modules=link_settings.codec.use_default_message_modules,
+            model_name=link.codec.model_name,
+            module_names=link.codec.message_modules,
+            use_default_modules=link.codec.use_default_message_modules,
         )
