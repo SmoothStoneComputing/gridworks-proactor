@@ -31,7 +31,7 @@ class SubTypes:
 
 
 class App(abc.ABC):
-    settings: AppSettings
+    _settings: AppSettings
     config: ProactorConfig
     links: dict[str, LinkSettings]
     sub_types: SubTypes
@@ -50,7 +50,7 @@ class App(abc.ABC):
         env_file: Optional[str | Path] = None,
     ) -> None:
         self.sub_types = self.make_subtypes() if sub_types is None else sub_types
-        self.settings = self.get_settings(
+        self._settings = self.get_settings(
             paths_name=paths_name,
             paths=paths,
             settings=app_settings,
@@ -69,6 +69,10 @@ class App(abc.ABC):
             layout=self.config.layout,
             brokers=self.settings.brokers(),
         )
+
+    @property
+    def settings(self) -> AppSettings:
+        return self._settings
 
     @classmethod
     def make_subtypes(cls) -> SubTypes:
