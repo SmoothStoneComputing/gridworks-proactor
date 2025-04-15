@@ -2,6 +2,9 @@ import secrets
 from typing import Any, ClassVar, Optional, Sequence
 
 from gwproto import HardwareLayout, Message, MQTTCodec, create_message_model
+from gwproto.messages import AnyEvent
+from pydantic import ValidationError
+from pydantic_core import ErrorDetails
 
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
@@ -63,6 +66,36 @@ class ProactorCodec(MQTTCodec):
                 f"  exp: {self.src_name} -> {self.dst_name}\n"
                 f"  got: {src} -> {dst}"
             )
+
+    @classmethod
+    def _may_be_event(cls, details: ErrorDetails) -> bool:
+        loc = details.get("loc", [])
+        return (
+            len(loc) >= 2  # noqa: PLR2004
+            and loc[0] == "Payload"
+            and loc[1].startswith("gridworks.event")
+        )
+
+    @classmethod
+    def get_unrecognized_payload_error(
+        cls, e: ValidationError
+    ) -> Optional[ErrorDetails]:
+        super_error = super().get_unrecognized_payload_error(e)
+        if super_error is None:
+            for error in e.errors():
+                if cls._may_be_event(error):
+                    return error
+        return super_error
+
+    def handle_unrecognized_payload(  # noqa
+        self, payload: bytes, e: ValidationError, details: ErrorDetails
+    ) -> Message[Any]:
+        if self._may_be_event(details):
+            try:
+                return Message[AnyEvent].model_validate_json(payload)
+            except ValidationError as e2:
+                raise e2 from e
+        raise e
 
 
 class CodecFactory:
