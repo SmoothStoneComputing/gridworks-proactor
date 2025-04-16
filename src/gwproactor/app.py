@@ -198,7 +198,7 @@ class App(abc.ABC):
                 self.proactor.add_communicator(
                     ActorInterface.load(
                         node.Name,
-                        str(node.actor_class),
+                        node.actor_class_str,
                         self.proactor,
                         actors_module=self.sub_types.actors_module,
                     )
