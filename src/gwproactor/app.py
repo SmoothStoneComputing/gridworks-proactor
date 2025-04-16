@@ -9,6 +9,7 @@ import dotenv
 import rich
 from gwproto import HardwareLayout, ShNode
 
+from gwproactor import actors
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.codecs import CodecFactory
 from gwproactor.config import MQTTClient, Paths
@@ -98,7 +99,7 @@ class App(abc.ABC):
 
     @classmethod
     def actors_module(cls) -> Optional[ModuleType]:
-        return None
+        return actors
 
     @classmethod
     def paths_name(cls) -> Optional[str]:
@@ -189,7 +190,7 @@ class App(abc.ABC):
 
     def _get_actor_nodes(self) -> Sequence[ActorConfig]:
         if self.prime_actor is None or self.prime_actor.node is None:
-            raise ValueError("_get_actor_nodes called without prime_actor")
+            return []
         return [
             ActorConfig(node=node)
             for node in self._layout.nodes.values()

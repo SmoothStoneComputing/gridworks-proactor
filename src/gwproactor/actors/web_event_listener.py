@@ -39,7 +39,7 @@ class WebEventListener(Actor):
         self.services.add_web_route(
             server_name=settings.server_name,
             method="POST",
-            path=WebEventListenerSettings.http_path,
+            path=settings.http_path,
             handler=self._handle_web_post,
         )
 
