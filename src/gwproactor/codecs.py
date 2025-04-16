@@ -69,10 +69,11 @@ class ProactorCodec(MQTTCodec):
 
     @classmethod
     def _may_be_event(cls, details: ErrorDetails) -> bool:
-        loc = details.get("loc", [])
+        loc: Sequence[str | int] = details.get("loc", [])
         return (
             len(loc) >= 2  # noqa: PLR2004
             and loc[0] == "Payload"
+            and isinstance(loc[1], str)
             and loc[1].startswith("gridworks.event")
         )
 
@@ -95,7 +96,9 @@ class ProactorCodec(MQTTCodec):
                 return Message[AnyEvent].model_validate_json(payload)
             except ValidationError as e2:
                 raise e2 from e
-        raise e
+        return super().handle_unrecognized_payload(
+            payload=payload, e=e, details=details
+        )
 
 
 class CodecFactory:
