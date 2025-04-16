@@ -118,7 +118,9 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
 
     @classmethod
     @abstractmethod
-    def instantiate(cls, name: str, services: "ServicesInterface") -> "ActorInterface":
+    def instantiate(
+        cls, name: str, services: "ServicesInterface", **contstructor_kwargs: Any
+    ) -> "ActorInterface":
         raise NotImplementedError
 
     @classmethod
@@ -128,6 +130,7 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
         actor_class_name: str,
         services: "ServicesInterface",
         actors_module: ModuleType,
+        **constructor_kwargs: Any,
     ) -> "ActorInterface":
         actor_class = getattr(actors_module, actor_class_name)
         if not issubclass(actor_class, ActorInterface):
@@ -137,7 +140,7 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
                 f"with via requested name <{actor_class_name} "
                 "does not implement ActorInterface",
             )
-        actor = actor_class.instantiate(name, services)
+        actor = actor_class.instantiate(name, services, **constructor_kwargs)
         if not isinstance(actor, ActorInterface):
             raise ValueError(  # noqa: TRY004
                 f"ERROR. Constructed object with type {type(actor)} "

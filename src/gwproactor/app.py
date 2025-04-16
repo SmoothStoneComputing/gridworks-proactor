@@ -1,9 +1,9 @@
 import abc
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing import Optional, Self, Sequence
+from typing import Any, Optional, Self, Sequence
 
 import dotenv
 import rich
@@ -28,6 +28,12 @@ class SubTypes:
     prime_actor_type: Optional[type[PrimeActor]] = None
     app_settings_type: type[AppSettings] = AppSettings
     actors_module: Optional[ModuleType] = None
+
+
+@dataclass
+class ActorConfig:
+    node: ShNode
+    constructor_args: dict[str, Any] = field(default_factory=dict)
 
 
 class App(abc.ABC):
@@ -111,8 +117,11 @@ class App(abc.ABC):
             hardware_layout=layout,
         )
 
+    def _instantiate_proactor(self) -> Proactor:
+        return self.sub_types.proactor_type(self.config)
+
     def instantiate(self) -> Self:
-        self.proactor = self.sub_types.proactor_type(self.config)
+        self.proactor = self._instantiate_proactor()
         self._connect_links(self.proactor)
         if self.sub_types.prime_actor_type is not None:
             self.prime_actor = self.sub_types.prime_actor_type(
@@ -178,11 +187,11 @@ class App(abc.ABC):
     def _make_stats(self) -> ProactorStats:
         return ProactorStats()
 
-    def _get_actor_nodes(self) -> Sequence[ShNode]:
+    def _get_actor_nodes(self) -> Sequence[ActorConfig]:
         if self.prime_actor is None or self.prime_actor.node is None:
-            raise ValueError
+            raise ValueError("_get_actor_nodes called without prime_actor")
         return [
-            node
+            ActorConfig(node=node)
             for node in self._layout.nodes.values()
             if (
                 node.has_actor
@@ -194,13 +203,14 @@ class App(abc.ABC):
         if self.proactor is None:
             raise ValueError("_load_actors called before proactor instantiated")
         if self.sub_types.actors_module is not None:
-            for node in self._get_actor_nodes():
+            for actor_config in self._get_actor_nodes():
                 self.proactor.add_communicator(
                     ActorInterface.load(
-                        node.Name,
-                        node.actor_class_str,
+                        actor_config.node.Name,
+                        actor_config.node.actor_class_str,
                         self.proactor,
                         actors_module=self.sub_types.actors_module,
+                        **actor_config.constructor_args,
                     )
                 )
 

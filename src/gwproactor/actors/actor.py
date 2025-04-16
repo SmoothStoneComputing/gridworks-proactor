@@ -29,8 +29,14 @@ class Actor(ActorInterface, Communicator, ABC):
         super().__init__(name, services)
 
     @classmethod
-    def instantiate(cls, name: str, services: "ServicesInterface") -> "ActorInterface":
-        return cls(name, services)
+    def instantiate(
+        cls, name: str, services: "ServicesInterface", **constructor_args: Any
+    ) -> "ActorInterface":
+        return cls(
+            name,
+            services,
+            **constructor_args,  # noqa
+        )
 
     @property
     def name(self) -> str:
