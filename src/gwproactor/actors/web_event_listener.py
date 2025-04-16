@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from http import HTTPStatus
 from typing import Any, Optional
 
@@ -6,28 +7,39 @@ from aiohttp.web_request import Request
 from aiohttp.web_response import Response
 from gwproto import Message
 from gwproto.messages import EventBase, ProblemEvent
+from gwproto.named_types import SpaceheatNodeGt
 from gwproto.named_types.web_server_gt import DEFAULT_WEB_SERVER_NAME
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from result import Result
 
 from gwproactor.actors.actor import Actor
 from gwproactor.proactor_interface import ServicesInterface
 from gwproactor.problems import Problems
 
+EVENT_PATH: str = "/event"
+
+
+class WebEventListenerSettings(BaseModel):
+    http_path: str = EVENT_PATH
+    server_name: str = DEFAULT_WEB_SERVER_NAME
+
 
 class WebEventListener(Actor):
-    EVENT_PATH: str = "/event"
+    DEFAULT_NODE_NAME: str = "web-event"
 
     def __init__(
         self,
         name: str,
         services: ServicesInterface,
+        settings: Optional[WebEventListenerSettings] = None,
     ) -> None:
         super().__init__(name, services)
+        if settings is None:
+            settings = WebEventListenerSettings()
         self.services.add_web_route(
-            server_name=DEFAULT_WEB_SERVER_NAME,
+            server_name=settings.server_name,
             method="POST",
-            path=self.EVENT_PATH,
+            path=WebEventListenerSettings.http_path,
             handler=self._handle_web_post,
         )
 
@@ -74,3 +86,14 @@ class WebEventListener(Actor):
 
     async def join(self) -> None:
         """IOLoop will take care of shutting down the associated task."""
+
+    @classmethod
+    def default_node(
+        cls, name: str = DEFAULT_NODE_NAME, parent_name: str = "s"
+    ) -> SpaceheatNodeGt:
+        return SpaceheatNodeGt(
+            ShNodeId=str(uuid.uuid4()),
+            Name=name,
+            ActorHierarchyName=f"{parent_name}.{name}",
+            ActorClass=cls.__name__,
+        )
