@@ -30,11 +30,11 @@ class TLSPaths(BaseModel):
         )
 
     def effective_paths(self, certs_dir: str | Path, client_name: str) -> "TLSPaths":
-        """Re-calculate non-set paths given a certs_dir and client name. Meant to be called in context where those are
+        """Re-calculate paths given a certs_dir and client name. Meant to be called in context where those are
         known, e.g. a validator on a higher-level model which has access to a Paths object and a named MQTT
         configuration."""
-        fields = self.defaults(Path(certs_dir), client_name).model_dump()
-        fields.update(self.model_dump(exclude_none=True))
+        fields = self.model_dump(exclude_none=True)
+        fields.update(self.defaults(Path(certs_dir), client_name).model_dump())
         return TLSPaths(**fields)
 
     def mkdirs(
@@ -172,13 +172,13 @@ class Paths(BaseModel):
         self,
         *,
         exclude_unset: bool = True,
-        excluded_defaults: bool = True,
+        exclude_defaults: bool = True,
         exclude: Optional[set[str]] = None,
         **kwargs: Any,
     ) -> "Paths":
         fields = self.model_dump(
             exclude_unset=exclude_unset,
-            exclude_defaults=excluded_defaults,
+            exclude_defaults=exclude_defaults,
             exclude=exclude,
         )
         fields.update(**kwargs)

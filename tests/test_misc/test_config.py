@@ -59,7 +59,7 @@ def test_tls_paths() -> None:
     certs_dir = Path("foo/certs")
     name = "bar"
     exp = {
-        "ca_cert_path": ca_cert_path,
+        "ca_cert_path": certs_dir / name / "ca.crt",
         "cert_path": certs_dir / name / f"{name}.crt",
         "private_key_path": certs_dir / name / "private" / f"{name}.pem",
     }
@@ -86,7 +86,6 @@ def test_tls_paths_mkdirs(clean_test_env: Any, tmp_path: Path) -> None:
     assert not paths.config_dir.exists()
     assert not paths.certs_dir.exists()
     assert not ca_cert_dir.exists()
-    assert tls_paths.ca_cert_path == ca_cert_path
     assert not tls_paths.cert_path.parent.exists()
     assert not tls_paths.private_key_path.parent.exists()
     tls_paths.mkdirs()
