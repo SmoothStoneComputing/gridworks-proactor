@@ -31,7 +31,7 @@ paho-mqtt = "^1.6.1"
 result = "^0.9.0"
 # gridworks-protocol = "^1.2.3"
 # gridworks-protocol = { path = "../gridworks-protocol", develop = true }
-gridworks-protocol = { git = "https://github.com/thegridelectric/gridworks-protocol.git", branch = "as/ActorClass" }
+gridworks-protocol = { git = "https://github.com/thegridelectric/gridworks-protocol.git", branch = "as/sharing" }
 aiohttp = "^3.11.11"
 yarl = "^1.9.2"
 multidict = "^6.0.4"
