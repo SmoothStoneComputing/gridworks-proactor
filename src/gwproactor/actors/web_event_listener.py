@@ -6,7 +6,7 @@ from typing import Any, Optional
 from aiohttp.web_request import Request
 from aiohttp.web_response import Response
 from gwproto import Message
-from gwproto.messages import EventBase, ProblemEvent
+from gwproto.messages import AnyEvent, EventBase, ProblemEvent
 from gwproto.named_types import SpaceheatNodeGt
 from gwproto.named_types.web_server_gt import DEFAULT_WEB_SERVER_NAME
 from pydantic import BaseModel, ValidationError
@@ -16,7 +16,7 @@ from gwproactor.actors.actor import Actor
 from gwproactor.proactor_interface import ServicesInterface
 from gwproactor.problems import Problems
 
-EVENT_PATH: str = "/event"
+EVENT_PATH: str = "/events"
 
 
 class WebEventListenerSettings(BaseModel):
@@ -50,7 +50,7 @@ class WebEventListener(Actor):
         try:
             text = await request.text()
             try:
-                event = EventBase.model_validate_json(text)
+                event = AnyEvent.model_validate_json(text)
             except ValidationError as validation_error:
                 status = HTTPStatus.UNPROCESSABLE_ENTITY
                 response_text = validation_error.json(indent=2)
