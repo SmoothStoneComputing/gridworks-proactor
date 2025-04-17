@@ -17,6 +17,7 @@ class AppSettings(BaseSettings):
         env_prefix="PROACTOR_APP_",
         env_nested_delimiter="__",
         nested_model_default_partial_update=True,
+        extra="ignore",
     )
     paths: Paths = Field(default_factory=Paths, validate_default=True)
     logging: LoggingSettings = LoggingSettings()

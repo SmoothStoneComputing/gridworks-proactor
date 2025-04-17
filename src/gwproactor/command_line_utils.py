@@ -30,7 +30,7 @@ def get_app(  # noqa: PLR0913
     run_in_thread: bool = False,
     add_screen_handler: bool = True,
 ) -> App:
-    dotenv_file = dotenv.find_dotenv(str(env_file))
+    dotenv_file = dotenv.find_dotenv(str(env_file), usecwd=True)
     dotenv_file_debug_str = (
         f"Env file: <{dotenv_file}>  exists:{Path(dotenv_file).exists()}"
     )

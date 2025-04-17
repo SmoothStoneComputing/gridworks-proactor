@@ -239,9 +239,9 @@ class App(abc.ABC):
         *,
         env_file: str | Path = ".env",
     ) -> None:
-        dotenv_file = dotenv.find_dotenv(str(env_file))
+        dotenv_file = dotenv.find_dotenv(str(env_file), usecwd=True)
         rich.print(
-            f"Env file: <{dotenv_file}>  exists:{env_file and Path(dotenv_file).exists()}"
+            f"Env file: <{dotenv_file}>  exists: {bool(dotenv_file and Path(dotenv_file).exists())}"
         )
         app = cls(env_file=env_file)
         rich.print(app.settings)
