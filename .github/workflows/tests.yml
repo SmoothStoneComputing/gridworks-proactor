@@ -12,17 +12,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { python: "3.12", os: "ubuntu-latest", session: "pre-commit" }
+          - { python: "3.13", os: "ubuntu-latest", session: "pre-commit" }
+          - { python: "3.13", os: "ubuntu-latest", session: "mypy" }
           - { python: "3.12", os: "ubuntu-latest", session: "mypy" }
           - { python: "3.11", os: "ubuntu-latest", session: "mypy" }
+          - { python: "3.13", os: "ubuntu-latest", session: "tests", coverage: true }
+          - { python: "3.12", os: "ubuntu-latest", session: "tests" }
           - { python: "3.11", os: "ubuntu-latest", session: "tests" }
-          - { python: "3.12", os: "ubuntu-latest", session: "tests", coverage: true }
           # mosuqitto github action only supported on ubuntu
-          # - { python: "3.12", os: "macos-latest", session: "tests" }
-          # - { python: "3.12", os: "windows-latest", session: "tests" }
+          # - { python: "3.13", os: "macos-latest", session: "tests" }
+          # - { python: "3.13", os: "windows-latest", session: "tests" }
           - { python: "3.12", os: "ubuntu-latest", session: "xdoctest" }
           - { python: "3.12", os: "ubuntu-latest", session: "docs-build" }
-
           # - { python: "3.12", os: "ubuntu-latest", session: "mypy" }
 
     env:
@@ -220,7 +221,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5.2.0
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Upgrade pip
         run: |
@@ -239,7 +240,7 @@ jobs:
           nox --version
 
       - name: Download coverage data
-        uses: "actions/download-artifact@v4.1.9"
+        uses: "actions/download-artifact@v4.2.1"
         with:
           name: coverage-data
 
@@ -252,4 +253,4 @@ jobs:
           nox --session=coverage -- xml
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v5.4.0
+        uses: codecov/codecov-action@v5.4.2
