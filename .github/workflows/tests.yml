@@ -22,8 +22,8 @@ jobs:
           # mosuqitto github action only supported on ubuntu
           # - { python: "3.13", os: "macos-latest", session: "tests" }
           # - { python: "3.13", os: "windows-latest", session: "tests" }
-          - { python: "3.12", os: "ubuntu-latest", session: "xdoctest" }
-          - { python: "3.12", os: "ubuntu-latest", session: "docs-build" }
+          - { python: "3.13", os: "ubuntu-latest", session: "xdoctest" }
+          - { python: "3.13", os: "ubuntu-latest", session: "docs-build" }
           # - { python: "3.12", os: "ubuntu-latest", session: "mypy" }
 
     env:
