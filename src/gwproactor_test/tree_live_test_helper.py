@@ -7,18 +7,18 @@ from typing import Any, Optional, Self
 from gwproactor import setup_logging
 from gwproactor.app import App
 from gwproactor.config import MQTTClient
-from gwproactor_test.comm_test_helper import (
-    CommTestHelper,
-    get_option_value,
-)
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
 from gwproactor_test.dummies.tree.scada1 import DummyScada1App
 from gwproactor_test.dummies.tree.scada2 import DummyScada2App
 from gwproactor_test.instrumented_proactor import InstrumentedProactor
+from gwproactor_test.live_test_helper import (
+    LiveTest,
+    get_option_value,
+)
 from gwproactor_test.logger_guard import LoggerGuards
 
 
-class TreeCommTestHelper(CommTestHelper):
+class TreeLiveTest(LiveTest):
     child2_app: App
     child2_verbose: bool = False
     child2_on_screen: bool = False

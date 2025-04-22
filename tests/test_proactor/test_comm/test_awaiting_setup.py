@@ -7,8 +7,8 @@ from gwproto import MQTTTopic
 
 from gwproactor.links import StateName
 from gwproactor.message import DBGPayload
-from gwproactor_test.comm_test_helper import (
-    CommTestHelper,
+from gwproactor_test.live_test_helper import (
+    LiveTest,
 )
 from gwproactor_test.wait import await_for
 
@@ -21,7 +21,7 @@ async def test_awaiting_setup_and_peer(request: Any) -> None:
      (awaiting_setup_and_peer -> mqtt_suback -> awaiting_peer)
      (awaiting_setup_and_peer -> disconnected -> connecting)
     """
-    async with CommTestHelper(add_child=True, request=request) as h:
+    async with LiveTest(add_child=True, request=request) as h:
         child = h.child
         stats = child.stats.link(child.upstream_client)
         comm_event_counts = stats.comm_event_counts
@@ -150,7 +150,7 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
     In practice these might be corner cases that rarely or never occur, since by default all subacks will come and
     one message and we should not receive any messages before subscribing.
     """
-    async with CommTestHelper(add_child=True, request=request) as h:
+    async with LiveTest(add_child=True, request=request) as h:
         child = h.child
         child_subscriptions = child.mqtt_subscriptions(child.upstream_client)
         if len(child_subscriptions) < 2:
@@ -306,7 +306,7 @@ async def test_awaiting_setup2__(request: Any) -> None:
     In practice these might be corner cases that rarely or never occur, since by default all subacks will come and
     one message and we should not receive any messages before subscribing.
     """
-    async with CommTestHelper(add_child=True, add_parent=True, request=request) as h:
+    async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
         child_subscriptions = child.mqtt_subscriptions(child.upstream_client)
         if len(child_subscriptions) < 2:

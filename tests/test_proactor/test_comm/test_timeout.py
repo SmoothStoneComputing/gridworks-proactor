@@ -7,10 +7,10 @@ import pytest
 from gwproto import MQTTTopic
 
 from gwproactor.links import StateName
-from gwproactor_test.comm_test_helper import (
-    CommTestHelper,
-)
 from gwproactor_test.dummies import DummyChildApp
+from gwproactor_test.live_test_helper import (
+    LiveTest,
+)
 from gwproactor_test.wait import await_for
 
 
@@ -22,7 +22,7 @@ async def test_response_timeout(request: Any) -> None:
         (active -> response_timeout -> awaiting_peer)
     """
 
-    async with CommTestHelper(
+    async with LiveTest(
         add_child=True,
         add_parent=True,
         request=request,
@@ -126,7 +126,7 @@ async def test_ping(request: Any) -> None:
     from gwproactor import ProactorSettings
     from gwproactor_test.dummies.pair.child import DummyChildSettings
 
-    async with CommTestHelper(
+    async with LiveTest(
         add_child=True,
         add_parent=True,
         child_app=DummyChildApp(

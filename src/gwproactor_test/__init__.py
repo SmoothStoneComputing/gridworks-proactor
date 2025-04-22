@@ -9,7 +9,7 @@ from gwproactor_test.certs import (
     test_certificate_cache_dir,
 )
 from gwproactor_test.clean import DefaultTestEnv, clean_test_env, default_test_env
-from gwproactor_test.comm_test_helper import CommTestHelper
+from gwproactor_test.live_test_helper import LiveTest
 from gwproactor_test.logger_guard import LoggerGuard, LoggerGuards, restore_loggers
 from gwproactor_test.wait import (
     AwaitablePredicate,
@@ -24,7 +24,7 @@ __all__ = [
     "TEST_CA_PRIVATE_KEY_VAR",
     "TEST_CERTIFICATE_CACHE_VAR",
     "AwaitablePredicate",
-    "CommTestHelper",
+    "LiveTest",
     "DefaultTestEnv",
     "ErrorStringFunction",
     "LoggerGuard",

@@ -5,13 +5,13 @@ import pytest
 
 from gwproactor.links import StateName
 from gwproactor_test.dummies.tree.messages import RelayInfoReported
-from gwproactor_test.tree_comm_test_helper import TreeCommTestHelper
+from gwproactor_test.tree_live_test_helper import TreeLiveTest
 from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
 async def test_tree_no_parent(request: Any) -> None:
-    async with TreeCommTestHelper(request=request) as h:
+    async with TreeLiveTest(request=request) as h:
         # add child 1
         h.add_child()
         child1 = h.child1  # noqa
@@ -73,7 +73,7 @@ async def test_tree_no_parent(request: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_tree_message_exchange(request: Any) -> None:
-    async with TreeCommTestHelper(
+    async with TreeLiveTest(
         start_child1=True,
         start_child2=True,
         request=request,
@@ -120,7 +120,7 @@ async def test_tree_message_exchange(request: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_tree_parent_comm(request: Any) -> None:
-    async with TreeCommTestHelper(add_child=True, request=request) as h:
+    async with TreeLiveTest(add_child=True, request=request) as h:
         h.start_child1()
         await await_for(
             h.child1.mqtt_quiescent,
@@ -152,7 +152,7 @@ async def test_tree_parent_comm(request: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_tree_event_forward(request: Any) -> None:
-    async with TreeCommTestHelper(
+    async with TreeLiveTest(
         start_child=True,
         start_child2=True,
         start_parent=True,

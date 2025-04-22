@@ -28,7 +28,7 @@ def get_option_value(
     return bool(request.config.getoption(option_name))
 
 
-class CommTestHelper:
+class LiveTest:
     parent_app: App
     child_app: App
     verbose: bool

@@ -6,14 +6,14 @@ import pytest
 from gwproto import MQTTTopic
 
 from gwproactor.links import StateName
-from gwproactor_test import CommTestHelper
+from gwproactor_test import LiveTest
 from gwproactor_test.certs import uses_tls
 from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
 async def test_no_parent(request: Any) -> None:
-    async with CommTestHelper(add_child=True, request=request) as h:
+    async with LiveTest(add_child=True, request=request) as h:
         child = h.child
         stats = child.stats.link(child.upstream_client)
         comm_event_counts = stats.comm_event_counts
@@ -69,7 +69,7 @@ async def test_no_parent(request: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_basic_comm_child_first(request: Any) -> None:
-    async with CommTestHelper(add_child=True, add_parent=True, request=request) as h:
+    async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
         child_stats = child.stats.link(child.upstream_client)
         child_comm_event_counts = child_stats.comm_event_counts
@@ -164,7 +164,7 @@ async def test_basic_comm_child_first(request: Any) -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("suppress_tls", [False, True])
 async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None:
-    async with CommTestHelper(request=request) as h:
+    async with LiveTest(request=request) as h:
         child_settings = h.child_app.config.settings
         parent_settings = h.parent_app.config.settings
         base_logger = logging.getLogger(child_settings.logging.base_log_name)
@@ -236,7 +236,7 @@ async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None
 
 @pytest.mark.asyncio
 async def test_basic_parent_comm_loss(request: Any) -> None:
-    async with CommTestHelper(add_child=True, add_parent=True, request=request) as h:
+    async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
         child_stats = child.stats.link(child.upstream_client)
         child_comm_event_counts = child_stats.comm_event_counts

@@ -13,10 +13,10 @@ from gwproactor import Proactor
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
 from gwproactor.persister import TimedRollingFilePersister
-from gwproactor_test.comm_test_helper import (
-    CommTestHelper,
-)
 from gwproactor_test.dummies import DummyChildApp
+from gwproactor_test.live_test_helper import (
+    LiveTest,
+)
 from gwproactor_test.wait import await_for
 
 
@@ -105,7 +105,7 @@ async def test_reupload_basic(request: Any) -> None:
     Test:
         reupload not requiring flow control
     """
-    async with CommTestHelper(
+    async with LiveTest(
         start_child=True,
         add_parent=True,
         request=request,
@@ -161,7 +161,7 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
     from gwproactor import ProactorSettings
     from gwproactor_test.dummies.pair.child import DummyChildSettings
 
-    async with CommTestHelper(
+    async with LiveTest(
         start_child=True,
         add_parent=True,
         child_app=DummyChildApp(
@@ -228,7 +228,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
     from gwproactor import ProactorSettings
     from gwproactor_test.dummies.pair.child import DummyChildSettings
 
-    async with CommTestHelper(
+    async with LiveTest(
         start_child=True,
         add_parent=True,
         child_app=DummyChildApp(
@@ -406,7 +406,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_reupload_errors(request: Any) -> None:
-    async with CommTestHelper(
+    async with LiveTest(
         start_child=True,
         add_parent=True,
         request=request,
