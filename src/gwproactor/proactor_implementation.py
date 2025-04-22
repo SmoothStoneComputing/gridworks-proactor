@@ -254,6 +254,9 @@ class Proactor(ServicesInterface, Runnable):
             self.await_processing(message), self._loop
         ).result()
 
+    def get_communicator_names(self) -> set[str]:
+        return set(self._communicators.keys())
+
     def get_communicator(self, name: str) -> Optional[CommunicatorInterface]:
         return self._communicators.get(name, None)
 
@@ -323,10 +326,24 @@ class Proactor(ServicesInterface, Runnable):
     def remove_callbacks(self, callbacks_id: int) -> None:
         return self._callbacks.remove_callbacks(callbacks_id)
 
-    def publish_message(
-        self, link_name: str, message: Message[Any], qos: int = 0, context: Any = None
+    def publish_message(  # noqa: PLR0913
+        self,
+        link_name: str,
+        message: Message[Any],
+        qos: int = 0,
+        context: Any = None,
+        *,
+        topic: str = "",
+        use_link_topic: bool = False,
     ) -> MQTTMessageInfo:
-        return self._links.publish_message(link_name, message, qos, context)
+        return self._links.publish_message(
+            link_name=link_name,
+            message=message,
+            qos=qos,
+            context=context,
+            topic=topic,
+            use_link_topic=use_link_topic,
+        )
 
     @property
     def event_persister(self) -> PersisterInterface:
