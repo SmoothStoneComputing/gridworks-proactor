@@ -206,6 +206,10 @@ class ServicesInterface(CommunicatorInterface):
         raise NotImplementedError
 
     @abstractmethod
+    def get_communicator_names(self) -> set[str]:
+        raise NotImplementedError
+
+    @abstractmethod
     def send(self, message: Message[Any]) -> None:
         raise NotImplementedError
 
@@ -291,12 +295,15 @@ class ServicesInterface(CommunicatorInterface):
         raise NotImplementedError
 
     @abstractmethod
-    def publish_message(
+    def publish_message(  # noqa: PLR0913
         self,
         link_name: str,
         message: Message[Any],
         qos: int = 0,
         context: Any = None,
+        *,
+        topic: str = "",
+        use_link_topic: bool = False,
     ) -> MQTTMessageInfo:
         raise NotImplementedError
 

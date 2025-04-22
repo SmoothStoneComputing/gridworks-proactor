@@ -96,7 +96,7 @@ class RecorderLinks(LinkManager):
 
     def publish_message(
         self,
-        client: str,
+        link_name: str,
         message: Message[Any],
         qos: int = 0,
         context: Any = None,
@@ -105,10 +105,10 @@ class RecorderLinks(LinkManager):
         use_link_topic: bool = False,
     ) -> MQTTMessageInfo:
         if self.acks_paused:
-            self.needs_ack.append(_PausedAck(client, message, qos, context))
+            self.needs_ack.append(_PausedAck(link_name, message, qos, context))
             return MQTTMessageInfo(-1)
         return super().publish_message(
-            client,
+            link_name,
             message,
             qos=qos,
             context=context,
