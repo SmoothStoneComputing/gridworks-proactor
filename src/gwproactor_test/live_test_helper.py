@@ -2,17 +2,22 @@ import argparse
 import asyncio
 import contextlib
 import logging
+import shutil
 import typing
+from pathlib import Path
 from types import TracebackType
 from typing import Optional, Self, Type
 
 from pydantic_settings import BaseSettings
 
-from gwproactor import Proactor, setup_logging
+from gwproactor import AppSettings, Proactor, setup_logging
 from gwproactor.app import App
-from gwproactor.config import MQTTClient
+from gwproactor.config import MQTTClient, Paths
+from gwproactor_test import copy_keys
+from gwproactor_test.certs import uses_tls
+from gwproactor_test.clean import TEST_HARDWARE_LAYOUT_PATH
 from gwproactor_test.dummies.pair.child import DummyChildApp
-from gwproactor_test.dummies.pair.parent import ParentApp
+from gwproactor_test.dummies.pair.parent import DummyParentApp
 from gwproactor_test.instrumented_proactor import InstrumentedProactor
 from gwproactor_test.logger_guard import LoggerGuards
 
@@ -41,8 +46,8 @@ class LiveTest:
     def __init__(
         self,
         *,
-        child_app: Optional[App] = None,
-        parent_app: Optional[App] = None,
+        child_app_settings: Optional[AppSettings] = None,
+        parent_app_settings: Optional[AppSettings] = None,
         verbose: Optional[bool] = None,
         child_verbose: Optional[bool] = None,
         parent_verbose: Optional[bool] = None,
@@ -54,8 +59,8 @@ class LiveTest:
         parent_on_screen: Optional[bool] = None,
         request: typing.Any = None,
     ) -> None:
-        self.child_app = DummyChildApp() if child_app is None else child_app
-        self.parent_app = ParentApp() if parent_app is None else parent_app
+        self.child_app = self._make_app(self.child_app_type(), child_app_settings)
+        self.parent_app = self._make_app(self.parent_app_type(), parent_app_settings)
         self.verbose = get_option_value(
             parameter_value=verbose,
             option_name="--live-test-verbose",
@@ -86,6 +91,32 @@ class LiveTest:
             self.add_parent()
             if start_parent:
                 self.start_parent()
+
+    @classmethod
+    def child_app_type(cls) -> type[App]:
+        return DummyChildApp
+
+    @classmethod
+    def parent_app_type(cls) -> type[App]:
+        return DummyParentApp
+
+    @classmethod
+    def _make_app(cls, app_type: type[App], app_settings: Optional[AppSettings]) -> App:
+        paths = Paths(name=app_type.paths_name())
+        paths.mkdirs(parents=True, exist_ok=True)
+        shutil.copyfile(Path(TEST_HARDWARE_LAYOUT_PATH), paths.hardware_layout)
+        app = app_type(
+            paths=paths,
+            app_settings=app_settings
+            if app_settings is None
+            else app_settings.with_paths(paths=paths),
+        )
+        if uses_tls(app.config.settings):
+            copy_keys(
+                str(app.config.settings.paths.name),
+                app.config.settings,
+            )
+        return app
 
     @property
     def parent(self) -> InstrumentedProactor:

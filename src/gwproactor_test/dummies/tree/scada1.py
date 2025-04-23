@@ -5,7 +5,7 @@ import rich
 from gwproto import HardwareLayout, Message
 from gwproto.messages import EventBase
 
-from gwproactor import AppSettings, ServicesInterface, actors
+from gwproactor import App, AppSettings, ServicesInterface, actors
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import CodecSettings, LinkSettings
@@ -28,7 +28,6 @@ from gwproactor_test.dummies.tree.messages import (
     SetRelay,
     SetRelayMessage,
 )
-from gwproactor_test.instrumented_app import InstrumentedApp
 from gwproactor_test.instrumented_proactor import InstrumentedProactor
 
 
@@ -229,7 +228,7 @@ class DummyScada1Settings(AppSettings):
     dummy_admin: MQTTClient = MQTTClient()
 
 
-class DummyScada1App(InstrumentedApp):
+class DummyScada1App(App):
     ATN_LINK: str = DUMMY_ATN_NAME
     SCADA2_LINK: str = DUMMY_SCADA2_NAME
     ADMIN_LINK: str = DUMMY_ADMIN_NAME

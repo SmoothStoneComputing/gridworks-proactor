@@ -4,7 +4,7 @@ import textwrap
 import typing
 from typing import Any, Optional, Self
 
-from gwproactor import setup_logging
+from gwproactor import AppSettings, setup_logging
 from gwproactor.app import App
 from gwproactor.config import MQTTClient
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
@@ -30,7 +30,7 @@ class TreeLiveTest(LiveTest):
         add_child1: bool = False,
         start_child1: bool = False,
         child1_verbose: Optional[bool] = None,
-        child2_app: Optional[App] = None,
+        child2_app_settings: Optional[AppSettings] = None,
         child2_verbose: Optional[bool] = None,
         add_child2: bool = False,
         start_child2: bool = False,
@@ -45,13 +45,9 @@ class TreeLiveTest(LiveTest):
                 option_name="--child1-verbose",
                 request=kwargs["request"],
             )
-        kwargs["child_app"] = kwargs.get(
-            "child_app", kwargs.get("child1_app", DummyScada1App())
-        )
-        kwargs["parent_app"] = kwargs.get("parent_app", DummyAtnApp())
         kwargs["request"] = kwargs.get("request")
         super().__init__(**kwargs)
-        self.child2_app = DummyScada2App() if child2_app is None else child2_app
+        self.child2_app = self._make_app(self.child2_app_type(), child2_app_settings)
         self.child2_verbose = get_option_value(
             parameter_value=child2_verbose,
             option_name="--child2-verbose",
@@ -67,6 +63,18 @@ class TreeLiveTest(LiveTest):
             self.add_child2()
             if start_child2:
                 self.start_child2()
+
+    @classmethod
+    def child_app_type(cls) -> type[App]:
+        return DummyScada1App
+
+    @classmethod
+    def child2_app_type(cls) -> type[App]:
+        return DummyScada2App
+
+    @classmethod
+    def parent_app_type(cls) -> type[App]:
+        return DummyAtnApp
 
     @property
     def child1(self) -> InstrumentedProactor:
