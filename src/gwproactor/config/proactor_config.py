@@ -48,7 +48,6 @@ class ProactorConfig:
         callbacks: Optional[ProactorCallbackFunctions] = None,
         logger: Optional[ProactorLogger] = None,
         event_persister: Optional[PersisterInterface] = None,
-        stats: Optional[ProactorStats] = None,
         hardware_layout: Optional[HardwareLayout] = None,
     ) -> None:
         self.name = name
@@ -68,7 +67,6 @@ class ProactorConfig:
         self.event_persister = (
             StubPersister() if event_persister is None else event_persister
         )
-        self.stats = ProactorStats() if stats is None else stats
         self.layout = (
             (
                 HardwareLayout(

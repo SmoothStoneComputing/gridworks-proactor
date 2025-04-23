@@ -8,7 +8,7 @@ from gwproactor.app import App, SubTypes
 from gwproactor.codecs import CodecFactory
 from gwproactor.config import DEFAULT_LAYOUT_FILE, Paths
 from gwproactor_test.certs import copy_keys, set_test_certificate_cache_dir, uses_tls
-from gwproactor_test.instrumented_proactor import InstrumentedProactor, RecorderStats
+from gwproactor_test.instrumented_proactor import InstrumentedProactor
 
 TEST_HARDWARE_LAYOUT_PATH = Path(__file__).parent / "config" / DEFAULT_LAYOUT_FILE
 
@@ -54,10 +54,6 @@ class InstrumentedApp(App, abc.ABC):
         sub_types = super().make_subtypes()
         sub_types.proactor_type = InstrumentedProactor
         return sub_types
-
-    @classmethod
-    def _make_stats(cls) -> RecorderStats:
-        return RecorderStats()
 
     def _copy_keys(self) -> None:
         if uses_tls(self.config.settings):

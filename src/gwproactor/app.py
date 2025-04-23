@@ -20,7 +20,6 @@ from gwproactor.links.link_settings import LinkConfig
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.proactor_implementation import Proactor
 from gwproactor.proactor_interface import ActorInterface
-from gwproactor.stats import ProactorStats
 
 
 @dataclass
@@ -114,7 +113,6 @@ class App(abc.ABC):
             name=name,
             settings=self.settings,
             event_persister=self._make_persister(self.settings),
-            stats=self._make_stats(),
             hardware_layout=layout,
         )
 
@@ -184,9 +182,6 @@ class App(abc.ABC):
 
     def _make_persister(self, settings: AppSettings) -> PersisterInterface:  # noqa: ARG002, ARG003
         return StubPersister()
-
-    def _make_stats(self) -> ProactorStats:
-        return ProactorStats()
 
     def _get_actor_nodes(self) -> Sequence[ActorConfig]:
         if self.prime_actor is None or self.prime_actor.node is None:

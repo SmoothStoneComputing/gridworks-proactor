@@ -106,7 +106,7 @@ class Proactor(ServicesInterface, Runnable):
         self._layout = config.layout
         self._node = self._layout.node(self.name)
         self._logger = config.logger
-        self._stats = config.stats
+        self._stats = self.make_stats()
         self._event_persister = config.event_persister
         self._logger.lifecycle(f"Proactor <{self._name}> reindexing events")
         reindex_result = self._event_persister.reindex()
@@ -151,6 +151,10 @@ class Proactor(ServicesInterface, Runnable):
                 enabled=server_config.web_server_gt.Enabled,
                 server_kwargs=server_config.web_server_gt.Kwargs,
             )
+
+    @classmethod
+    def make_stats(cls) -> ProactorStats:
+        return ProactorStats()
 
     def send(self, message: Message[Any]) -> None:
         if self._receive_queue is None:
