@@ -221,7 +221,7 @@ class DummyScada1(PrimeActor):
         return DUMMY_ADMIN_NAME
 
     @classmethod
-    def get_codec_factory(cls) -> ScadaCodecFactory():
+    def get_codec_factory(cls) -> ScadaCodecFactory:
         return ScadaCodecFactory()
 
 

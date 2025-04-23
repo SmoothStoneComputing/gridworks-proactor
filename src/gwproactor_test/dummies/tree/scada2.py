@@ -39,7 +39,7 @@ class DummyScada2(PrimeActor):
         return self.ADMIN_LINK
 
     @classmethod
-    def get_codec_factory(cls) -> ScadaCodecFactory():
+    def get_codec_factory(cls) -> ScadaCodecFactory:
         return ScadaCodecFactory()
 
     def _process_set_relay(self, payload: RelayInfo) -> None:
