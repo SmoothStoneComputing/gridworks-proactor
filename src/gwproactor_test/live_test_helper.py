@@ -102,15 +102,22 @@ class LiveTest:
 
     @classmethod
     def _make_app(cls, app_type: type[App], app_settings: Optional[AppSettings]) -> App:
+        # Copy hardware layout file.
         paths = Paths(name=app_type.paths_name())
         paths.mkdirs(parents=True, exist_ok=True)
         shutil.copyfile(Path(TEST_HARDWARE_LAYOUT_PATH), paths.hardware_layout)
+        # Use an instrumented proactor
+        sub_types = app_type.make_subtypes()
+        sub_types.proactor_type = InstrumentedProactor
+        # Create the app
         app = app_type(
             paths=paths,
             app_settings=app_settings
             if app_settings is None
             else app_settings.with_paths(paths=paths),
+            sub_types=sub_types,
         )
+        # Copy keys.
         if uses_tls(app.config.settings):
             copy_keys(
                 str(app.config.settings.paths.name),

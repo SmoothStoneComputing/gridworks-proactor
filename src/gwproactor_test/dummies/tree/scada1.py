@@ -28,7 +28,6 @@ from gwproactor_test.dummies.tree.messages import (
     SetRelay,
     SetRelayMessage,
 )
-from gwproactor_test.instrumented_proactor import InstrumentedProactor
 
 
 class DummyScada1(PrimeActor):
@@ -221,6 +220,10 @@ class DummyScada1(PrimeActor):
     def admin_client(self) -> str:
         return DUMMY_ADMIN_NAME
 
+    @classmethod
+    def get_codec_factory(cls) -> ScadaCodecFactory():
+        return ScadaCodecFactory()
+
 
 class DummyScada1Settings(AppSettings):
     dummy_atn1: MQTTClient = MQTTClient()
@@ -232,14 +235,6 @@ class DummyScada1App(App):
     ATN_LINK: str = DUMMY_ATN_NAME
     SCADA2_LINK: str = DUMMY_SCADA2_NAME
     ADMIN_LINK: str = DUMMY_ADMIN_NAME
-
-    def __init__(self, **kwargs: typing.Any) -> None:
-        kwargs["codec_factory"] = ScadaCodecFactory()
-        super().__init__(**kwargs)
-
-    @classmethod
-    def proactor_type(cls) -> type[InstrumentedProactor]:
-        return InstrumentedProactor
 
     @classmethod
     def app_settings_type(cls) -> type[DummyScada1Settings]:
