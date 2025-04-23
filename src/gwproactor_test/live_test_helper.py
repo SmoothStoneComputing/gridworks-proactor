@@ -58,7 +58,7 @@ class LiveTest:
         self.parent_app = ParentApp() if parent_app is None else parent_app
         self.verbose = get_option_value(
             parameter_value=verbose,
-            option_name="--comm-test-verbose",
+            option_name="--live-test-verbose",
             request=request,
         )
         self.child_verbose = get_option_value(
@@ -265,7 +265,7 @@ class LiveTest:
                 with contextlib.suppress(Exception):
                     logging.getLogger("gridworks").error(s)
             with contextlib.suppress(Exception):
-                self.logger_guards.restore()
+                self.logger_guards.restore()  # noqa
         return False
 
     def summary_str(self) -> str:
