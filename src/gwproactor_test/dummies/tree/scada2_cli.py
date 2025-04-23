@@ -2,13 +2,8 @@ import asyncio
 
 import typer
 
-from gwproactor.command_line_utils import (
-    print_settings,
-    run_async_main,
-)
-from gwproactor_test.dummies import DUMMY_SCADA2_NAME
-from gwproactor_test.dummies.tree.scada2 import DummyScada2
-from gwproactor_test.dummies.tree.scada2_settings import DummyScada2Settings
+from gwproactor.command_line_utils import run_async_main
+from gwproactor_test.dummies.tree.scada2 import DummyScada2App
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -27,9 +22,7 @@ def run(
 ) -> None:
     asyncio.run(
         run_async_main(
-            name=DUMMY_SCADA2_NAME,
-            proactor_type=DummyScada2,
-            settings_type=DummyScada2Settings,
+            app_type=DummyScada2App,
             env_file=env_file,
             dry_run=dry_run,
             verbose=verbose,
@@ -42,7 +35,7 @@ def run(
 def config(
     env_file: str = ".env",
 ) -> None:
-    print_settings(settings_type=DummyScada2Settings, env_file=env_file)
+    DummyScada2App.print_settings(env_file=env_file)
 
 
 @app.callback()

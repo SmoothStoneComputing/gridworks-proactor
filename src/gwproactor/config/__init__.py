@@ -1,5 +1,6 @@
 """Settings for the GridWorks Scada, readable from environment and/or from env files."""
 
+from gwproactor.config.app_settings import AppSettings
 from gwproactor.config.logging import (
     DEFAULT_BYTES_PER_LOG_FILE,
     DEFAULT_FRACTIONAL_SECOND_FORMAT,
@@ -47,4 +48,6 @@ __all__ = [
     # proactor
     "ProactorSettings",
     "RotatingFileHandlerSettings",
+    # App
+    "AppSettings",
 ]

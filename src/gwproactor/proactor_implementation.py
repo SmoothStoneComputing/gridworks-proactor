@@ -4,13 +4,11 @@ import asyncio
 import sys
 import threading
 import traceback
-import typing
-import uuid
+from functools import cached_property
 from typing import (
     Any,
     Dict,
     List,
-    Mapping,
     Optional,
     Sequence,
     Type,
@@ -28,7 +26,13 @@ from gwproto.named_types.web_server_gt import WebServerGt
 from paho.mqtt.client import MQTTMessageInfo
 from result import Err, Ok, Result
 
-from gwproactor import ProactorSettings
+from gwproactor.callbacks import (
+    CallbackManager,
+    ProactorCallbackFunctions,
+    ProactorCallbackInterface,
+)
+from gwproactor.config.app_settings import AppSettings
+from gwproactor.config.proactor_config import ProactorConfig, ProactorName
 from gwproactor.external_watchdog import (
     ExternalWatchdogCommandBuilder,
     SystemDWatchdogCommandBuilder,
@@ -38,8 +42,6 @@ from gwproactor.links import (
     AckWaitInfo,
     AsyncioTimerManager,
     LinkManager,
-    LinkManagerTransition,
-    Transition,
 )
 from gwproactor.logger import ProactorLogger
 from gwproactor.message import (
@@ -55,7 +57,7 @@ from gwproactor.message import (
     PatWatchdog,
     Shutdown,
 )
-from gwproactor.persister import PersisterInterface, StubPersister
+from gwproactor.persister import PersisterInterface
 from gwproactor.proactor_interface import (
     CommunicatorInterface,
     IOLoopInterface,
@@ -73,9 +75,12 @@ T = TypeVar("T")
 
 
 class Proactor(ServicesInterface, Runnable):
-    _name: str
-    _settings: ProactorSettings
+    AWAIT_PROCESSING_FUTURE_ATTRIBUTE: str = "_await_processing_future"
+
+    _name: ProactorName
+    _settings: AppSettings
     _node: ShNode
+    _callbacks: CallbackManager
     _layout: HardwareLayout
     _logger: ProactorLogger
     _stats: ProactorStats
@@ -83,6 +88,8 @@ class Proactor(ServicesInterface, Runnable):
     _reindex_problems: Optional[Problems] = None
     _loop: Optional[asyncio.AbstractEventLoop] = None
     _receive_queue: Optional[asyncio.Queue[Any]] = None
+    _processing_futures: set[asyncio.Future[Any]]
+    _processing_futures_lock: asyncio.Lock
     _links: LinkManager
     _communicators: Dict[str, CommunicatorInterface]
     _stop_requested: bool
@@ -92,37 +99,15 @@ class Proactor(ServicesInterface, Runnable):
     _web_manager: _WebManager
     _watchdog: WatchdogManager
 
-    def __init__(
-        self,
-        name: str,
-        settings: ProactorSettings,
-        hardware_layout: Optional[HardwareLayout] = None,
-    ) -> None:
-        self._name = name
-        self._settings = settings
-        if hardware_layout is None:
-            hardware_layout = HardwareLayout(
-                layout={
-                    "ShNodes": [
-                        {
-                            "ShNodeId": str(uuid.uuid4()),
-                            "Name": self._name,
-                            "ActorClass": "NoActor",
-                            "TypeName": "spaceheat.node.gt",
-                        }
-                    ]
-                },
-                cacs={},
-                components={},
-                nodes={},
-                data_channels={},
-                synth_channels={},
-            )
-        self._layout = hardware_layout
-        self._node = self._layout.node(name)
-        self._logger = self.make_logger(settings)
+    def __init__(self, config: ProactorConfig) -> None:
+        self._name = config.name
+        self._settings = config.settings
+        self._callbacks = CallbackManager(callback_functions=config.callback_functions)
+        self._layout = config.layout
+        self._node = self._layout.node(self.name)
+        self._logger = config.logger
         self._stats = self.make_stats()
-        self._event_persister = self.make_event_persister(settings)
+        self._event_persister = config.event_persister
         self._logger.lifecycle(f"Proactor <{self._name}> reindexing events")
         reindex_result = self._event_persister.reindex()
         self._logger.lifecycle(
@@ -139,13 +124,15 @@ class Proactor(ServicesInterface, Runnable):
         self._links = LinkManager(
             publication_name=self.publication_name,
             subscription_name=self.subscription_name,
-            settings=settings,
+            settings=self._settings.proactor,
             logger=self._logger,
             stats=self._stats,
             event_persister=self._event_persister,
             timer_manager=AsyncioTimerManager(),
             ack_timeout_callback=self._process_ack_timeout,
         )
+        self._processing_futures = set()
+        self._processing_futures_lock = asyncio.Lock()
         self._communicators = {}
         self._tasks = []
         self._stop_requested = False
@@ -156,27 +143,18 @@ class Proactor(ServicesInterface, Runnable):
         self.add_communicator(self._io_loop_manager)
         self._web_manager = _WebManager(self)
         self.add_communicator(self._web_manager)
-        for config in self._layout.get_components_by_type(WebServerComponent):
+        for server_config in self._layout.get_components_by_type(WebServerComponent):
             self._web_manager.add_web_server_config(
-                name=config.web_server_gt.Name,
-                host=config.web_server_gt.Host,
-                port=config.web_server_gt.Port,
-                **config.web_server_gt.Kwargs,
+                name=server_config.web_server_gt.Name,
+                host=server_config.web_server_gt.Host,
+                port=server_config.web_server_gt.Port,
+                enabled=server_config.web_server_gt.Enabled,
+                server_kwargs=server_config.web_server_gt.Kwargs,
             )
 
     @classmethod
     def make_stats(cls) -> ProactorStats:
         return ProactorStats()
-
-    @classmethod
-    def make_logger(cls, settings: ProactorSettings) -> ProactorLogger:
-        return ProactorLogger(
-            **typing.cast(Mapping[str, Any], settings.logging.qualified_logger_names())
-        )
-
-    @classmethod
-    def make_event_persister(cls, settings: ProactorSettings) -> PersisterInterface:  # noqa: ARG003
-        return StubPersister()
 
     def send(self, message: Message[Any]) -> None:
         if self._receive_queue is None:
@@ -192,12 +170,96 @@ class Proactor(ServicesInterface, Runnable):
             )
         self._receive_queue.put_nowait(message)
 
+    async def _add_processing_future(self, future: asyncio.Future[Any]) -> None:
+        async with self._processing_futures_lock:
+            self._processing_futures.add(future)
+
+    async def _clear_processing_future(self, future: asyncio.Future[Any]) -> None:
+        async with self._processing_futures_lock:
+            if future in self._processing_futures:
+                self._processing_futures.remove(future)
+
+    async def _clear_processing_futures(self) -> list[asyncio.Future[Any]]:
+        futures = []
+        async with self._processing_futures_lock:
+            futures = list(self._processing_futures)
+            self._processing_futures.clear()
+        return futures
+
+    async def _get_processing_future(self) -> asyncio.Future[Any]:
+        if self._loop is None:
+            raise RuntimeError(
+                "ERROR. _get_processing_future() called before Proactor started."
+            )
+        future = self._loop.create_future()
+        await self._add_processing_future(future)
+        return future
+
+    async def _attach_future_to_message(
+        self, message: Message[Any]
+    ) -> asyncio.Future[Any]:
+        if self._loop is None:
+            raise RuntimeError(
+                "ERROR. await_processing() called before Proactor started."
+            )
+        future = getattr(message, self.AWAIT_PROCESSING_FUTURE_ATTRIBUTE, None)
+        if future is None:
+            future = await self._get_processing_future()
+            setattr(message, self.AWAIT_PROCESSING_FUTURE_ATTRIBUTE, future)
+        else:
+            if not isinstance(future, asyncio.Future):
+                raise RuntimeError(
+                    "ERROR. await_processing() received message "
+                    f"(type: {message.message_type()}) with "
+                    f"{self.AWAIT_PROCESSING_FUTURE_ATTRIBUTE} attribute "
+                    f"(type: {type(future)}) which is not an instance of "
+                    f"asyncio.Future."
+                )
+            await self._add_processing_future(future)
+        return future
+
+    @classmethod
+    async def _await_processing(
+        cls, future: asyncio.Future[Result[Any, BaseException]]
+    ) -> Result[Any, BaseException]:
+        try:
+            await future
+        except asyncio.CancelledError as canceled:
+            return Err(canceled)
+        e = future.exception()
+        if e is not None:
+            return Err(e)
+        return future.result()
+
+    async def await_processing(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
+        if self._stop_requested:
+            return Ok(value=False)
+        future = await self._attach_future_to_message(message)
+        self.send(message)
+        return await self._await_processing(future)
+
     def send_threadsafe(self, message: Message[Any]) -> None:
         if self._loop is None or self._receive_queue is None:
             raise RuntimeError(
                 "ERROR. send_threadsafe() called before Proactor started."
             )
         self._loop.call_soon_threadsafe(self._receive_queue.put_nowait, message)
+
+    def wait_for_processing_threadsafe(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
+        if self._loop is None:
+            raise RuntimeError(
+                "ERROR. wait_for_send_threadsafe() called before Proactor started."
+            )
+        return asyncio.run_coroutine_threadsafe(
+            self.await_processing(message), self._loop
+        ).result()
+
+    def get_communicator_names(self) -> set[str]:
+        return set(self._communicators.keys())
 
     def get_communicator(self, name: str) -> Optional[CommunicatorInterface]:
         return self._communicators.get(name, None)
@@ -210,24 +272,44 @@ class Proactor(ServicesInterface, Runnable):
             )
         return communicator
 
-    @property
+    @cached_property
     def name(self) -> str:
-        return self._name
+        return self._name.name
 
-    @property
+    @cached_property
+    def long_name(self) -> str:
+        return self._name.long_name
+
+    @cached_property
+    def short_name(self) -> str:
+        return self._name.short_name
+
+    @cached_property
+    def paths_name(self) -> str:
+        return str(self.settings.paths.name)
+
+    @cached_property
     def publication_name(self) -> str:
+        return self._name.publication_name
+
+    @cached_property
+    def subscription_name(self) -> str:
+        return self._name.subscription_name
+
+    @cached_property
+    def name_object(self) -> ProactorName:
         return self._name
 
     @property
-    def subscription_name(self) -> str:
-        return ""
+    def callback_functions(self) -> ProactorCallbackFunctions:
+        return self._callbacks.callback_functions
 
     @property
     def monitored_names(self) -> Sequence[MonitoredName]:
         return []
 
     @property
-    def settings(self) -> ProactorSettings:
+    def settings(self) -> AppSettings:
         return self._settings
 
     @property
@@ -242,10 +324,30 @@ class Proactor(ServicesInterface, Runnable):
     def links(self) -> LinkManager:
         return self._links
 
-    def publish_message(
-        self, link_name: str, message: Message[Any], qos: int = 0, context: Any = None
+    def add_callbacks(self, callbacks: ProactorCallbackInterface) -> int:
+        return self._callbacks.add_callbacks(callbacks)
+
+    def remove_callbacks(self, callbacks_id: int) -> None:
+        return self._callbacks.remove_callbacks(callbacks_id)
+
+    def publish_message(  # noqa: PLR0913
+        self,
+        link_name: str,
+        message: Message[Any],
+        qos: int = 0,
+        context: Any = None,
+        *,
+        topic: str = "",
+        use_link_topic: bool = False,
     ) -> MQTTMessageInfo:
-        return self._links.publish_message(link_name, message, qos, context)
+        return self._links.publish_message(
+            link_name=link_name,
+            message=message,
+            qos=qos,
+            context=context,
+            topic=topic,
+            use_link_topic=use_link_topic,
+        )
 
     @property
     def event_persister(self) -> PersisterInterface:
@@ -254,6 +356,26 @@ class Proactor(ServicesInterface, Runnable):
     @property
     def io_loop_manager(self) -> IOLoopInterface:
         return self._io_loop_manager
+
+    @property
+    def hardware_layout(self) -> HardwareLayout:
+        return self._layout
+
+    @property
+    def upstream_client(self) -> str:
+        return self._links.upstream_client
+
+    @property
+    def downstream_client(self) -> str:
+        return self._links.downstream_client
+
+    @property
+    def async_receive_queue(self) -> Optional[asyncio.Queue[Any]]:
+        return self._receive_queue
+
+    @property
+    def event_loop(self) -> Optional[asyncio.AbstractEventLoop]:
+        return self._loop
 
     def add_web_server_config(
         self, name: str, host: str, port: int, **kwargs: Any
@@ -280,26 +402,10 @@ class Proactor(ServicesInterface, Runnable):
     def get_web_server_configs(self) -> dict[str, WebServerGt]:
         return self._web_manager.get_configs()
 
-    @property
-    def hardware_layout(self) -> HardwareLayout:
-        return self._layout
-
-    @property
-    def services(self) -> "ServicesInterface":
-        return self
-
     def get_external_watchdog_builder_class(
         self,
     ) -> type[ExternalWatchdogCommandBuilder]:
         return SystemDWatchdogCommandBuilder
-
-    @property
-    def upstream_client(self) -> str:
-        return self._links.upstream_client
-
-    @property
-    def downstream_client(self) -> str:
-        return self._links.downstream_client
 
     def _send(self, message: Message[Any]) -> None:
         self.send(message)
@@ -317,7 +423,7 @@ class Proactor(ServicesInterface, Runnable):
                 path_dbg |= 0x00000001
                 if transition.deactivated():
                     path_dbg |= 0x00000002
-                    self._derived_recv_deactivated(transition)
+                    self._callbacks.recv_deactivated(transition)
             case Err(exception):
                 path_dbg |= 0x00000004
                 self._report_error(exception, msg="Proactor._process_ack_timeout")
@@ -366,21 +472,13 @@ class Proactor(ServicesInterface, Runnable):
         for monitored in communicator.monitored_names:
             self._watchdog.add_monitored_name(monitored)
 
-    @property
-    def async_receive_queue(self) -> Optional[asyncio.Queue[Any]]:
-        return self._receive_queue
-
-    @property
-    def event_loop(self) -> Optional[asyncio.AbstractEventLoop]:
-        return self._loop
-
-    async def process_messages(self) -> None:
+    async def process_messages(self) -> None:  # noqa: C901
         if self._receive_queue is None:
             raise RuntimeError(
                 "ERROR. process_messages() called before Proactor started."
             )
         try:
-            self._start_processing_messages()
+            self._callbacks.start_processing_messages()
             while not self._stop_requested:
                 message = await self._receive_queue.get()
                 if not self._stop_requested:
@@ -401,7 +499,13 @@ class Proactor(ServicesInterface, Runnable):
                     )
                 except:  # noqa: E722
                     self._logger.exception("ERROR generating exception event")
-
+        try:
+            message_futures = await self._clear_processing_futures()
+            for future in message_futures:
+                if not future.done():
+                    future.cancel()
+        except:  # noqa: E722
+            ...
         try:
             self.stop()
         except:  # noqa: E722
@@ -415,18 +519,7 @@ class Proactor(ServicesInterface, Runnable):
             asyncio.create_task(self.process_messages(), name="process_messages"),
             *self._links.start_ping_tasks(),
         ]
-        self._start_derived_tasks()
-
-    def _start_derived_tasks(self) -> None:
-        pass
-
-    def _derived_process_message(self, message: Message[Any]) -> None:
-        pass
-
-    def _derived_process_mqtt_message(
-        self, message: Message[MQTTReceiptPayload], decoded: Message[Any]
-    ) -> None:
-        pass
+        self._tasks.extend(self._callbacks.start_tasks())
 
     @classmethod
     def _second_caller(cls) -> str:
@@ -455,9 +548,6 @@ class Proactor(ServicesInterface, Runnable):
         except Exception as e2:  # noqa: BLE001
             return Err(e2)
         return Ok()
-
-    def _start_processing_messages(self) -> None:
-        """Hook for processing before any messages are pulled from queue"""
 
     def process_message(self, message: Message[Any]) -> Result[bool, Exception]:
         raise NotImplementedError(
@@ -514,11 +604,18 @@ class Proactor(ServicesInterface, Runnable):
                 self.generate_event(message.Payload)
             case _:
                 path_dbg |= 0x00000400
-                self._derived_process_message(message)
+                self._callbacks.process_internal_message(message)
+        await self._notify_message_future(message)
         if not isinstance(message.Payload, PatWatchdog):
             self._logger.message_exit(
                 "--Proactor.process_message  path:0x%08X", path_dbg
             )
+
+    async def _notify_message_future(self, message: Message[Any]) -> None:
+        future = getattr(message, self.AWAIT_PROCESSING_FUTURE_ATTRIBUTE, None)
+        if future is not None and isinstance(future, asyncio.Future):
+            await self._clear_processing_future(future)
+            future.set_result(Ok(value=True))
 
     def _decode_mqtt_message(
         self, mqtt_payload: MQTTReceiptPayload
@@ -550,7 +647,7 @@ class Proactor(ServicesInterface, Runnable):
             result = Err(e)
         return result
 
-    def _process_mqtt_message(  # noqa: C901
+    def _process_mqtt_message(  # noqa: C901, PLR0912
         self, mqtt_receipt_message: Message[MQTTReceiptPayload]
     ) -> Result[Message[Any], Exception]:
         self._logger.path(
@@ -586,7 +683,7 @@ class Proactor(ServicesInterface, Runnable):
                         path_dbg |= 0x00000002
                         if transition.recv_activated():
                             path_dbg |= 0x00000004
-                            self._derived_recv_activated(transition)
+                            self._callbacks.recv_activated(transition)
                     case Err(error):
                         path_dbg |= 0x00000008
                         self._report_error(
@@ -607,11 +704,11 @@ class Proactor(ServicesInterface, Runnable):
                         self._process_dbg(decoded_message.Payload)
                     case _:
                         path_dbg |= 0x00000080
-                        self._derived_process_mqtt_message(
+                        self._callbacks.process_mqtt_message(
                             mqtt_receipt_message, decoded_message
                         )
                 if decoded_message.Header.AckRequired:
-                    path_dbg |= 0x00000100
+                    path_dbg |= 0x00000200
                     self._links.send_ack(
                         mqtt_receipt_message.Payload.client_name, decoded_message
                     )
@@ -627,20 +724,6 @@ class Proactor(ServicesInterface, Runnable):
             case Err(error):
                 self._report_error(error, "_process_mqtt_connected")
 
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def _derived_recv_deactivated(
-        self,
-        transition: LinkManagerTransition,  # noqa: ARG002
-    ) -> Result[bool, Exception]:
-        return Ok()
-
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def _derived_recv_activated(
-        self,
-        transition: Transition,  # noqa: ARG002
-    ) -> Result[bool, Exception]:
-        return Ok()
-
     def _process_mqtt_disconnected(
         self, message: Message[MQTTDisconnectPayload]
     ) -> Result[bool, Exception]:
@@ -648,7 +731,8 @@ class Proactor(ServicesInterface, Runnable):
         match self._links.process_mqtt_disconnected(message):
             case Ok(transition):
                 if transition.recv_deactivated():
-                    result = self._derived_recv_deactivated(transition)
+                    self._callbacks.recv_deactivated(transition)
+                result = Ok(value=True)
             case Err(error):
                 result = Err(error)
         return result
@@ -675,7 +759,8 @@ class Proactor(ServicesInterface, Runnable):
                 path_dbg |= 0x00000001
                 if transition.recv_activated():
                     path_dbg |= 0x00000002
-                    result = self._derived_recv_activated(transition)
+                    self._callbacks.recv_activated(transition)
+                    result = Ok(value=True)
             case Err(error):
                 path_dbg |= 0x00000004
                 result = Err(error)
@@ -708,11 +793,6 @@ class Proactor(ServicesInterface, Runnable):
             f"Shutting down due to ShutdownMessage, [{message.Payload.Reason}]"
         )
 
-    def _pre_child_start(self) -> None:
-        """Hook into _start() for derived classes, prior to starting
-        communicators and tasks.
-        """
-
     def _start(self) -> None:
         self._loop = asyncio.get_running_loop()
         self._receive_queue = asyncio.Queue()
@@ -722,7 +802,7 @@ class Proactor(ServicesInterface, Runnable):
                 self._reindex_problems.problem_event("Startup event reindex() problems")
             )
         self._reindex_problems = None
-        self._pre_child_start()
+        self._callbacks.pre_child_start()
         for communicator in self._communicators.values():
             if isinstance(communicator, Runnable):
                 communicator.start()

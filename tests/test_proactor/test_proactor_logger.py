@@ -6,12 +6,12 @@ from typing import Any, Mapping
 
 import pytest
 
-from gwproactor import ProactorLogger, ProactorSettings, setup_logging
+from gwproactor import ProactorLogger, AppSettings, setup_logging
 from gwproactor.config import Paths
 from gwproactor_test import LoggerGuards
 
 
-def _prlogger(settings: ProactorSettings) -> ProactorLogger:
+def _prlogger(settings: AppSettings) -> ProactorLogger:
     return ProactorLogger(
         **typing.cast(Mapping[str, Any], settings.logging.qualified_logger_names()),
     )
@@ -20,7 +20,7 @@ def _prlogger(settings: ProactorSettings) -> ProactorLogger:
 def test_proactor_logger(caplog: Any) -> None:
     paths = Paths()
     paths.mkdirs()
-    settings = ProactorSettings()
+    settings = AppSettings()
     with LoggerGuards():
         errors: list[Exception] = []
         setup_logging(argparse.Namespace(), settings, errors=errors)
@@ -82,7 +82,7 @@ def test_proactor_logger(caplog: Any) -> None:
 
 def test_category_logger() -> None:
     # default - no categories
-    settings = ProactorSettings()
+    settings = AppSettings()
     prlogger = _prlogger(settings)
     assert not prlogger.category_loggers
 

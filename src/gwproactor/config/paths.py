@@ -30,11 +30,11 @@ class TLSPaths(BaseModel):
         )
 
     def effective_paths(self, certs_dir: str | Path, client_name: str) -> "TLSPaths":
-        """Re-calculate non-set paths given a certs_dir and client name. Meant to be called in context where those are
+        """Re-calculate paths given a certs_dir and client name. Meant to be called in context where those are
         known, e.g. a validator on a higher-level model which has access to a Paths object and a named MQTT
         configuration."""
-        fields = self.defaults(Path(certs_dir), client_name).model_dump()
-        fields.update(self.model_dump(exclude_none=True))
+        fields = self.model_dump(exclude_none=True)
+        fields.update(self.defaults(Path(certs_dir), client_name).model_dump())
         return TLSPaths(**fields)
 
     def mkdirs(
@@ -57,6 +57,14 @@ class TLSPaths(BaseModel):
         Path(self.private_key_path).parent.mkdir(
             mode=mode, parents=parents, exist_ok=exist_ok
         )
+
+    def missing_paths(self) -> list[tuple[str, Optional[Path]]]:
+        missing = []
+        for path_name in self.__pydantic_fields__:
+            path = getattr(self, path_name)
+            if path is None or not Path(path).exists():
+                missing.append((path_name, path))
+        return missing
 
 
 class Paths(BaseModel):
@@ -160,7 +168,18 @@ class Paths(BaseModel):
         Path(self.event_dir).mkdir(mode=mode, parents=parents, exist_ok=exist_ok)
         Path(self.log_dir).mkdir(mode=mode, parents=parents, exist_ok=exist_ok)
 
-    def copy(self, **kwargs: Any) -> "Paths":
-        fields = self.model_dump(exclude_unset=True)
+    def duplicate(
+        self,
+        *,
+        exclude_unset: bool = True,
+        exclude_defaults: bool = True,
+        exclude: Optional[set[str]] = None,
+        **kwargs: Any,
+    ) -> "Paths":
+        fields = self.model_dump(
+            exclude_unset=exclude_unset,
+            exclude_defaults=exclude_defaults,
+            exclude=exclude,
+        )
         fields.update(**kwargs)
         return Paths(**fields)

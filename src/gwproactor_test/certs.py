@@ -1,13 +1,15 @@
 """Generate or copy test certificates for MQTT using TLS."""
 
-# ruff: noqa: T201
+# ruff: noqa: T201, S101
 
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
+import rich
 from gwcert import DEFAULT_CA_DIR
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
@@ -121,13 +123,15 @@ def _copy_keys(test_cert_dir: Path, dst_paths: TLSPaths) -> None:
 def mqtt_client_fields(model: BaseModel | BaseSettings) -> list[tuple[str, MQTTClient]]:
     clients: list[tuple[str, MQTTClient]] = [
         (field_name, getattr(model, field_name))
-        for field_name in model.model_fields
+        for field_name in model.__pydantic_fields__
         if isinstance(getattr(model, field_name), MQTTClient)
     ]
     clients.extend(
         [
             (field_name, field_value)
-            for field_name, field_value in getattr(model, "mqtt", {}).items()
+            for field_name, field_value in getattr(
+                model, "mqtt", getattr(model, "mqtt_brokers", {})
+            ).items()
             if isinstance(field_value, MQTTClient)
         ]
     )
@@ -180,3 +184,41 @@ def test_certificate_cache_dir() -> Path:
             "  set_test_certificate_cache(Path(__file__).parent / '.certificate_cache')"
         )
     return Path(found_cache_dir)
+
+
+def generate_dummy_certs(settings: BaseModel, *, dry_run: bool = False) -> None:
+    """Generate certs for dummy proactors."""
+    console = rich.console.Console()
+    ca_cert_path = test_ca_certificate_path()
+    ca_private_key_path = test_ca_private_key_path()
+    commands_ = [
+        [
+            "gwcert",
+            "key",
+            "add",
+            "--ca-certificate-path",
+            str(ca_cert_path),
+            "--ca-private-key-path",
+            str(ca_private_key_path),
+            "--force",
+            str(client_config.tls.paths.cert_path),
+        ]
+        for _, client_config in mqtt_client_fields(settings)
+    ]
+    if dry_run:
+        console.print(f"Showing key generation commands for {type(settings)}")
+        for command in commands_:
+            console.print(f"  {' '.join(command)}", soft_wrap=True)
+        console.print("\n\n\n")
+    else:
+        console.print(f"Generating keys with for {type(settings)}")
+        for command in commands_:
+            console.print("Generating keys with command:")
+            console.print(f"  {' '.join(command)}", soft_wrap=True)
+            try:
+                result = subprocess.run(command, capture_output=True, check=True)  # noqa: S603
+                print(result.stdout.decode("utf-8"))  # noqa
+            except subprocess.CalledProcessError as e:
+                print(e.stderr.decode("utf-8"))  # noqa
+                sys.exit(e.returncode)
+        console.print("\n")

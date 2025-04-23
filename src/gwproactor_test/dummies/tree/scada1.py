@@ -1,21 +1,25 @@
 import typing
-from typing import Optional
+from types import ModuleType
 
 import rich
-from gwproto import Message
+from gwproto import HardwareLayout, Message
 from gwproto.messages import EventBase
 
-from gwproactor import Proactor, ProactorSettings
-from gwproactor.links.link_settings import LinkSettings
+from gwproactor import App, AppSettings, ServicesInterface, actors
+from gwproactor.actors.actor import PrimeActor
+from gwproactor.config import MQTTClient
+from gwproactor.config.links import CodecSettings, LinkSettings
+from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import TimedRollingFilePersister
-from gwproactor_test.dummies.names import DUMMY_SCADA1_SHORT_NAME
+from gwproactor_test.dummies import DUMMY_ATN_NAME, DUMMY_SCADA1_NAME, DUMMY_SCADA2_NAME
+from gwproactor_test.dummies.names import DUMMY_ADMIN_NAME, DUMMY_ADMIN_SHORT_NAME
 from gwproactor_test.dummies.tree.admin_messages import (
     AdminCommandReadRelays,
     AdminCommandSetRelay,
     AdminSetRelayEvent,
 )
-from gwproactor_test.dummies.tree.codecs import AdminCodec, DummyCodec
+from gwproactor_test.dummies.tree.codecs import ScadaCodecFactory
 from gwproactor_test.dummies.tree.messages import (
     RelayInfoReported,
     RelayReportEvent,
@@ -24,84 +28,17 @@ from gwproactor_test.dummies.tree.messages import (
     SetRelay,
     SetRelayMessage,
 )
-from gwproactor_test.dummies.tree.scada1_settings import DummyScada1Settings
 
 
-class DummyScada1(Proactor):
+class DummyScada1(PrimeActor):
     relays: RelayStates
 
-    def __init__(
-        self,
-        name: str = "",
-        settings: Optional[DummyScada1Settings] = None,
-    ) -> None:
+    def __init__(self, name: str, services: ServicesInterface) -> None:
+        super().__init__(name, services)
         self.relays = RelayStates()
-        if settings is None:
-            settings = DummyScada1Settings()
-        super().__init__(name=name, settings=settings)
-
-        self._links.add_mqtt_link(
-            LinkSettings(
-                client_name=self.settings.atn_link.client_name,
-                gnode_name=self.settings.atn_link.long_name,
-                spaceheat_name=self.settings.atn_link.short_name,
-                mqtt=self.settings.atn_link,
-                codec=DummyCodec(
-                    src_name=self.settings.atn_link.long_name,
-                    dst_name=DUMMY_SCADA1_SHORT_NAME,
-                    model_name="Atn1ToScada1Message",
-                ),
-                upstream=True,
-            ),
-        )
-        self._links.add_mqtt_link(
-            LinkSettings(
-                client_name=self.settings.scada2_link.client_name,
-                gnode_name=self.settings.scada2_link.long_name,
-                spaceheat_name=self.settings.scada2_link.short_name,
-                mqtt=self.settings.scada2_link,
-                codec=DummyCodec(
-                    src_name=self.settings.scada2_link.long_name,
-                    dst_name=DUMMY_SCADA1_SHORT_NAME,
-                    model_name="Scada2ToScada1Message",
-                ),
-                downstream=True,
-            ),
-        )
-        if self.settings.admin_link.enabled:
-            self._links.add_mqtt_link(
-                LinkSettings(
-                    client_name=self.settings.admin_link.client_name,
-                    gnode_name=self.settings.admin_link.long_name,
-                    spaceheat_name=self.settings.admin_link.long_name,
-                    subscription_name=self.publication_name,
-                    mqtt=self.settings.admin_link,
-                    codec=AdminCodec(),
-                ),
-            )
-        self.links.log_subscriptions("construction")
-        self.links.enable_mqtt_loggers(self.logger.message_summary_logger)
-
-    @property
-    def settings(self) -> DummyScada1Settings:
-        return typing.cast(DummyScada1Settings, self._settings)
-
-    @property
-    def admin_client(self) -> str:
-        return self.settings.admin_link.client_name
-
-    @property
-    def subscription_name(self) -> str:
-        return DUMMY_SCADA1_SHORT_NAME
-
-    @classmethod
-    def make_event_persister(
-        cls, settings: ProactorSettings
-    ) -> TimedRollingFilePersister:
-        return TimedRollingFilePersister(settings.paths.event_dir)
 
     def set_relay(self, relay_name: str, closed: bool) -> None:
-        self.send_threadsafe(
+        self.services.send_threadsafe(
             SetRelayMessage(
                 src=self.name,
                 dst=self.name,
@@ -110,8 +47,8 @@ class DummyScada1(Proactor):
             )
         )
 
-    def _derived_process_message(self, message: Message[typing.Any]) -> None:
-        self._logger.path(
+    def process_internal_message(self, message: Message[typing.Any]) -> None:
+        self.services.logger.path(
             f"++{self.name}._derived_process_message "
             f"{message.Header.Src}/{message.Header.MessageType}"
         )
@@ -119,10 +56,10 @@ class DummyScada1(Proactor):
         match message.Payload:
             case SetRelay():
                 path_dbg |= 0x00000001
-                self._links.publish_message(
-                    self.downstream_client,
+                self.services.publish_message(
+                    self.services.downstream_client,
                     SetRelayMessage(
-                        src=self.publication_name,
+                        src=self.services.publication_name,
                         relay_name=message.Payload.RelayName,
                         closed=message.Payload.Closed,
                         ack_required=True,
@@ -130,12 +67,12 @@ class DummyScada1(Proactor):
                 )
             case _:
                 path_dbg |= 0x00000002
-        self._logger.path(
+        self.services.logger.path(
             "--{self.name}._derived_process_message  path:0x{path_dbg:08X}"
         )
 
     def _process_report_relay_event(self, event: RelayReportEvent) -> None:
-        self._logger.path(
+        self.services.logger.path(
             f"++{self.name}._process_set_relay_event "
             f"{event.relay_name}  "
             f"closed:{event.closed}  "
@@ -147,7 +84,7 @@ class DummyScada1(Proactor):
         last_val = self.relays.Relays[event.relay_name].Closed
         self.relays.Relays[event.relay_name].Closed = event.closed
         changed = last_val != self.relays.Relays[event.relay_name].Closed
-        self.logger.info(
+        self.services.logger.info(
             f"{event.relay_name}:  {int(last_val)} -> "
             f"{int(self.relays.Relays[event.relay_name].Closed)}  "
             f"changed: {int(changed)}/{int(event.changed)}"
@@ -165,13 +102,13 @@ class DummyScada1(Proactor):
             self.relays.Relays[event.relay_name].MismatchCount += 1
             self.relays.TotalChangeMismatches += 1
             report_received_event.mismatch_count = self.relays.TotalChangeMismatches
-            self.logger.info(
+            self.services.logger.info(
                 f"State change mismatch for {event.relay_name}  "
                 f"found: {int(changed)}  reported: {event.changed}  "
                 f"total mismatches: {self.relays.TotalChangeMismatches}"
             )
-        self.generate_event(report_received_event)
-        self._logger.path(
+        self.services.generate_event(report_received_event)
+        self.services.logger.path(
             f"--{self.name}._process_set_relay_event "
             f"{event.relay_name}  "
             f"closed:{event.closed}  "
@@ -180,18 +117,18 @@ class DummyScada1(Proactor):
         )
 
     def _process_event(self, event: EventBase) -> None:
-        self._logger.path(
+        self.services.logger.path(
             f"++_process_event  {event.TypeName}  from:{event.Src}",
         )
-        self.generate_event(event)
+        self.services.generate_event(event)
         if isinstance(event, RelayReportEvent):
             self._process_report_relay_event(event)
-        self._logger.path("--_process_event")
+        self.services.logger.path("--_process_event")
 
     def _process_downstream_mqtt_message(
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
-        self._logger.path(
+        self.services.logger.path(
             f"++{self.name}._process_downstream_mqtt_message {message.Payload.message.topic}",
         )
         path_dbg = 0
@@ -209,25 +146,25 @@ class DummyScada1(Proactor):
                     f"[{type(decoded.Payload)}]\n"
                     f"Received\n\t topic: [{message.Payload.message.topic}]"
                 )
-        self._logger.path(
+        self.services.logger.path(
             f"--{self.name}._process_downstream_mqtt_message  path:0x{path_dbg:08X}",
         )
 
     def _process_admin_mqtt_message(
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
-        self._logger.path(
+        self.services.logger.path(
             f"++{self.name}._process_admin_mqtt_message {message.Payload.message.topic}",
         )
         path_dbg = 0
         match decoded.Payload:
             case AdminCommandSetRelay() as command:
                 path_dbg |= 0x00000001
-                self.generate_event(AdminSetRelayEvent(command=command))
-                self._links.publish_message(
-                    self.downstream_client,
+                self.services.generate_event(AdminSetRelayEvent(command=command))
+                self.services.publish_message(
+                    self.services.downstream_client,
                     SetRelayMessage(
-                        src=self.publication_name,
+                        src=self.services.publication_name,
                         relay_name=command.RelayInfo.RelayName,
                         closed=command.RelayInfo.Closed,
                         ack_required=True,
@@ -235,10 +172,11 @@ class DummyScada1(Proactor):
                 )
             case AdminCommandReadRelays():
                 path_dbg |= 0x00000002
-                self._links.publish_message(
+                self.services.publish_message(
                     self.admin_client,
                     Message(
-                        Src=self.publication_name, Payload=self.relays.model_copy()
+                        Src=self.services.publication_name,
+                        Payload=self.relays.model_copy(),
                     ),
                 )
             case _:
@@ -249,18 +187,18 @@ class DummyScada1(Proactor):
                     f"Received\n\t topic: [{message.Payload.message.topic}]"
                 )
 
-        self._logger.path(
+        self.services.logger.path(
             f"--{self.name}._process_admin_mqtt_message  path:0x{path_dbg:08X}",
         )
 
-    def _derived_process_mqtt_message(
+    def process_mqtt_message(
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
-        self._logger.path(
+        self.services.logger.path(
             f"++{self.name}._derived_process_mqtt_message {message.Payload.message.topic}",
         )
         path_dbg = 0
-        if message.Payload.client_name == self.downstream_client:
+        if message.Payload.client_name == self.services.downstream_client:
             path_dbg |= 0x00000001
             self._process_downstream_mqtt_message(message, decoded)
         elif message.Payload.client_name == self.admin_client:
@@ -274,6 +212,82 @@ class DummyScada1(Proactor):
                 f"[{message.Payload.client_name}]\n"
                 f"Received\n\t topic: [{message.Payload.message.topic}]"
             )
-        self._logger.path(
+        self.services.logger.path(
             f"--{self.name}._derived_process_mqtt_message  path:0x{path_dbg:08X}",
         )
+
+    @property
+    def admin_client(self) -> str:
+        return DUMMY_ADMIN_NAME
+
+    @classmethod
+    def get_codec_factory(cls) -> ScadaCodecFactory:
+        return ScadaCodecFactory()
+
+
+class DummyScada1Settings(AppSettings):
+    dummy_atn1: MQTTClient = MQTTClient()
+    dummy_scada2: MQTTClient = MQTTClient()
+    dummy_admin: MQTTClient = MQTTClient()
+
+
+class DummyScada1App(App):
+    ATN_LINK: str = DUMMY_ATN_NAME
+    SCADA2_LINK: str = DUMMY_SCADA2_NAME
+    ADMIN_LINK: str = DUMMY_ADMIN_NAME
+
+    @classmethod
+    def app_settings_type(cls) -> type[DummyScada1Settings]:
+        return DummyScada1Settings
+
+    @classmethod
+    def prime_actor_type(cls) -> type[DummyScada1]:
+        return DummyScada1
+
+    @classmethod
+    def actors_module(cls) -> ModuleType:
+        return actors
+
+    @classmethod
+    def paths_name(cls) -> str:
+        return DUMMY_SCADA1_NAME
+
+    def _get_name(self, layout: HardwareLayout) -> ProactorName:
+        return ProactorName(
+            long_name=layout.scada_g_node_alias,
+            short_name="s",
+        )
+
+    def _get_link_settings(
+        self,
+        name: ProactorName,  # noqa: ARG002
+        layout: HardwareLayout,
+        brokers: dict[str, MQTTClient],  # noqa: ARG002
+    ) -> dict[str, LinkSettings]:
+        return {
+            self.ATN_LINK: LinkSettings(
+                broker_name=self.ATN_LINK,
+                peer_long_name=layout.atn_g_node_alias,
+                peer_short_name="a",
+                upstream=True,
+            ),
+            self.SCADA2_LINK: LinkSettings(
+                broker_name=self.SCADA2_LINK,
+                peer_long_name=layout.scada_g_node_alias + ".s2",
+                peer_short_name="s2",
+                downstream=True,
+                codec=CodecSettings(
+                    message_modules=["gwproactor_test.dummies.tree.messages"]
+                ),
+            ),
+            self.ADMIN_LINK: LinkSettings(
+                broker_name=self.ADMIN_LINK,
+                peer_long_name=DUMMY_ADMIN_NAME,
+                peer_short_name=DUMMY_ADMIN_SHORT_NAME,
+                link_subscription_short_name=layout.scada_g_node_alias,
+            ),
+        }
+
+    @classmethod
+    def _make_persister(cls, settings: AppSettings) -> TimedRollingFilePersister:
+        return TimedRollingFilePersister(settings.paths.event_dir)

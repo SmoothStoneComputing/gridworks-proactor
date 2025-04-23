@@ -23,7 +23,7 @@ from result import Err, Ok, Result
 from gwproactor.config import ProactorSettings
 from gwproactor.links import AckWaitInfo
 from gwproactor.links.acks import AckManager, AckTimerCallback
-from gwproactor.links.link_settings import LinkSettings
+from gwproactor.links.link_settings import LinkConfig
 from gwproactor.links.link_state import (
     InvalidCommStateInput,
     LinkState,
@@ -179,7 +179,7 @@ class LinkManager:
     def stopped(self, name: str) -> bool:
         return self._states.stopped(name)
 
-    def add_mqtt_link(self, settings: LinkSettings) -> None:
+    def add_mqtt_link(self, settings: LinkConfig) -> None:
         self._mqtt_clients.add_client(settings)
         self._mqtt_codecs[settings.client_name] = settings.codec
         self._states.add(settings.client_name)

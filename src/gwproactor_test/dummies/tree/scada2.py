@@ -1,86 +1,49 @@
 import typing
 from collections import defaultdict
-from typing import Optional
 
 import rich
-from gwproto import Message
+from gwproto import HardwareLayout, Message
 
-from gwproactor import Proactor, ProactorSettings
-from gwproactor.links.link_settings import LinkSettings
+from gwproactor import App, AppSettings, ServicesInterface
+from gwproactor.actors.actor import PrimeActor
+from gwproactor.config import MQTTClient
+from gwproactor.config.links import CodecSettings, LinkSettings
+from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import TimedRollingFilePersister
-from gwproactor_test.dummies.names import DUMMY_SCADA2_SHORT_NAME
+from gwproactor_test.dummies import DUMMY_SCADA1_NAME, DUMMY_SCADA2_NAME
+from gwproactor_test.dummies.names import DUMMY_ADMIN_NAME, DUMMY_ADMIN_SHORT_NAME
 from gwproactor_test.dummies.tree.admin_messages import (
     AdminCommandSetRelay,
     AdminSetRelayEvent,
 )
-from gwproactor_test.dummies.tree.codecs import AdminCodec, DummyCodec
+from gwproactor_test.dummies.tree.codecs import ScadaCodecFactory
 from gwproactor_test.dummies.tree.messages import (
     RelayInfo,
     RelayReportEvent,
     SetRelay,
 )
-from gwproactor_test.dummies.tree.scada2_settings import DummyScada2Settings
 
 
-class DummyScada2(Proactor):
+class DummyScada2(PrimeActor):
+    ADMIN_LINK: str = "admin_link"
+
     relays: dict[str, bool]
 
-    def __init__(
-        self,
-        name: str = "",
-        settings: Optional[DummyScada2Settings] = None,
-    ) -> None:
-        if settings is None:
-            settings = DummyScada2Settings()
-        self.relays = defaultdict(bool)
-        super().__init__(name=name, settings=settings)
-        self._links.add_mqtt_link(
-            LinkSettings(
-                client_name=self.settings.scada1_link.client_name,
-                gnode_name=self.settings.scada1_link.long_name,
-                spaceheat_name=self.settings.scada1_link.short_name,
-                mqtt=self.settings.scada1_link,
-                codec=DummyCodec(
-                    src_name=self.settings.scada1_link.long_name,
-                    dst_name=DUMMY_SCADA2_SHORT_NAME,
-                    model_name="Scada1ToScada2Message",
-                ),
-                upstream=True,
-            ),
-        )
-        if self.settings.admin_link.enabled:
-            self._links.add_mqtt_link(
-                LinkSettings(
-                    client_name=self.settings.admin_link.client_name,
-                    gnode_name=self.settings.admin_link.long_name,
-                    spaceheat_name=self.settings.admin_link.short_name,
-                    mqtt=self.settings.admin_link,
-                    codec=AdminCodec(),
-                ),
-            )
-        self.links.log_subscriptions("construction")
-
-    @property
-    def settings(self) -> DummyScada2Settings:
-        return typing.cast(DummyScada2Settings, self._settings)
-
-    @property
-    def subscription_name(self) -> str:
-        return DUMMY_SCADA2_SHORT_NAME
+    def __init__(self, name: str, services: ServicesInterface) -> None:
+        super().__init__(name, services)
+        self.relays = self.relays = defaultdict(bool)
 
     @property
     def admin_client(self) -> str:
-        return self.settings.admin_link.client_name
+        return self.ADMIN_LINK
 
     @classmethod
-    def make_event_persister(
-        cls, settings: ProactorSettings
-    ) -> TimedRollingFilePersister:
-        return TimedRollingFilePersister(settings.paths.event_dir)
+    def get_codec_factory(cls) -> ScadaCodecFactory:
+        return ScadaCodecFactory()
 
     def _process_set_relay(self, payload: RelayInfo) -> None:
-        self._logger.path(
+        self.services.logger.path(
             f"++{self.name}._process_set_relay "
             f"{payload.RelayName}  "
             f"closed:{payload.Closed}"
@@ -95,8 +58,8 @@ class DummyScada2(Proactor):
         if event.changed:
             path_dbg |= 0x00000001
             self.relays[payload.RelayName] = event.closed
-        self.generate_event(event)
-        self._logger.path(
+        self.services.generate_event(event)
+        self.services.logger.path(
             f"--{self.name}._process_set_relay  "
             f"path:0x{path_dbg:08X}  "
             f"{int(last_val)} -> "
@@ -106,7 +69,7 @@ class DummyScada2(Proactor):
     def _process_upstream_mqtt_message(
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
-        self._logger.path(
+        self.services.logger.path(
             f"++{self.name}._process_downstream_mqtt_message {message.Payload.message.topic}",
         )
         path_dbg = 0
@@ -121,21 +84,21 @@ class DummyScada2(Proactor):
                     f"There is no handler for mqtt message payload type [{type(decoded.Payload)}]\n"
                     f"Received\n\t topic: [{message.Payload.message.topic}]"
                 )
-        self._logger.path(
+        self.services.logger.path(
             f"--{self.name}._process_downstream_mqtt_message  path:0x{path_dbg:08X}",
         )
 
     def _process_admin_mqtt_message(
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
-        self._logger.path(
+        self.services.logger.path(
             f"++{self.name}._process_admin_mqtt_message {message.Payload.message.topic}",
         )
         path_dbg = 0
         match decoded.Payload:
             case AdminCommandSetRelay() as command:
                 path_dbg |= 0x00000001
-                self.generate_event(AdminSetRelayEvent(command=command))
+                self.services.generate_event(AdminSetRelayEvent(command=command))
                 self._process_set_relay(command.RelayInfo)
             case _:
                 raise ValueError(
@@ -145,18 +108,18 @@ class DummyScada2(Proactor):
                     f"Received\n\t topic: [{message.Payload.message.topic}]"
                 )
 
-        self._logger.path(
+        self.services.logger.path(
             f"--{self.name}._process_admin_mqtt_message  path:0x{path_dbg:08X}",
         )
 
-    def _derived_process_mqtt_message(
+    def process_mqtt_message(
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
-        self._logger.path(
+        self.services.logger.path(
             f"++{self.name}._derived_process_mqtt_message {message.Payload.message.topic}",
         )
         path_dbg = 0
-        if message.Payload.client_name == self.upstream_client:
+        if message.Payload.client_name == self.services.upstream_client:
             path_dbg |= 0x00000001
             self._process_upstream_mqtt_message(message, decoded)
         elif message.Payload.client_name == self.admin_client:
@@ -170,6 +133,62 @@ class DummyScada2(Proactor):
                 f"[{message.Payload.client_name}]\n"
                 f"Received\n\t topic: [{message.Payload.message.topic}]"
             )
-        self._logger.path(
+        self.services.logger.path(
             f"--{self.name}._derived_process_mqtt_message  path:0x{path_dbg:08X}",
         )
+
+
+class DummyScada2Settings(AppSettings):
+    dummy_scada1: MQTTClient = MQTTClient()
+    dummy_admin: MQTTClient = MQTTClient()
+
+
+class DummyScada2App(App):
+    SCADA1_LINK: str = DUMMY_SCADA1_NAME
+    ADMIN_LINK: str = DUMMY_ADMIN_NAME
+
+    @classmethod
+    def app_settings_type(cls) -> type[DummyScada2Settings]:
+        return DummyScada2Settings
+
+    @classmethod
+    def prime_actor_type(cls) -> type[DummyScada2]:
+        return DummyScada2
+
+    @classmethod
+    def paths_name(cls) -> str:
+        return DUMMY_SCADA2_NAME
+
+    def _get_name(self, layout: HardwareLayout) -> ProactorName:
+        return ProactorName(
+            long_name=layout.scada_g_node_alias + ".s2",
+            short_name="s2",
+        )
+
+    def _get_link_settings(
+        self,
+        name: ProactorName,  # noqa: ARG002
+        layout: HardwareLayout,
+        brokers: dict[str, MQTTClient],  # noqa: ARG002
+    ) -> dict[str, LinkSettings]:
+        return {
+            self.SCADA1_LINK: LinkSettings(
+                broker_name=self.SCADA1_LINK,
+                peer_long_name=layout.scada_g_node_alias,
+                peer_short_name="s",
+                upstream=True,
+                codec=CodecSettings(
+                    message_modules=["gwproactor_test.dummies.tree.messages"]
+                ),
+            ),
+            self.ADMIN_LINK: LinkSettings(
+                broker_name=self.ADMIN_LINK,
+                peer_long_name=DUMMY_ADMIN_NAME,
+                peer_short_name=DUMMY_ADMIN_SHORT_NAME,
+                link_subscription_short_name=layout.scada_g_node_alias + ".s2",
+            ),
+        }
+
+    @classmethod
+    def _make_persister(cls, settings: AppSettings) -> TimedRollingFilePersister:
+        return TimedRollingFilePersister(settings.paths.event_dir)
