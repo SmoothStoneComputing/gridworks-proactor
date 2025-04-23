@@ -8,6 +8,7 @@ from gwproactor.links import QOS
 from gwproactor.persister import PersisterInterface, TimedRollingFilePersister
 from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
 from gwproactor_test.instrumented_app import InstrumentedApp
+from gwproactor_test.instrumented_proactor import InstrumentedProactor
 
 
 class DummyChildSettings(AppSettings):
@@ -20,6 +21,10 @@ class DummyChildApp(InstrumentedApp):
     @classmethod
     def app_settings_type(cls) -> type[DummyChildSettings]:
         return DummyChildSettings
+
+    @classmethod
+    def proactor_type(cls) -> type[InstrumentedProactor]:
+        return InstrumentedProactor
 
     @classmethod
     def paths_name(cls) -> str:

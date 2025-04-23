@@ -14,6 +14,7 @@ from gwproactor.message import DBGPayload
 from gwproactor.persister import PersisterInterface, SimpleDirectoryWriter
 from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
 from gwproactor_test.instrumented_app import InstrumentedApp
+from gwproactor_test.instrumented_proactor import InstrumentedProactor
 
 
 class DummyParent(PrimeActor):
@@ -36,6 +37,10 @@ class DummyParentSettings(AppSettings):
 
 class ParentApp(InstrumentedApp):
     CHILD_MQTT: str = DUMMY_CHILD_NAME
+
+    @classmethod
+    def proactor_type(cls) -> type[InstrumentedProactor]:
+        return InstrumentedProactor
 
     @classmethod
     def app_settings_type(cls) -> type[DummyParentSettings]:

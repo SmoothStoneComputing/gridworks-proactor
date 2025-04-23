@@ -15,6 +15,7 @@ from gwproactor.persister import PersisterInterface, SimpleDirectoryWriter
 from gwproactor_test.dummies import DUMMY_SCADA1_NAME
 from gwproactor_test.dummies.names import DUMMY_ATN_NAME
 from gwproactor_test.instrumented_app import InstrumentedApp
+from gwproactor_test.instrumented_proactor import InstrumentedProactor
 
 
 class DummyAtn(PrimeActor):
@@ -43,6 +44,10 @@ class DummyAtnSettings(AppSettings):
 
 class DummyAtnApp(InstrumentedApp):
     SCADA1_LINK: str = DUMMY_SCADA1_NAME
+
+    @classmethod
+    def proactor_type(cls) -> type[InstrumentedProactor]:
+        return InstrumentedProactor
 
     @classmethod
     def app_settings_type(cls) -> type[AppSettings]:
