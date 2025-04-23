@@ -3,10 +3,9 @@ create forward references for implementation hiearchies
 """
 
 import asyncio
-import importlib
-import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from types import ModuleType
 from typing import Any, Coroutine, Optional, Sequence, Type, TypeVar
 
 from aiohttp.typedefs import Handler as HTTPHandler
@@ -15,7 +14,8 @@ from gwproto.messages import EventT
 from paho.mqtt.client import MQTTMessageInfo
 from result import Result
 
-from gwproactor.config.proactor_settings import ProactorSettings
+from gwproactor.callbacks import ProactorCallbackInterface
+from gwproactor.config.app_settings import AppSettings
 from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
 from gwproactor.logger import ProactorLogger
 from gwproactor.stats import ProactorStats
@@ -48,11 +48,6 @@ class CommunicatorInterface(ABC):
     @property
     @abstractmethod
     def monitored_names(self) -> Sequence[MonitoredName]:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def services(self) -> "ServicesInterface":
         raise NotImplementedError
 
 
@@ -122,24 +117,30 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
         """Called after constructor so derived functions can be used in setup."""
 
     @classmethod
+    @abstractmethod
+    def instantiate(
+        cls, name: str, services: "ServicesInterface", **contstructor_kwargs: Any
+    ) -> "ActorInterface":
+        raise NotImplementedError
+
+    @classmethod
     def load(
         cls,
         name: str,
         actor_class_name: str,
         services: "ServicesInterface",
-        module_name: str,
+        actors_module: ModuleType,
+        **constructor_kwargs: Any,
     ) -> "ActorInterface":
-        if module_name not in sys.modules:
-            importlib.import_module(module_name)
-        actor_class = getattr(sys.modules[module_name], actor_class_name)
+        actor_class = getattr(actors_module, actor_class_name)
         if not issubclass(actor_class, ActorInterface):
             raise ValueError(  # noqa: TRY004
                 f"ERROR. Imported class <{actor_class}> "
-                f"from module <{module_name}> "
+                f"from module <{actors_module.__name__}> "
                 f"with via requested name <{actor_class_name} "
                 "does not implement ActorInterface",
             )
-        actor = actor_class(name, services)
+        actor = actor_class.instantiate(name, services, **constructor_kwargs)
         if not isinstance(actor, ActorInterface):
             raise ValueError(  # noqa: TRY004
                 f"ERROR. Constructed object with type {type(actor)} "
@@ -193,6 +194,10 @@ class ServicesInterface(CommunicatorInterface):
     """Interface to system services (the proactor)"""
 
     @abstractmethod
+    def add_communicator(self, communicator: CommunicatorInterface) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
     def get_communicator(self, name: str) -> Optional[CommunicatorInterface]:
         raise NotImplementedError
 
@@ -201,11 +206,27 @@ class ServicesInterface(CommunicatorInterface):
         raise NotImplementedError
 
     @abstractmethod
+    def get_communicator_names(self) -> set[str]:
+        raise NotImplementedError
+
+    @abstractmethod
     def send(self, message: Message[Any]) -> None:
         raise NotImplementedError
 
     @abstractmethod
+    async def await_processing(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
+        raise NotImplementedError
+
+    @abstractmethod
     def send_threadsafe(self, message: Message[Any]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def wait_for_processing_threadsafe(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
         raise NotImplementedError
 
     @abstractmethod
@@ -274,18 +295,29 @@ class ServicesInterface(CommunicatorInterface):
         raise NotImplementedError
 
     @abstractmethod
-    def publish_message(
+    def publish_message(  # noqa: PLR0913
         self,
         link_name: str,
         message: Message[Any],
         qos: int = 0,
         context: Any = None,
+        *,
+        topic: str = "",
+        use_link_topic: bool = False,
     ) -> MQTTMessageInfo:
         raise NotImplementedError
 
     @property
+    def upstream_client(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def downstream_client(self) -> str:
+        raise NotImplementedError
+
+    @property
     @abstractmethod
-    def settings(self) -> ProactorSettings:
+    def settings(self) -> AppSettings:
         raise NotImplementedError
 
     @property
@@ -306,4 +338,12 @@ class ServicesInterface(CommunicatorInterface):
     def get_external_watchdog_builder_class(
         self,
     ) -> type[ExternalWatchdogCommandBuilder]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_callbacks(self, callbacks: ProactorCallbackInterface) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_callbacks(self, callbacks_id: int) -> None:
         raise NotImplementedError

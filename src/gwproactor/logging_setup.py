@@ -7,7 +7,7 @@ import syslog
 import traceback
 from typing import Optional
 
-from gwproactor.config.proactor_settings import ProactorSettings
+from gwproactor.config.app_settings import AppSettings
 
 
 def enable_aiohttp_logging() -> None:
@@ -56,7 +56,7 @@ def format_exceptions(exceptions: list[Exception]) -> str:
 
 def setup_logging(  # noqa: C901, PLR0912, PLR0915
     args: argparse.Namespace,
-    settings: ProactorSettings,
+    settings: AppSettings,
     *,
     errors: Optional[list[Exception]] = None,
     add_screen_handler: bool = True,

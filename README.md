@@ -13,10 +13,15 @@
 [![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
 
 [pypi status]: https://pypi.org/project/gridworks-proactor/
+
 [read the docs]: https://gridworks-proactor.readthedocs.io/
+
 [tests]: https://github.com/thegridelectric/gridworks-proactor/actions?workflow=Tests
+
 [codecov]: https://app.codecov.io/gh/thegridelectric/gridworks-proactor
+
 [pre-commit]: https://github.com/pre-commit/pre-commit
+
 [black]: https://github.com/psf/black
 
 This packages provides "live actor" and "application monitored communication" infrastructure for the
@@ -30,10 +35,10 @@ allows the scada code to be more focussed on on application specific details and
   object, "live actor" subobjects and MQTT clients.
 - A [communication state] ("active" or not) for each external communications link is available to the proactor and
   sub-objects. "Active" communications is defined as ALL of the following:
-  - The underlying communications mechanism (MQTT) is connected.
-  - All input channels of underlying mechanism (MQTT topics) are established.
-  - A application messages requiring acknowledgement have been ACKed in timely fashion (by default 5 seconds).
-  - A message has been received "recently" (by default within 1 minute).
+    - The underlying communications mechanism (MQTT) is connected.
+    - All input channels of underlying mechanism (MQTT topics) are established.
+    - A application messages requiring acknowledgement have been ACKed in timely fashion (by default 5 seconds).
+    - A message has been received "recently" (by default within 1 minute).
 - Reliable delievery of "Events" generated locally. Generated Events are stored locally until they are acknowledged
   and unacknowledged Events are retransmitted when the "Active" communication state is restored.
 - [](gwproactor_test), a test package for development and test environments of projects that implement a class derived
@@ -52,7 +57,8 @@ brew services restart mosquitto
 
 ### TLS
 
-Testing uses TLS by default. The tests require the path to the CA certificate and private key used to sign the certificate
+Testing uses TLS by default. The tests require the path to the CA certificate and private key used to sign the
+certificate
 of the MQTT broker. To set up TLS:
 
 Install gridworks-cert (gwcert):
@@ -64,7 +70,7 @@ pipx install gridworks-cert
 Create a local Certificate Authority:
 
 ```shell
-gwcert ca create
+gwcert ca create NAME_OF_YOUR_LOCAL_CA
 ```
 
 Create certificate and key for the Mosquitto MQTT broker:
@@ -154,7 +160,8 @@ gwcert key add \
 
 #### Pre-existing key files
 
-If CA or Mosquito certificate can key files _already_ exist, their paths can be specified in `mosquitto.conf` as above and
+If CA or Mosquito certificate can key files _already_ exist, their paths can be specified in `mosquitto.conf` as above
+and
 for the tests with there GWPROACTOR_TEST_CA_CERT_PATH and GWPROACTOR_TEST_CA_KEY_PATH environment variables.
 
 #### Disabling TLS
@@ -199,14 +206,21 @@ please [file an issue] along with a detailed description.
 This project was generated from [@cjolowicz]'s [Hypermodern Python Cookiecutter] template.
 
 [@cjolowicz]: https://github.com/cjolowicz
+
 [pypi]: https://pypi.org/
+
 [hypermodern python cookiecutter]: https://github.com/cjolowicz/cookiecutter-hypermodern-python
+
 [file an issue]: https://github.com/thegridelectric/gridworks-proactor/issues
+
 [pip]: https://pip.pypa.io/
+
 [example-test-mosquitto.conf]: https://github.com/thegridelectric/gridworks-proactor/blob/main/tests/config/example-test-mosquitto.conf
 
 <!-- github-only -->
 
 [license]: https://github.com/thegridelectric/gridworks-proactor/blob/main/LICENSE
+
 [contributor guide]: https://github.com/thegridelectric/gridworks-proactor/blob/main/CONTRIBUTING.md
+
 [communication state]: https://gridworks-proactor.readthedocs.io/en/latest/comm_state.html

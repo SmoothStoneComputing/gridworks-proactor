@@ -35,8 +35,8 @@ class DefaultTestEnv:
 
     >>> tmp_path = Path("/home/bla")
     >>> with DefaultTestEnv(tmp_path).context() as mpatch:
-    ...     assert ProactorSettings().paths.hardware_layout == Path("/home/bla/.config/gridworks/scada/hardware-layout.json")
-    ...     assert ProactorSettings().paths.hardware_layout.exists()
+    ...     assert AppSettings().paths.hardware_layout == Path("/home/bla/.config/gridworks/scada/hardware-layout.json")
+    ...     assert AppSettings().paths.hardware_layout.exists()
 
 
     The default test env file is tests/.env-gwproactor-test. This path can be overridden with the environment variable

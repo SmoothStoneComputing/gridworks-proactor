@@ -1,9 +1,10 @@
 from enum import StrEnum
+from pathlib import Path
 
+import dotenv
 import rich
 import typer
 
-from gwproactor.command_line_utils import get_settings, print_settings
 from gwproactor_test.dummies.tree.admin import MQTTAdmin
 from gwproactor_test.dummies.tree.admin_settings import (
     DummyAdminSettings,
@@ -62,7 +63,7 @@ def set_relay(
 
 @app.command()
 def run(
-    target: str = "dummy_scada1",
+    target: str = DummyAdminSettings.DEFAULT_TARGET,
     relay_name: str = "relay0",
     closed: RelayState = RelayState.closed,
     user: str = "HeatpumpWizard",
@@ -79,12 +80,18 @@ def run(
 
 @app.command()
 def config(
-    target: str = "",
+    target: str = DummyAdminSettings.DEFAULT_TARGET,
     env_file: str = ".env",
 ) -> None:
-    settings = get_settings(settings_type=DummyAdminSettings, env_file=env_file)
-    settings.target_gnode = target
-    print_settings(settings=settings, env_file=env_file)
+    settings = DummyAdminSettings(_env_file=env_file, target_gnode=target)  # noqa
+    dotenv_file = dotenv.find_dotenv(str(env_file))
+    rich.print(
+        f"Env file: <{dotenv_file}>  exists:{env_file and Path(dotenv_file).exists()}"
+    )
+    rich.print(settings)
+    missing_tls_paths_ = settings.check_tls_paths_present(raise_error=False)
+    if missing_tls_paths_:
+        rich.print(missing_tls_paths_)
 
 
 @app.callback()

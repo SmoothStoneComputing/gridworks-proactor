@@ -3,7 +3,7 @@ from gwproto import Message, MQTTCodec, MQTTTopic
 from gwproactor.config import MQTTClient
 
 
-class LinkSettings:
+class LinkConfig:
     client_name: str
     gnode_name: str
     spaceheat_name: str

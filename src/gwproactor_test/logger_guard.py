@@ -1,3 +1,5 @@
+# ruff: noqa: S101
+
 import logging
 import sys
 from types import TracebackType

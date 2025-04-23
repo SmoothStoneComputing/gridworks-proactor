@@ -1,14 +1,11 @@
 import asyncio
+import typing
 
 import typer
 
-from gwproactor.command_line_utils import (
-    print_settings,
-    run_async_main,
-)
-from gwproactor_test.dummies import DUMMY_SCADA1_NAME
-from gwproactor_test.dummies.tree.scada1 import DummyScada1
-from gwproactor_test.dummies.tree.scada1_settings import DummyScada1Settings
+from gwproactor.command_line_utils import run_async_main
+from gwproactor.logging_setup import enable_aiohttp_logging
+from gwproactor_test.dummies.tree.scada1 import DummyScada1App
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -18,18 +15,25 @@ app = typer.Typer(
 )
 
 
+class DummyScada1CLIApp(DummyScada1App):
+    def __init__(self, **kwargs: typing.Any) -> None:
+        kwargs["src_layout_path"] = None
+        super().__init__(**kwargs)
+
+
 @app.command()
 def run(
     env_file: str = ".env",
     dry_run: bool = False,
     verbose: bool = False,
     message_summary: bool = False,
+    aiohttp_verbose: bool = False,
 ) -> None:
+    if aiohttp_verbose:
+        enable_aiohttp_logging()
     asyncio.run(
         run_async_main(
-            name=DUMMY_SCADA1_NAME,
-            proactor_type=DummyScada1,
-            settings_type=DummyScada1Settings,
+            app_type=DummyScada1CLIApp,
             env_file=env_file,
             dry_run=dry_run,
             verbose=verbose,
@@ -42,7 +46,7 @@ def run(
 def config(
     env_file: str = ".env",
 ) -> None:
-    print_settings(settings_type=DummyScada1Settings, env_file=env_file)
+    DummyScada1App.print_settings(env_file=env_file)
 
 
 @app.callback()

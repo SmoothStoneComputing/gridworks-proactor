@@ -69,7 +69,7 @@ class MQTTMessageModel(BaseModel):
     @classmethod
     def from_mqtt_message(cls, message: MQTTMessage) -> "MQTTMessageModel":
         model = MQTTMessageModel()
-        for field_name in model.model_fields:
+        for field_name in model.__pydantic_fields__:
             setattr(model, field_name, getattr(message, field_name))
         return model
 

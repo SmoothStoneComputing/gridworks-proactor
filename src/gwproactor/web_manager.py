@@ -81,12 +81,18 @@ class _WebManager(Communicator, Runnable):
         pass
 
     def add_web_server_config(
-        self, name: str, host: str, port: int, **kwargs: Any
+        self,
+        *,
+        name: str,
+        host: str,
+        port: int,
+        enabled: bool,
+        server_kwargs: dict[str, Any],
     ) -> None:
         if name in self._configs:
             raise ValueError(f"ERROR: Server with name '{name}' already exists")
         self._configs[name] = WebServerGt(
-            Name=name, Host=host, Port=port, Kwargs=kwargs
+            Name=name, Host=host, Port=port, Enabled=enabled, Kwargs=server_kwargs
         )
 
     def add_web_route(

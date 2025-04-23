@@ -156,7 +156,7 @@ class MQTTAdmin:
         msg_type = message.topic.split("/")[-1].replace("-", ".")
         if (
             self.state == AppState.awaiting_command_ack
-            and msg_type == Ack.model_fields["TypeName"].default
+            and msg_type == Ack.__pydantic_fields__["TypeName"].default
         ):
             ack_message = Message[Ack].model_validate_json(message.payload)
             if ack_message.Payload.AckMessageID == self.command_message_id:
@@ -194,7 +194,7 @@ class MQTTAdmin:
                 sys.exit(3)
         elif (
             self.state == AppState.awaiting_report
-            and msg_type == RelayStates.model_fields["TypeName"].default
+            and msg_type == RelayStates.__pydantic_fields__["TypeName"].default
         ):
             report_message = Message[RelayStates].model_validate_json(message.payload)
             if self.json:

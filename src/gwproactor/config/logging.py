@@ -62,7 +62,7 @@ class LoggerLevels(BaseModel):
     def qualified_logger_names(self, base_log_name: str) -> dict[str, str]:
         return {
             field_name: f"{base_log_name}.{field_name}"
-            for field_name in self.model_fields
+            for field_name in self.__pydantic_fields__
         }
 
     def _logger_levels(
@@ -74,7 +74,7 @@ class LoggerLevels(BaseModel):
         }
 
     def logger_names_to_levels(self, base_log_name: str) -> dict[str, dict[str, int]]:
-        return self._logger_levels(base_log_name, self.model_fields)
+        return self._logger_levels(base_log_name, self.__pydantic_fields__)
 
     def set_logger_names_to_levels(
         self, base_log_name: str
