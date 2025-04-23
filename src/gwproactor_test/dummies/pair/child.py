@@ -1,20 +1,19 @@
 from gwproto import HardwareLayout, Message, MQTTTopic
 
-from gwproactor import AppSettings, Proactor
+from gwproactor import App, AppSettings, Proactor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.links import QOS
 from gwproactor.persister import PersisterInterface, TimedRollingFilePersister
 from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
-from gwproactor_test.instrumented_app import InstrumentedApp
 
 
 class DummyChildSettings(AppSettings):
     parent: MQTTClient = MQTTClient()
 
 
-class DummyChildApp(InstrumentedApp):
+class DummyChildApp(App):
     PARENT_MQTT: str = DUMMY_PARENT_NAME
 
     @classmethod

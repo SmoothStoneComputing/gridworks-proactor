@@ -13,7 +13,6 @@ from gwproactor import Proactor
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
 from gwproactor.persister import TimedRollingFilePersister
-from gwproactor_test.dummies import DummyChildApp
 from gwproactor_test.live_test_helper import (
     LiveTest,
 )
@@ -164,10 +163,8 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
     async with LiveTest(
         start_child=True,
         add_parent=True,
-        child_app=DummyChildApp(
-            app_settings=DummyChildSettings(
-                proactor=ProactorSettings(num_initial_event_reuploads=5)
-            )
+        child_app_settings=DummyChildSettings(
+            proactor=ProactorSettings(num_initial_event_reuploads=5)
         ),
         request=request,
     ) as h:
@@ -231,10 +228,8 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
     async with LiveTest(
         start_child=True,
         add_parent=True,
-        child_app=DummyChildApp(
-            app_settings=DummyChildSettings(
-                proactor=ProactorSettings(num_initial_event_reuploads=5)
-            )
+        child_app_settings=DummyChildSettings(
+            proactor=ProactorSettings(num_initial_event_reuploads=5)
         ),
         request=request,
     ) as h:

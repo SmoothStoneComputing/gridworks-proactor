@@ -5,7 +5,7 @@ from typing import Any, Optional
 from gwproto import HardwareLayout, Message
 from gwproto.messages import EventBase
 
-from gwproactor import AppSettings
+from gwproactor import App, AppSettings
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
@@ -14,7 +14,6 @@ from gwproactor.message import MQTTReceiptPayload
 from gwproactor.persister import PersisterInterface, SimpleDirectoryWriter
 from gwproactor_test.dummies import DUMMY_SCADA1_NAME
 from gwproactor_test.dummies.names import DUMMY_ATN_NAME
-from gwproactor_test.instrumented_app import InstrumentedApp
 
 
 class DummyAtn(PrimeActor):
@@ -41,7 +40,7 @@ class DummyAtnSettings(AppSettings):
     dummy_scada1: MQTTClient = MQTTClient()
 
 
-class DummyAtnApp(InstrumentedApp):
+class DummyAtnApp(App):
     SCADA1_LINK: str = DUMMY_SCADA1_NAME
 
     @classmethod

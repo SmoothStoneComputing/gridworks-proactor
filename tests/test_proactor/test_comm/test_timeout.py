@@ -7,7 +7,6 @@ import pytest
 from gwproto import MQTTTopic
 
 from gwproactor.links import StateName
-from gwproactor_test.dummies import DummyChildApp
 from gwproactor_test.live_test_helper import (
     LiveTest,
 )
@@ -129,10 +128,8 @@ async def test_ping(request: Any) -> None:
     async with LiveTest(
         add_child=True,
         add_parent=True,
-        child_app=DummyChildApp(
-            app_settings=DummyChildSettings(
-                proactor=ProactorSettings(mqtt_link_poll_seconds=0.1),
-            )
+        child_app_settings=DummyChildSettings(
+            proactor=ProactorSettings(mqtt_link_poll_seconds=0.1),
         ),
         request=request,
     ) as h:

@@ -83,10 +83,15 @@ class App(abc.ABC):
     @classmethod
     def make_subtypes(cls) -> SubTypes:
         return SubTypes(
+            proactor_type=cls.proactor_type(),
             app_settings_type=cls.app_settings_type(),
             prime_actor_type=cls.prime_actor_type(),
             actors_module=cls.actors_module(),
         )
+
+    @classmethod
+    def proactor_type(cls) -> type[Proactor]:
+        return Proactor
 
     @classmethod
     def app_settings_type(cls) -> type[AppSettings]:

@@ -5,7 +5,7 @@ from typing import Any
 from gwproto import HardwareLayout, Message
 from result import Ok, Result
 
-from gwproactor import AppSettings
+from gwproactor import App, AppSettings
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
@@ -13,7 +13,6 @@ from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import DBGPayload
 from gwproactor.persister import PersisterInterface, SimpleDirectoryWriter
 from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
-from gwproactor_test.instrumented_app import InstrumentedApp
 
 
 class DummyParent(PrimeActor):
@@ -34,7 +33,7 @@ class DummyParentSettings(AppSettings):
     child: MQTTClient = MQTTClient()
 
 
-class ParentApp(InstrumentedApp):
+class DummyParentApp(App):
     CHILD_MQTT: str = DUMMY_CHILD_NAME
 
     @classmethod
