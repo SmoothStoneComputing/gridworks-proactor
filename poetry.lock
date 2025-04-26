@@ -227,13 +227,13 @@ lxml = ["lxml"]
 
 [[package]]
 name = "certifi"
-version = "2025.1.31"
+version = "2025.4.26"
 description = "Python package for providing Mozilla's CA Bundle."
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "certifi-2025.1.31-py3-none-any.whl", hash = "sha256:ca78db4565a652026a4db2bcdf68f2fb589ea80d0be70e03929ed730746b84fe"},
-    {file = "certifi-2025.1.31.tar.gz", hash = "sha256:3d5da6925056f6f18f119200434a4780a94263f10d1c21d032a6f6b2baa20651"},
+    {file = "certifi-2025.4.26-py3-none-any.whl", hash = "sha256:30350364dfe371162649852c63336a15c70c6510c2ad5015b21c2345311805f3"},
+    {file = "certifi-2025.4.26.tar.gz", hash = "sha256:0a816057ea3cdefcef70270d2c515e4506bbc954f417fa5ade2021213bb8f0c6"},
 ]
 
 [[package]]
@@ -799,13 +799,13 @@ xdg = ">=6.0.0"
 
 [[package]]
 name = "gridworks-protocol"
-version = "1.2.5"
+version = "1.2.6"
 description = "Gridworks Protocol"
 optional = false
 python-versions = "<4.0,>=3.11"
 files = [
-    {file = "gridworks_protocol-1.2.5-py3-none-any.whl", hash = "sha256:16b8ef1834bce535782f43894fe27c3bbd6b858b0a77db3fc3e37ac4e0c11268"},
-    {file = "gridworks_protocol-1.2.5.tar.gz", hash = "sha256:9ba560b1e69aaed07e1b8d89dd32755f6906940d575a1fa4094805dff74031d4"},
+    {file = "gridworks_protocol-1.2.6-py3-none-any.whl", hash = "sha256:0e46b004bab3119b30dd059d56386f4f341266a31f1b3a3256a01b5237dc57e4"},
+    {file = "gridworks_protocol-1.2.6.tar.gz", hash = "sha256:32027f248d21867094dfa7fb32d0a342cb67d4340e6959ea1a9ea893e6e4a426"},
 ]
 
 [package.dependencies]
@@ -817,13 +817,13 @@ yarl = ">=1.9.2,<2.0.0"
 
 [[package]]
 name = "h11"
-version = "0.14.0"
+version = "0.16.0"
 description = "A pure-Python, bring-your-own-I/O implementation of HTTP/1.1"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "h11-0.14.0-py3-none-any.whl", hash = "sha256:e3fe4ac4b851c468cc8363d500db52c2ead036020723024a109d37346efaa761"},
-    {file = "h11-0.14.0.tar.gz", hash = "sha256:8f19fbbe99e72420ff35c00b27a34cb9937e902a8b810e2c88300c6f0a3b699d"},
+    {file = "h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86"},
+    {file = "h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1"},
 ]
 
 [[package]]
@@ -2803,4 +2803,4 @@ tests = ["freezegun", "gridworks-cert", "pytest", "pytest-asyncio", "typer"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "dc889beebe8279474ac85ee865d21f4cf27e3c9141a7d4a687932784a1b4beca"
+content-hash = "24b2324385533bb2c741703c5e7ca980832f7c3320c369f45ab00f970d7ee20e"

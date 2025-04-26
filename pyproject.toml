@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gridworks-proactor"
-version = "2.0.0"
+version = "2.0.2"
 description = "Gridworks Proactor"
 authors = ["Jessica Millar <jmillar@gridworks-consulting.com>"]
 license = "MIT"
@@ -24,12 +24,12 @@ Changelog = "https://github.com/thegridelectric/gridworks-proactor/releases"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-pydantic = "^2.8.2"
+pydantic = "^2.10.0"
 python-dotenv = "^1.0.0"
 xdg = "^6.0.0"
 paho-mqtt = "^1.6.1"
 result = "^0.9.0"
-gridworks-protocol = "^1.2.5"
+gridworks-protocol = "^1.2.6"
 # gridworks-protocol = { path = "../gridworks-protocol", develop = true }
 # gridworks-protocol = { git = "https://github.com/thegridelectric/gridworks-protocol.git", branch = "dev" }
 aiohttp = "^3.11.11"
