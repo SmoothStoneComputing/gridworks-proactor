@@ -244,6 +244,10 @@ class DummyScada1App(App):
     def prime_actor_type(cls) -> type[DummyScada1]:
         return DummyScada1
 
+    @property
+    def prime_actor(self) -> DummyScada1:
+        return typing.cast(DummyScada1, self._prime_actor)
+
     @classmethod
     def actors_module(cls) -> ModuleType:
         return actors

@@ -155,6 +155,10 @@ class DummyScada2App(App):
     def prime_actor_type(cls) -> type[DummyScada2]:
         return DummyScada2
 
+    @property
+    def prime_actor(self) -> DummyScada2:
+        return typing.cast(DummyScada2, self._prime_actor)
+
     @classmethod
     def paths_name(cls) -> str:
         return DUMMY_SCADA2_NAME

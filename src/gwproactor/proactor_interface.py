@@ -190,7 +190,7 @@ class IOLoopInterface(CommunicatorInterface, Runnable, ABC):
         """
 
 
-class ServicesInterface(CommunicatorInterface):
+class ServicesInterface(ABC):
     """Interface to system services (the proactor)"""
 
     @abstractmethod

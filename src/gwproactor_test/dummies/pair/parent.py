@@ -1,5 +1,6 @@
 """Scada implementation"""
 
+import typing
 from typing import Any
 
 from gwproto import HardwareLayout, Message
@@ -43,6 +44,10 @@ class DummyParentApp(App):
     @classmethod
     def prime_actor_type(cls) -> type[DummyParent]:
         return DummyParent
+
+    @property
+    def prime_actor(self) -> DummyParent:
+        return typing.cast(DummyParent, self._prime_actor)
 
     @classmethod
     def paths_name(cls) -> str:

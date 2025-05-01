@@ -19,7 +19,7 @@ from gwproactor_test.logger_guard import LoggerGuards
 
 
 class TreeLiveTest(LiveTest):
-    child2_app: App
+    _child2_app: App
     child2_verbose: bool = False
     child2_on_screen: bool = False
     child2_logger_guards: LoggerGuards
@@ -47,7 +47,7 @@ class TreeLiveTest(LiveTest):
             )
         kwargs["request"] = kwargs.get("request")
         super().__init__(**kwargs)
-        self.child2_app = self._make_app(self.child2_app_type(), child2_app_settings)
+        self._child2_app = self._make_app(self.child2_app_type(), child2_app_settings)
         self.child2_verbose = get_option_value(
             parameter_value=child2_verbose,
             option_name="--child2-verbose",
@@ -68,13 +68,29 @@ class TreeLiveTest(LiveTest):
     def child_app_type(cls) -> type[App]:
         return DummyScada1App
 
+    @property
+    def child_app(self) -> DummyScada1App:
+        return typing.cast(DummyScada1App, self._child_app)
+
+    @property
+    def child1_app(self) -> DummyScada1App:
+        return self.child_app
+
     @classmethod
     def child2_app_type(cls) -> type[App]:
         return DummyScada2App
 
+    @property
+    def child2_app(self) -> DummyScada2App:
+        return typing.cast(DummyScada2App, self._child2_app)
+
     @classmethod
     def parent_app_type(cls) -> type[App]:
         return DummyAtnApp
+
+    @property
+    def parent_app(self) -> DummyAtnApp:
+        return typing.cast(DummyAtnApp, self._parent_app)
 
     @property
     def child1(self) -> InstrumentedProactor:
@@ -117,7 +133,7 @@ class TreeLiveTest(LiveTest):
     def remove_child2(
         self,
     ) -> Self:
-        self.child2_app.proactor = None
+        self.child2_app.raw_proactor = None
         return self
 
     def _get_child2_clients_supporting_tls(self) -> list[MQTTClient]:
@@ -148,7 +164,7 @@ class TreeLiveTest(LiveTest):
 
     def get_proactors(self) -> list[InstrumentedProactor]:
         proactors = super().get_proactors()
-        if self.child2_app.proactor is not None:
+        if self.child2_app.raw_proactor is not None:
             proactors.append(self.child2)
         return proactors
 
@@ -162,17 +178,17 @@ class TreeLiveTest(LiveTest):
 
     def summary_str(self) -> str:
         s = ""
-        if self.child_app.proactor is None:
+        if self.child_app.raw_proactor is None:
             s += "SCADA1: None\n"
         else:
             s += "SCADA1:\n"
             s += textwrap.indent(self.child1.summary_str(), "    ") + "\n"
-        if self.child2_app.proactor is None:
+        if self.child2_app.raw_proactor is None:
             s += "SCADA2: None\n"
         else:
             s += "SCADA2:\n"
             s += textwrap.indent(self.child2.summary_str(), "    ") + "\n"
-        if self.parent_app.proactor is None:
+        if self.parent_app.raw_proactor is None:
             s += "ATN: None\n"
         else:
             s += "ATN:\n"

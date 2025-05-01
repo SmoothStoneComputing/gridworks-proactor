@@ -1,25 +1,40 @@
 import abc
+import asyncio
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Optional, Self, Sequence
+from typing import Any, Optional, Self, Sequence, Type
 
 import dotenv
 import rich
-from gwproto import HardwareLayout, ShNode
+from aiohttp.typedefs import Handler as HTTPHandler
+from gwproto import HardwareLayout, Message, ShNode
+from gwproto.messages import EventT
+from paho.mqtt.client import MQTTMessageInfo
+from result import Result
 
 from gwproactor import actors
 from gwproactor.actors.actor import PrimeActor
+from gwproactor.callbacks import ProactorCallbackInterface
 from gwproactor.codecs import CodecFactory
 from gwproactor.config import MQTTClient, Paths
 from gwproactor.config.app_settings import AppSettings
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
+from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
 from gwproactor.links.link_settings import LinkConfig
+from gwproactor.logger import ProactorLogger
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.proactor_implementation import Proactor
-from gwproactor.proactor_interface import ActorInterface
+from gwproactor.proactor_interface import (
+    ActorInterface,
+    CommunicatorInterface,
+    IOLoopInterface,
+    ServicesInterface,
+    T,
+)
+from gwproactor.stats import ProactorStats
 
 
 @dataclass
@@ -36,14 +51,14 @@ class ActorConfig:
     constructor_args: dict[str, Any] = field(default_factory=dict)
 
 
-class App(abc.ABC):
+class App(ServicesInterface):
     _settings: AppSettings
     config: ProactorConfig
     links: dict[str, LinkSettings]
     sub_types: SubTypes
-    codec_factory: CodecFactory
-    proactor: Optional[Proactor] = None
-    prime_actor: Optional[PrimeActor] = None
+    _codec_factory: CodecFactory
+    _proactor: Optional[Proactor] = None
+    _prime_actor: Optional[PrimeActor] = None
 
     def __init__(  # noqa: PLR0913
         self,
@@ -79,6 +94,30 @@ class App(abc.ABC):
     @property
     def settings(self) -> AppSettings:
         return self._settings
+
+    @property
+    def raw_proactor(self) -> Optional[Proactor]:
+        return self._proactor
+
+    @raw_proactor.setter
+    def raw_proactor(self, proactor: Optional[Proactor]) -> None:
+        self._proactor = proactor
+
+    @property
+    def proactor(self) -> Proactor:
+        if self._proactor is None:
+            raise ValueError("proactor accessed before it was initialized")
+        return self._proactor
+
+    @property
+    def has_prime_actor(self) -> bool:
+        return self._prime_actor is not None
+
+    @property
+    def prime_actor(self) -> PrimeActor:
+        if self._prime_actor is None:
+            raise ValueError("prime_actor accessed before it was initialized")
+        return self._prime_actor
 
     @classmethod
     def make_subtypes(cls) -> SubTypes:
@@ -125,10 +164,10 @@ class App(abc.ABC):
         return self.sub_types.proactor_type(self.config)
 
     def instantiate(self) -> Self:
-        self.proactor = self._instantiate_proactor()
+        self.raw_proactor = self._instantiate_proactor()
         self._connect_links(self.proactor)
         if self.sub_types.prime_actor_type is not None:
-            self.prime_actor = self.sub_types.prime_actor_type(
+            self._prime_actor = self.sub_types.prime_actor_type(
                 self.config.name.short_name,
                 self.proactor,
             )
@@ -175,12 +214,6 @@ class App(abc.ABC):
                     ),
                 )
 
-    @property
-    def _layout(self) -> HardwareLayout:
-        if self.proactor is None:
-            raise ValueError("hardware_layout access before proactor instantiated")
-        return self.proactor.hardware_layout
-
     # noinspection PyMethodMayBeStatic
     def _load_hardware_layout(self, layout_path: str | Path) -> HardwareLayout:
         return HardwareLayout.load(layout_path)
@@ -189,14 +222,14 @@ class App(abc.ABC):
         return StubPersister()
 
     def _get_actor_nodes(self) -> Sequence[ActorConfig]:
-        if self.prime_actor is None or self.prime_actor.node is None:
+        if self._prime_actor is None or self._prime_actor.node is None:
             return []
         return [
             ActorConfig(node=node)
-            for node in self._layout.nodes.values()
+            for node in self.hardware_layout.nodes.values()
             if (
                 node.has_actor
-                and self._layout.parent_node(node) == self.prime_actor.node
+                and self.hardware_layout.parent_node(node) == self.prime_actor.node
             )
         ]
 
@@ -209,7 +242,7 @@ class App(abc.ABC):
                     ActorInterface.load(
                         actor_config.node.Name,
                         actor_config.node.actor_class_str,
-                        self.proactor,
+                        self,
                         actors_module=self.sub_types.actors_module,
                         **actor_config.constructor_args,
                     )
@@ -248,3 +281,128 @@ class App(abc.ABC):
         missing_tls_paths_ = app.settings.check_tls_paths_present(raise_error=False)
         if missing_tls_paths_:
             rich.print(missing_tls_paths_)
+
+    @property
+    def name(self) -> str:
+        return self.config.name.name
+
+    def add_communicator(self, communicator: CommunicatorInterface) -> None:
+        self.proactor.add_communicator(communicator)
+
+    def get_communicator(self, name: str) -> Optional[CommunicatorInterface]:
+        return self.proactor.get_communicator(name)
+
+    def get_communicator_as_type(self, name: str, type_: Type[T]) -> Optional[T]:
+        return self.proactor.get_communicator_as_type(name, type_)
+
+    def get_communicator_names(self) -> set[str]:
+        return self.proactor.get_communicator_names()
+
+    def send(self, message: Message[Any]) -> None:
+        self.proactor.send(message)
+
+    async def await_processing(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
+        return await self.proactor.await_processing(message)
+
+    def send_threadsafe(self, message: Message[Any]) -> None:
+        self.proactor.send_threadsafe(message)
+
+    def wait_for_processing_threadsafe(
+        self, message: Message[Any]
+    ) -> Result[Any, BaseException]:
+        return self.proactor.wait_for_processing_threadsafe(message)
+
+    def add_task(self, task: asyncio.Task[Any]) -> None:
+        self.proactor.add_task(task)
+
+    @property
+    def async_receive_queue(self) -> Optional[asyncio.Queue[Any]]:
+        return self.proactor.async_receive_queue
+
+    @property
+    def event_loop(self) -> Optional[asyncio.AbstractEventLoop]:
+        return self.proactor.event_loop
+
+    @property
+    def io_loop_manager(self) -> IOLoopInterface:
+        return self.proactor.io_loop_manager
+
+    def add_web_server_config(
+        self, name: str, host: str, port: int, **kwargs: Any
+    ) -> None:
+        self.proactor.add_web_server_config(name, host, port, **kwargs)
+
+    def add_web_route(
+        self,
+        server_name: str,
+        method: str,
+        path: str,
+        handler: HTTPHandler,
+        **kwargs: Any,
+    ) -> None:
+        self.proactor.add_web_route(server_name, method, path, handler, **kwargs)
+
+    def generate_event(self, event: EventT) -> Result[bool, Exception]:
+        return self.proactor.generate_event(event)
+
+    @property
+    def publication_name(self) -> str:
+        return self.config.name.publication_name
+
+    @property
+    def subscription_name(self) -> str:
+        return self.config.name.subscription_name
+
+    def publish_message(  # noqa: PLR0913
+        self,
+        link_name: str,
+        message: Message[Any],
+        qos: int = 0,
+        context: Any = None,
+        *,
+        topic: str = "",
+        use_link_topic: bool = False,
+    ) -> MQTTMessageInfo:
+        if self.proactor is None:
+            raise ValueError("publish_message called before proactor instantiated")
+        return self.proactor.publish_message(
+            link_name=link_name,
+            message=message,
+            qos=qos,
+            context=context,
+            topic=topic,
+            use_link_topic=use_link_topic,
+        )
+
+    @property
+    def upstream_client(self) -> str:
+        return self.proactor.upstream_client
+
+    @property
+    def downstream_client(self) -> str:
+        return self.proactor.downstream_client
+
+    @property
+    def logger(self) -> ProactorLogger:
+        return self.config.logger
+
+    @property
+    def stats(self) -> ProactorStats:
+        return self.proactor.stats
+
+    @property
+    def hardware_layout(self) -> HardwareLayout:
+        return self.config.layout
+
+    def get_external_watchdog_builder_class(
+        self,
+    ) -> type[ExternalWatchdogCommandBuilder]:
+        return self.proactor.get_external_watchdog_builder_class()
+
+    def add_callbacks(self, callbacks: ProactorCallbackInterface) -> int:
+        return self.proactor.add_callbacks(callbacks)
+
+    def remove_callbacks(self, callbacks_id: int) -> None:
+        self.proactor.remove_callbacks(callbacks_id)
