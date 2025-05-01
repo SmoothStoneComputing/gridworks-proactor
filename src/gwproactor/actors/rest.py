@@ -15,7 +15,7 @@ from gwproto.data_classes.components.rest_poller_component import RESTPollerComp
 from gwproto.type_helpers import AioHttpClientTimeout, RESTPollerSettings, URLConfig
 from result import Ok, Result
 
-from gwproactor import Actor, Problems, ServicesInterface
+from gwproactor import Actor, AppInterface, Problems
 from gwproactor.proactor_interface import INVALID_IO_TASK_HANDLE, IOLoopInterface
 
 Converter = Callable[[ClientResponse], Awaitable[Optional[Message[Any]]]]
@@ -199,7 +199,7 @@ class RESTPollerActor(Actor):
     def __init__(
         self,
         name: str,
-        services: ServicesInterface,
+        services: AppInterface,
         *,
         convert: Converter = null_converter,
         forward: ThreadSafeForwarder = null_forwarder,

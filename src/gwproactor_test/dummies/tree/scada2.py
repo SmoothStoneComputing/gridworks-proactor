@@ -4,7 +4,7 @@ from collections import defaultdict
 import rich
 from gwproto import HardwareLayout, Message
 
-from gwproactor import App, AppSettings, ServicesInterface
+from gwproactor import App, AppInterface, AppSettings
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import CodecSettings, LinkSettings
@@ -30,7 +30,7 @@ class DummyScada2(PrimeActor):
 
     relays: dict[str, bool]
 
-    def __init__(self, name: str, services: ServicesInterface) -> None:
+    def __init__(self, name: str, services: AppInterface) -> None:
         super().__init__(name, services)
         self.relays = self.relays = defaultdict(bool)
 

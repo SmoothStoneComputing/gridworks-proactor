@@ -5,7 +5,7 @@ import rich
 from gwproto import HardwareLayout, Message
 from gwproto.messages import EventBase
 
-from gwproactor import App, AppSettings, ServicesInterface, actors
+from gwproactor import App, AppInterface, AppSettings, actors
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import CodecSettings, LinkSettings
@@ -33,7 +33,7 @@ from gwproactor_test.dummies.tree.messages import (
 class DummyScada1(PrimeActor):
     relays: RelayStates
 
-    def __init__(self, name: str, services: ServicesInterface) -> None:
+    def __init__(self, name: str, services: AppInterface) -> None:
         super().__init__(name, services)
         self.relays = RelayStates()
 

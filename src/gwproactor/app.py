@@ -29,9 +29,9 @@ from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.proactor_implementation import Proactor
 from gwproactor.proactor_interface import (
     ActorInterface,
+    AppInterface,
     CommunicatorInterface,
     IOLoopInterface,
-    ServicesInterface,
     T,
 )
 from gwproactor.stats import ProactorStats
@@ -51,7 +51,7 @@ class ActorConfig:
     constructor_args: dict[str, Any] = field(default_factory=dict)
 
 
-class App(ServicesInterface):
+class App(AppInterface):
     _settings: AppSettings
     config: ProactorConfig
     links: dict[str, LinkSettings]
