@@ -10,7 +10,7 @@ from gwproto import Message
 from gwproto.type_helpers import WebServerGt
 from result import Result
 
-from gwproactor.proactor_interface import Communicator, Runnable, ServicesInterface
+from gwproactor.proactor_interface import AppInterface, Communicator, Runnable
 
 
 class _RunWebServer:
@@ -51,7 +51,7 @@ class _WebManager(Communicator, Runnable):
     _configs: dict[str, WebServerGt]
     _routes: dict[str, list[RouteDef]]
 
-    def __init__(self, services: ServicesInterface) -> None:
+    def __init__(self, services: AppInterface) -> None:
         super().__init__("_WebManager", services)
         self._configs = {}
         self._routes = defaultdict(list)

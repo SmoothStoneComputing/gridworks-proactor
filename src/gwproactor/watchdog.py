@@ -16,10 +16,10 @@ from gwproactor.message import (
     PatInternalWatchdog,
 )
 from gwproactor.proactor_interface import (
+    AppInterface,
     Communicator,
     MonitoredName,
     Runnable,
-    ServicesInterface,
 )
 
 
@@ -33,7 +33,7 @@ class WatchdogManager(Communicator, Runnable):
     _monitored_names: dict[str, _MonitoredName]
     _pat_external_watchdog_process_args: list[str]
 
-    def __init__(self, seconds_per_pat: float, services: ServicesInterface) -> None:
+    def __init__(self, seconds_per_pat: float, services: AppInterface) -> None:
         super().__init__(KnownNames.watchdog_manager.value, services)
         self.lg = services.logger
         self._seconds_per_pat = seconds_per_pat

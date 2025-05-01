@@ -1,5 +1,6 @@
 """Scada implementation"""
 
+import typing
 from typing import Any, Optional
 
 from gwproto import HardwareLayout, Message
@@ -50,6 +51,10 @@ class DummyAtnApp(App):
     @classmethod
     def prime_actor_type(cls) -> type[DummyAtn]:
         return DummyAtn
+
+    @property
+    def prime_actor(self) -> DummyAtn:
+        return typing.cast(DummyAtn, self._prime_actor)
 
     @classmethod
     def paths_name(cls) -> Optional[str]:

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ValidationError
 from result import Result
 
 from gwproactor.actors.actor import Actor
-from gwproactor.proactor_interface import ServicesInterface
+from gwproactor.proactor_interface import AppInterface
 from gwproactor.problems import Problems
 
 EVENT_PATH: str = "/events"
@@ -30,7 +30,7 @@ class WebEventListener(Actor):
     def __init__(
         self,
         name: str,
-        services: ServicesInterface,
+        services: AppInterface,
         settings: Optional[WebEventListenerSettings] = None,
     ) -> None:
         super().__init__(name, services)

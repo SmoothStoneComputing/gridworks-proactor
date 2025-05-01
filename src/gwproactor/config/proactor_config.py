@@ -10,7 +10,6 @@ from gwproactor.callbacks import ProactorCallbackFunctions
 from gwproactor.config.app_settings import AppSettings
 from gwproactor.logger import ProactorLogger
 from gwproactor.persister import PersisterInterface, StubPersister
-from gwproactor.stats import ProactorStats
 
 
 @dataclass
@@ -37,7 +36,6 @@ class ProactorConfig:
     callback_functions: ProactorCallbackFunctions
     logger: ProactorLogger
     event_persister: PersisterInterface
-    stats: ProactorStats
     layout: HardwareLayout
 
     def __init__(  # noqa: PLR0913

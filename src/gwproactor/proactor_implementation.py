@@ -59,11 +59,11 @@ from gwproactor.message import (
 )
 from gwproactor.persister import PersisterInterface
 from gwproactor.proactor_interface import (
+    AppInterface,
     CommunicatorInterface,
     IOLoopInterface,
     MonitoredName,
     Runnable,
-    ServicesInterface,
 )
 from gwproactor.problems import Problems
 from gwproactor.stats import ProactorStats
@@ -74,7 +74,7 @@ from gwproactor.web_manager import _WebManager
 T = TypeVar("T")
 
 
-class Proactor(ServicesInterface, Runnable):
+class Proactor(AppInterface, Runnable):
     AWAIT_PROCESSING_FUTURE_ATTRIBUTE: str = "_await_processing_future"
 
     _name: ProactorName
