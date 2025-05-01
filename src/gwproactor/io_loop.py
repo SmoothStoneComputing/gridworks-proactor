@@ -11,10 +11,10 @@ from gwproactor.logger import ProactorLogger
 from gwproactor.message import KnownNames, PatInternalWatchdogMessage, ShutdownMessage
 from gwproactor.proactor_interface import (
     INVALID_IO_TASK_HANDLE,
+    AppInterface,
     Communicator,
     IOLoopInterface,
     MonitoredName,
-    ServicesInterface,
 )
 from gwproactor.problems import Problems
 from gwproactor.sync_thread import SyncAsyncInteractionThread
@@ -32,7 +32,7 @@ class IOLoop(Communicator, IOLoopInterface):
     _last_pat_time: float = 0.0
     _lg: ProactorLogger
 
-    def __init__(self, services: ServicesInterface) -> None:
+    def __init__(self, services: AppInterface) -> None:
         super().__init__(KnownNames.io_loop_manager.value, services)
         self._lg = services.logger
         self._lock = threading.RLock()

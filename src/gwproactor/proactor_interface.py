@@ -55,9 +55,9 @@ class Communicator(CommunicatorInterface, ABC):
     """A partial implementation of CommunicatorInterface which supplies the trivial implementations"""
 
     _name: str
-    _services: "ServicesInterface"
+    _services: "AppInterface"
 
-    def __init__(self, name: str, services: "ServicesInterface") -> None:
+    def __init__(self, name: str, services: "AppInterface") -> None:
         self._name = name
         self._services = services
 
@@ -73,7 +73,7 @@ class Communicator(CommunicatorInterface, ABC):
         return []
 
     @property
-    def services(self) -> "ServicesInterface":
+    def services(self) -> "AppInterface":
         return self._services
 
 
@@ -119,7 +119,7 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
     @classmethod
     @abstractmethod
     def instantiate(
-        cls, name: str, services: "ServicesInterface", **contstructor_kwargs: Any
+        cls, name: str, services: "AppInterface", **contstructor_kwargs: Any
     ) -> "ActorInterface":
         raise NotImplementedError
 
@@ -128,7 +128,7 @@ class ActorInterface(CommunicatorInterface, Runnable, ABC):
         cls,
         name: str,
         actor_class_name: str,
-        services: "ServicesInterface",
+        services: "AppInterface",
         actors_module: ModuleType,
         **constructor_kwargs: Any,
     ) -> "ActorInterface":
@@ -190,7 +190,7 @@ class IOLoopInterface(CommunicatorInterface, Runnable, ABC):
         """
 
 
-class ServicesInterface(CommunicatorInterface):
+class AppInterface(ABC):
     """Interface to system services (the proactor)"""
 
     @abstractmethod

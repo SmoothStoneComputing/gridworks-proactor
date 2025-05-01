@@ -34,8 +34,8 @@ def get_option_value(
 
 
 class LiveTest:
-    parent_app: App
-    child_app: App
+    _parent_app: App
+    _child_app: App
     verbose: bool
     child_verbose: bool
     parent_verbose: bool
@@ -59,8 +59,8 @@ class LiveTest:
         parent_on_screen: Optional[bool] = None,
         request: typing.Any = None,
     ) -> None:
-        self.child_app = self._make_app(self.child_app_type(), child_app_settings)
-        self.parent_app = self._make_app(self.parent_app_type(), parent_app_settings)
+        self._child_app = self._make_app(self.child_app_type(), child_app_settings)
+        self._parent_app = self._make_app(self.parent_app_type(), parent_app_settings)
         self.verbose = get_option_value(
             parameter_value=verbose,
             option_name="--live-test-verbose",
@@ -96,9 +96,17 @@ class LiveTest:
     def child_app_type(cls) -> type[App]:
         return DummyChildApp
 
+    @property
+    def child_app(self) -> App:
+        return self._child_app
+
     @classmethod
     def parent_app_type(cls) -> type[App]:
         return DummyParentApp
+
+    @property
+    def parent_app(self) -> App:
+        return self._parent_app
 
     @classmethod
     def _make_app(cls, app_type: type[App], app_settings: Optional[AppSettings]) -> App:
@@ -179,13 +187,13 @@ class LiveTest:
     def remove_child(
         self,
     ) -> Self:
-        self.child_app.proactor = None
+        self.child_app.raw_proactor = None
         return self
 
     def remove_parent(
         self,
     ) -> Self:
-        self.parent_app.proactor = None
+        self.parent_app.raw_proactor = None
         return self
 
     @classmethod
@@ -252,9 +260,9 @@ class LiveTest:
 
     def get_proactors(self) -> list[InstrumentedProactor]:
         proactors = []
-        if self.child_app.proactor is not None:
+        if self.child_app.raw_proactor is not None:
             proactors.append(self.child)
-        if self.parent_app.proactor is not None:
+        if self.parent_app.raw_proactor is not None:
             proactors.append(self.parent)
         return proactors
 
@@ -308,11 +316,11 @@ class LiveTest:
 
     def summary_str(self) -> str:
         s = ""
-        if self.child_app.proactor is not None:
+        if self.child_app.raw_proactor is not None:
             s += "CHILD:\n" f"{self.child.summary_str()}\n"
         else:
             s += "CHILD: None\n"
-        if self.parent_app.proactor is not None:
+        if self.parent_app.raw_proactor is not None:
             s += "PARENT:\n" f"{self.parent.summary_str()}"
         else:
             s += "PARENT: None\n"

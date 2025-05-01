@@ -101,7 +101,7 @@ async def test_tree_message_exchange(request: Any) -> None:
         assert stats2.num_received_by_type["gridworks.dummy.set.relay"] == 0
         relay_name = "scada2.relay1"
         h.child.logger.info("SETTING RELAY")
-        h.child_app.prime_actor.set_relay(relay_name, True)  # type: ignore[union-attr]
+        h.child_app.prime_actor.set_relay(relay_name, True)
 
         # wait for response to be received
         await await_for(
@@ -111,11 +111,11 @@ async def test_tree_message_exchange(request: Any) -> None:
             err_str_f=h.summary_str,
         )
         assert stats2.num_received_by_type["gridworks.dummy.set.relay"] == 1
-        assert h.child_app.prime_actor.relays.Relays == {  # type: ignore[union-attr]
+        assert h.child_app.prime_actor.relays.Relays == {
             relay_name: RelayInfoReported(Closed=True)
         }
-        assert h.child2_app.prime_actor.relays == {relay_name: True}  # type: ignore[union-attr]
-        assert h.child_app.prime_actor.relays.TotalChangeMismatches == 0  # type: ignore[union-attr]
+        assert h.child2_app.prime_actor.relays == {relay_name: True}
+        assert h.child_app.prime_actor.relays.TotalChangeMismatches == 0
 
 
 @pytest.mark.asyncio
@@ -174,7 +174,7 @@ async def test_tree_event_forward(request: Any) -> None:
             err_str_f=h.summary_str,
         )
         relay_name = "scada2.relay1"
-        h.child_app.prime_actor.set_relay(relay_name, True)  # type: ignore[union-attr]
+        h.child_app.prime_actor.set_relay(relay_name, True)
 
         statsAtnTo1 = h.parent.stats.link(h.parent.downstream_client)
 

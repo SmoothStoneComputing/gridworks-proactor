@@ -14,9 +14,9 @@ from gwproactor.callbacks import ProactorCallbackInterface
 from gwproactor.codecs import CodecFactory
 from gwproactor.proactor_interface import (
     ActorInterface,
+    AppInterface,
     Communicator,
     MonitoredName,
-    ServicesInterface,
 )
 from gwproactor.sync_thread import SyncAsyncInteractionThread
 
@@ -24,13 +24,13 @@ from gwproactor.sync_thread import SyncAsyncInteractionThread
 class Actor(ActorInterface, Communicator, ABC):
     _node: ShNode
 
-    def __init__(self, name: str, services: ServicesInterface) -> None:
+    def __init__(self, name: str, services: AppInterface) -> None:
         self._node = services.hardware_layout.node(name)
         super().__init__(name, services)
 
     @classmethod
     def instantiate(
-        cls, name: str, services: "ServicesInterface", **constructor_args: Any
+        cls, name: str, services: "AppInterface", **constructor_args: Any
     ) -> "ActorInterface":
         return cls(
             name,
@@ -59,7 +59,7 @@ class SyncThreadActor(Actor, Generic[SyncThreadT]):
     def __init__(
         self,
         name: str,
-        services: ServicesInterface,
+        services: AppInterface,
         sync_thread: SyncAsyncInteractionThread,
     ) -> None:
         super().__init__(name, services)
@@ -100,7 +100,7 @@ class SyncThreadActor(Actor, Generic[SyncThreadT]):
 
 
 class PrimeActor(ProactorCallbackInterface, Actor):
-    def __init__(self, name: str, services: ServicesInterface) -> None:
+    def __init__(self, name: str, services: AppInterface) -> None:
         super().__init__(name, services)
         services.add_callbacks(self)
         services.add_communicator(self)

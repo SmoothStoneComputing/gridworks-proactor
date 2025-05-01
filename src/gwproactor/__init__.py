@@ -32,11 +32,11 @@ from gwproactor.proactor_implementation import Proactor
 from gwproactor.proactor_interface import (
     INVALID_IO_TASK_HANDLE,
     ActorInterface,
+    AppInterface,
     Communicator,
     CommunicatorInterface,
     MonitoredName,
     Runnable,
-    ServicesInterface,
 )
 from gwproactor.problems import Problems
 from gwproactor.sync_thread import (
@@ -74,7 +74,7 @@ __all__ = [
     "ProactorSettings",
     "Problems",
     "Runnable",
-    "ServicesInterface",
+    "AppInterface",
     "Subscription",
     "SyncAsyncInteractionThread",
     "SyncAsyncQueueWriter",
