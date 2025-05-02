@@ -11,6 +11,7 @@ from typing import Any, Coroutine, Optional, Sequence, Type, TypeVar
 from aiohttp.typedefs import Handler as HTTPHandler
 from gwproto import HardwareLayout, Message, ShNode
 from gwproto.messages import EventT
+from gwproto.named_types.web_server_gt import WebServerGt
 from paho.mqtt.client import MQTTMessageInfo
 from result import Result
 
@@ -279,6 +280,14 @@ class AppInterface(ABC):
 
         Not thread safe.
         """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_web_server_route_strings(self) -> dict[str, list[str]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_web_server_configs(self) -> dict[str, WebServerGt]:
         raise NotImplementedError
 
     @abstractmethod

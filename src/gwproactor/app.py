@@ -11,6 +11,7 @@ import rich
 from aiohttp.typedefs import Handler as HTTPHandler
 from gwproto import HardwareLayout, Message, ShNode
 from gwproto.messages import EventT
+from gwproto.named_types.web_server_gt import WebServerGt
 from paho.mqtt.client import MQTTMessageInfo
 from result import Result
 
@@ -344,6 +345,12 @@ class App(AppInterface):
         **kwargs: Any,
     ) -> None:
         self.proactor.add_web_route(server_name, method, path, handler, **kwargs)
+
+    def get_web_server_route_strings(self) -> dict[str, list[str]]:
+        return self.proactor.get_web_server_route_strings()
+
+    def get_web_server_configs(self) -> dict[str, WebServerGt]:
+        return self.proactor.get_web_server_configs()
 
     def generate_event(self, event: EventT) -> Result[bool, Exception]:
         return self.proactor.generate_event(event)
