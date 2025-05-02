@@ -113,7 +113,7 @@ class CodecFactory:
         return ProactorCodec(
             src_name=link.peer_long_name,
             dst_name=proactor_name.short_name,
-            model_name=link.codec.model_name,
+            model_name=link.codec.message_model_name,
             module_names=link.codec.message_modules,
             use_default_modules=link.codec.use_default_message_modules,
         )

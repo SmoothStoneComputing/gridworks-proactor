@@ -14,7 +14,7 @@ from pydantic_settings import BaseSettings
 
 
 class CodecSettings(BaseSettings):
-    model_name: str = ""
+    message_model_name: str = ""
     message_modules: list[str] = []
     use_default_message_modules: bool = True
 
