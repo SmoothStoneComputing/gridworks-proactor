@@ -43,6 +43,7 @@ from gwproactor.links import (
     AsyncioTimerManager,
     LinkManager,
 )
+from gwproactor.links.mqtt import QOS
 from gwproactor.logger import ProactorLogger
 from gwproactor.message import (
     DBGCommands,
@@ -348,6 +349,11 @@ class Proactor(AppInterface, Runnable):
             topic=topic,
             use_link_topic=use_link_topic,
         )
+
+    def publish_upstream(
+        self, payload: Any, qos: QOS = QOS.AtMostOnce, **message_args: Any
+    ) -> MQTTMessageInfo:
+        return self._links.publish_upstream(payload=payload, qos=qos, **message_args)
 
     @property
     def event_persister(self) -> PersisterInterface:

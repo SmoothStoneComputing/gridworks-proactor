@@ -17,6 +17,7 @@ from result import Result
 from gwproactor.callbacks import ProactorCallbackInterface
 from gwproactor.config.app_settings import AppSettings
 from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
+from gwproactor.links.mqtt import QOS
 from gwproactor.logger import ProactorLogger
 from gwproactor.stats import ProactorStats
 
@@ -304,6 +305,11 @@ class AppInterface(ABC):
         *,
         topic: str = "",
         use_link_topic: bool = False,
+    ) -> MQTTMessageInfo:
+        raise NotImplementedError
+
+    def publish_upstream(
+        self, payload: Any, qos: QOS = QOS.AtMostOnce, **message_args: Any
     ) -> MQTTMessageInfo:
         raise NotImplementedError
 
