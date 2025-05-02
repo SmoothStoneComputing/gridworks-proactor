@@ -11,12 +11,14 @@ from typing import Any, Coroutine, Optional, Sequence, Type, TypeVar
 from aiohttp.typedefs import Handler as HTTPHandler
 from gwproto import HardwareLayout, Message, ShNode
 from gwproto.messages import EventT
+from gwproto.named_types.web_server_gt import WebServerGt
 from paho.mqtt.client import MQTTMessageInfo
 from result import Result
 
 from gwproactor.callbacks import ProactorCallbackInterface
 from gwproactor.config.app_settings import AppSettings
 from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
+from gwproactor.links.mqtt import QOS
 from gwproactor.logger import ProactorLogger
 from gwproactor.stats import ProactorStats
 
@@ -281,6 +283,14 @@ class AppInterface(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_web_server_route_strings(self) -> dict[str, list[str]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_web_server_configs(self) -> dict[str, WebServerGt]:
+        raise NotImplementedError
+
+    @abstractmethod
     def generate_event(self, event: EventT) -> Result[bool, Exception]:
         raise NotImplementedError
 
@@ -304,6 +314,11 @@ class AppInterface(ABC):
         *,
         topic: str = "",
         use_link_topic: bool = False,
+    ) -> MQTTMessageInfo:
+        raise NotImplementedError
+
+    def publish_upstream(
+        self, payload: Any, qos: QOS = QOS.AtMostOnce, **message_args: Any
     ) -> MQTTMessageInfo:
         raise NotImplementedError
 
