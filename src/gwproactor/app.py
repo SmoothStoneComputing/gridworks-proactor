@@ -24,6 +24,7 @@ from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorConfig, ProactorName
 from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
 from gwproactor.links.link_settings import LinkConfig
+from gwproactor.links.mqtt import QOS
 from gwproactor.logger import ProactorLogger
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.proactor_implementation import Proactor
@@ -375,6 +376,11 @@ class App(AppInterface):
             topic=topic,
             use_link_topic=use_link_topic,
         )
+
+    def publish_upstream(
+        self, payload: Any, qos: QOS = QOS.AtMostOnce, **message_args: Any
+    ) -> MQTTMessageInfo:
+        return self.proactor.publish_upstream(payload=payload, qos=qos, **message_args)
 
     @property
     def upstream_client(self) -> str:
