@@ -25,6 +25,7 @@ def test_logger_levels() -> None:
         "message_summary",
         "lifecycle",
         "comm_event",
+        "io_loop",
     }
 
     # Defaults
@@ -32,27 +33,34 @@ def test_logger_levels() -> None:
     assert levels.message_summary == logging.WARNING
     assert levels.lifecycle == logging.INFO
     assert levels.comm_event == logging.INFO
+    assert levels.io_loop == logging.INFO
 
     # Set parameters
     levels = LoggerLevels(
         message_summary=2,
         lifecycle=3,
         comm_event=4,
+        io_loop=5,
     )
     assert levels.message_summary == 2
     assert levels.lifecycle == 3
     assert levels.comm_event == 4
+    assert levels.io_loop == 5
 
     # Level conversion
     with pytest.raises(ValidationError):
         LoggerLevels(message_summary="FOO")
 
     levels = LoggerLevels(
-        message_summary="Critical", lifecycle="DEBUG", comm_event="debug"
+        message_summary="Critical",
+        lifecycle="DEBUG",
+        comm_event="debug",
+        io_loop="WarNing",
     )
     assert levels.message_summary == logging.CRITICAL
     assert levels.lifecycle == logging.DEBUG
     assert levels.comm_event == logging.DEBUG
+    assert levels.io_loop == logging.WARNING
 
     # qualified_names()
     base_name = "foo"
@@ -66,6 +74,7 @@ def test_logger_levels() -> None:
         "foo.message_summary": {"level": 50},
         "foo.lifecycle": {"level": 10},
         "foo.comm_event": {"level": 10},
+        "foo.io_loop": {"level": 30},
     }
 
     # set_logger_names_to_levels() - all fields set
@@ -87,6 +96,7 @@ def test_logging_settings() -> None:
         "message_summary",
         "lifecycle",
         "comm_event",
+        "io_loop",
     }
 
     # Defaults
@@ -96,6 +106,7 @@ def test_logging_settings() -> None:
     assert logging_settings.levels.message_summary == logging.WARNING
     assert logging_settings.levels.lifecycle == logging.INFO
     assert logging_settings.levels.comm_event == logging.INFO
+    assert logging_settings.levels.io_loop == logging.INFO
 
     # constructor settings
     logging_settings = LoggingSettings(
@@ -105,6 +116,7 @@ def test_logging_settings() -> None:
             message_summary=2,
             lifecycle=3,
             comm_event=4,
+            io_loop=5,
         ),
     )
     assert logging_settings.base_log_name == "foo"
@@ -112,6 +124,7 @@ def test_logging_settings() -> None:
     assert logging_settings.levels.message_summary == 2
     assert logging_settings.levels.lifecycle == 3
     assert logging_settings.levels.comm_event == 4
+    assert logging_settings.levels.io_loop == 5
 
     # qualified_names()
     logging_settings = LoggingSettings()
@@ -128,6 +141,7 @@ def test_logging_settings() -> None:
         "gridworks.message_summary": {"level": 30},
         "gridworks.lifecycle": {"level": 20},
         "gridworks.comm_event": {"level": 20},
+        "gridworks.io_loop": {"level": 20},
     }
 
     # set_logger_levels() - no fields set
@@ -148,12 +162,14 @@ def test_logging_settings() -> None:
         "message_summary": "foo.message_summary",
         "lifecycle": "foo.lifecycle",
         "comm_event": "foo.comm_event",
+        "io_loop": "foo.io_loop",
     }
     assert logging_settings.logger_levels() == {
         "foo": {"level": 0},
         "foo.message_summary": {"level": 1},
         "foo.lifecycle": {"level": 20},
         "foo.comm_event": {"level": 20},
+        "foo.io_loop": {"level": 20},
     }
     assert logging_settings.set_logger_levels() == {"foo.message_summary": {"level": 1}}
 

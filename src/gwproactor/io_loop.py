@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import logging
 import threading
 import time
 from typing import Any, Coroutine, Optional, Sequence
@@ -7,7 +8,6 @@ from typing import Any, Coroutine, Optional, Sequence
 from gwproto import Message
 from result import Result
 
-from gwproactor.logger import ProactorLogger
 from gwproactor.message import KnownNames, PatInternalWatchdogMessage, ShutdownMessage
 from gwproactor.proactor_interface import (
     INVALID_IO_TASK_HANDLE,
@@ -30,11 +30,11 @@ class IOLoop(Communicator, IOLoopInterface):
     _next_id = INVALID_IO_TASK_HANDLE + 1
     _pat_timeout: float = SyncAsyncInteractionThread.PAT_TIMEOUT
     _last_pat_time: float = 0.0
-    _lg: ProactorLogger
+    logger: logging.Logger
 
     def __init__(self, services: AppInterface) -> None:
         super().__init__(KnownNames.io_loop_manager.value, services)
-        self._lg = services.logger
+        self.logger = services.logger.io_loop_logger
         self._lock = threading.RLock()
         self._tasks = {}
         self._task2id = {}
@@ -118,23 +118,30 @@ class IOLoop(Communicator, IOLoopInterface):
             self._io_loop.stop()
 
     async def _async_run(self) -> None:  # noqa: C901, PLR0912
+        self.logger.info("++IOLoop._async_run")
+        path_dbg = 0
         try:  # noqa: PLR1702
             while not self._stop_requested:
+                self.logger.debug("++IOLoop._async_run loop")
+                path_dbg = 0
                 with self._lock:
                     tasks = self._started_tasks()
                 if not self._stop_requested and not tasks:
+                    path_dbg |= 0x00000001
                     try:
                         await asyncio.sleep(1)
                     except asyncio.CancelledError:
-                        pass
+                        path_dbg |= 0x00000001
                     except GeneratorExit:
-                        pass
+                        path_dbg |= 0x00000001
                 else:
+                    path_dbg |= 0x00000001
                     done, _ = await asyncio.wait(
                         tasks, timeout=1.0, return_when="FIRST_COMPLETED"
                     )
                     if self._stop_requested:
-                        break  # type: ignore[unreachable]
+                        path_dbg |= 0x00000001  # type: ignore[unreachable]
+                        break
                     with self._lock:
                         for task in done:
                             task_id = self._task2id.pop(task)
@@ -144,22 +151,30 @@ class IOLoop(Communicator, IOLoopInterface):
                             self._tasks.pop(task_id)
                     errors = []
                     for task in done:
+                        path_dbg |= 0x00000001
                         if not task.cancelled():
+                            path_dbg |= 0x00000001
                             try:
                                 exception = task.exception()
                                 if exception is not None:
+                                    path_dbg |= 0x00000001
                                     errors.append(exception)
                             except Exception as retrieve_exception:  # noqa: BLE001
+                                path_dbg |= 0x00000001
                                 errors.append(retrieve_exception)
                     if errors:
+                        path_dbg |= 0x00000001
                         raise Problems(
                             f"IOLoop caught {len(errors)}.",
                             errors=errors,
                         )
                 if self.time_to_pat():
+                    path_dbg |= 0x00000001
                     self.pat_watchdog()
+                self.logger.debug("--IOLoop._async_run loop  path:0X%08X", path_dbg)
         finally:
             self._io_loop.stop()
+            self.logger.info("--IOLoop._async_run  path:0X%08X", path_dbg)
 
     def time_to_pat(self) -> bool:
         return time.time() >= (self._last_pat_time + (self._pat_timeout / 2))

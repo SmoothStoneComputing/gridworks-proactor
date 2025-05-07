@@ -105,6 +105,7 @@ class ProactorLogger(LoggerAdapterT):
     message_summary_logger: logging.Logger
     lifecycle_logger: logging.Logger
     comm_event_logger: logging.Logger
+    io_loop_logger: logging.Logger
     category_loggers: dict[str, CategoryLoggerInfo]
 
     def __init__(  # noqa: PLR0913
@@ -113,6 +114,7 @@ class ProactorLogger(LoggerAdapterT):
         message_summary: str,
         lifecycle: str,
         comm_event: str,
+        io_loop: str,
         *,
         extra: Optional[dict[str, Any]] = None,
         category_logger_names: Optional[Sequence[str]] = None,
@@ -122,6 +124,7 @@ class ProactorLogger(LoggerAdapterT):
         self.message_summary_logger = logging.getLogger(message_summary)
         self.lifecycle_logger = logging.getLogger(lifecycle)
         self.comm_event_logger = logging.getLogger(comm_event)
+        self.io_loop_logger = logging.getLogger(io_loop)
         self.category_loggers = {}
         if category_logger_names is not None:
             for category_logger_name in category_logger_names:
@@ -146,6 +149,10 @@ class ProactorLogger(LoggerAdapterT):
     @property
     def comm_event_enabled(self) -> bool:
         return self.comm_event_logger.isEnabledFor(logging.INFO)
+
+    @property
+    def io_loop_enabled(self) -> bool:
+        return self.io_loop_logger.isEnabledFor(logging.INFO)
 
     def message_summary(  # noqa: PLR0913
         self,
@@ -181,6 +188,9 @@ class ProactorLogger(LoggerAdapterT):
 
     def comm_event(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.comm_event_logger.info(msg, *args, **kwargs)
+
+    def io_loop(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self.io_loop_logger.info(msg, *args, **kwargs)
 
     def message_enter(self, msg: str, *args: Any, **kwargs: Any) -> None:
         if self.path_enabled:

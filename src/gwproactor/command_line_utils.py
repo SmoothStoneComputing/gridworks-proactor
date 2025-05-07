@@ -27,6 +27,9 @@ def get_app(  # noqa: PLR0913
     dry_run: bool = False,
     verbose: bool = False,
     message_summary: bool = False,
+    io_loop_verbose: bool = False,
+    io_loop_on_screen: bool = False,
+    aiohttp_logging: bool = False,
     run_in_thread: bool = False,
     add_screen_handler: bool = True,
 ) -> App:
@@ -55,6 +58,9 @@ def get_app(  # noqa: PLR0913
         args = argparse.Namespace(
             verbose=verbose,
             message_summary=message_summary,
+            io_loop_verbose=io_loop_verbose,
+            io_loop_on_screen=io_loop_on_screen,
+            aiohttp_logging=aiohttp_logging,
         )
         setup_logging(args, app.settings, add_screen_handler=add_screen_handler)
         logger = logging.getLogger(
@@ -85,6 +91,9 @@ async def run_async_main(  # noqa: PLR0913
     dry_run: bool = False,
     verbose: bool = False,
     message_summary: bool = False,
+    io_loop_verbose: bool = False,
+    io_loop_on_screen: bool = False,
+    aiohttp_logging: bool = False,
     add_screen_handler: bool = True,
 ) -> None:
     app_settings = app_type.get_settings(
@@ -108,6 +117,9 @@ async def run_async_main(  # noqa: PLR0913
             dry_run=dry_run,
             verbose=verbose,
             message_summary=message_summary,
+            io_loop_verbose=io_loop_verbose,
+            io_loop_on_screen=io_loop_on_screen,
+            aiohttp_logging=aiohttp_logging,
             run_in_thread=False,
             add_screen_handler=add_screen_handler,
         )
