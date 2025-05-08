@@ -131,16 +131,16 @@ class IOLoop(Communicator, IOLoopInterface):
                     try:
                         await asyncio.sleep(1)
                     except asyncio.CancelledError:
-                        path_dbg |= 0x00000001
+                        path_dbg |= 0x00000002
                     except GeneratorExit:
-                        path_dbg |= 0x00000001
+                        path_dbg |= 0x00000004
                 else:
-                    path_dbg |= 0x00000001
+                    path_dbg |= 0x00000008
                     done, _ = await asyncio.wait(
                         tasks, timeout=1.0, return_when="FIRST_COMPLETED"
                     )
                     if self._stop_requested:
-                        path_dbg |= 0x00000001  # type: ignore[unreachable]
+                        path_dbg |= 0x00000010  # type: ignore[unreachable]
                         break
                     with self._lock:
                         for task in done:
@@ -151,25 +151,25 @@ class IOLoop(Communicator, IOLoopInterface):
                             self._tasks.pop(task_id)
                     errors = []
                     for task in done:
-                        path_dbg |= 0x00000001
+                        path_dbg |= 0x00000020
                         if not task.cancelled():
-                            path_dbg |= 0x00000001
+                            path_dbg |= 0x00000040
                             try:
                                 exception = task.exception()
                                 if exception is not None:
-                                    path_dbg |= 0x00000001
+                                    path_dbg |= 0x00000080
                                     errors.append(exception)
                             except Exception as retrieve_exception:  # noqa: BLE001
-                                path_dbg |= 0x00000001
+                                path_dbg |= 0x00000100
                                 errors.append(retrieve_exception)
                     if errors:
-                        path_dbg |= 0x00000001
+                        path_dbg |= 0x00000200
                         raise Problems(
                             f"IOLoop caught {len(errors)}.",
                             errors=errors,
                         )
                 if self.time_to_pat():
-                    path_dbg |= 0x00000001
+                    path_dbg |= 0x00000400
                     self.pat_watchdog()
                 self.logger.debug("--IOLoop._async_run loop  path:0X%08X", path_dbg)
         finally:
