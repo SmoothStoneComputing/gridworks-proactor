@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gridworks-proactor"
-version = "3.0.1"
+version = "3.0.2"
 description = "Gridworks Proactor"
 authors = ["Jessica Millar <jmillar@gridworks-consulting.com>"]
 license = "MIT"
@@ -27,7 +27,7 @@ python = "^3.11"
 pydantic = "^2.10.0"
 python-dotenv = "^1.0.0"
 xdg = "^6.0.0"
-paho-mqtt = "^1.6.1"
+paho-mqtt = "^2.1.0"
 result = "^0.9.0"
 gridworks-protocol = "^1.2.6"
 # gridworks-protocol = { path = "../gridworks-protocol", develop = true }
@@ -59,7 +59,6 @@ xdoctest = { extras = ["colors"], version = ">=0.15.10" }
 myst-parser = { version = ">=0.16.1" }
 sphinxcontrib-mermaid = "^0.8.1"
 ruff = "^0.6.2"
-types-paho-mqtt = "^1.6.0.20240321"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
@@ -95,7 +94,6 @@ plugins = [
 
 [[tool.mypy.overrides]]
 module = [
-    "paho.mqtt.client",
     "trogon",
 ]
 ignore_missing_imports = true

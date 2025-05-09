@@ -192,7 +192,7 @@ class InstrumentedProactor(Proactor):
     def force_mqtt_disconnect(self, client_name: str) -> None:
         mqtt_client = self.mqtt_client_wrapper(client_name).mqtt_client
         # noinspection PyProtectedMember
-        mqtt_client._loop_rc_handle(MQTT_ERR_CONN_LOST)  # type: ignore[attr-defined]  # noqa: SLF001
+        mqtt_client._loop_rc_handle(MQTT_ERR_CONN_LOST)  # noqa: SLF001
 
     def _process_mqtt_message(
         self, mqtt_receipt_message: Message[MQTTReceiptPayload]

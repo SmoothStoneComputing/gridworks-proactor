@@ -7,7 +7,8 @@ from typing import Any, Generic, Literal, Optional, Sequence, TypeVar
 from gwproto import as_enum
 from gwproto.message import Header, Message, ensure_arg
 from gwproto.messages import EventBase
-from paho.mqtt.client import MQTT_ERR_UNKNOWN, MQTTMessage
+from paho.mqtt.client import ConnectFlags, MQTTMessage
+from paho.mqtt.reasoncodes import ReasonCode as PahoReasonCode
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from gwproactor.config import LoggerLevels
@@ -95,9 +96,25 @@ class MQTTReceiptMessage(MQTTClientMessage[MQTTReceiptPayload]):
         )
 
 
+class SerializedReasonCode(BaseModel):
+    packet_type: int
+    code: int
+    string: str
+
+    @classmethod
+    def from_paho_reason_code(
+        cls, reason_code: PahoReasonCode
+    ) -> "SerializedReasonCode":
+        return SerializedReasonCode(
+            packet_type=reason_code.packetType,
+            code=reason_code.value,
+            string=str(reason_code),
+        )
+
+
 class MQTTSubackPayload(MQTTClientsPayload):
     mid: int
-    granted_qos: Sequence[int]
+    reason_codes: Sequence[SerializedReasonCode]
 
 
 class MQTTSubackMessage(MQTTClientMessage[MQTTSubackPayload]):
@@ -106,7 +123,7 @@ class MQTTSubackMessage(MQTTClientMessage[MQTTSubackPayload]):
         client_name: str,
         userdata: Optional[Any],
         mid: int,
-        granted_qos: Sequence[int],
+        reason_codes: Sequence[PahoReasonCode],
     ) -> None:
         super().__init__(
             message_type=MessageType.mqtt_suback,
@@ -114,17 +131,20 @@ class MQTTSubackMessage(MQTTClientMessage[MQTTSubackPayload]):
                 client_name=client_name,
                 userdata=userdata,
                 mid=mid,
-                granted_qos=granted_qos,
+                reason_codes=[
+                    SerializedReasonCode.from_paho_reason_code(reason_code)
+                    for reason_code in reason_codes
+                ],
             ),
         )
 
 
 class MQTTCommEventPayload(MQTTClientsPayload):
-    rc: int
+    rc: Optional[SerializedReasonCode]
 
 
 class MQTTConnectPayload(MQTTCommEventPayload):
-    flags: dict[str, Any]
+    flags: ConnectFlags
 
 
 class MQTTConnectMessage(MQTTClientMessage[MQTTConnectPayload]):
@@ -132,8 +152,8 @@ class MQTTConnectMessage(MQTTClientMessage[MQTTConnectPayload]):
         self,
         client_name: str,
         userdata: Optional[Any],
-        flags: dict[str, Any],
-        rc: int,
+        flags: ConnectFlags,
+        rc: PahoReasonCode,
     ) -> None:
         super().__init__(
             message_type=MessageType.mqtt_connected,
@@ -141,7 +161,7 @@ class MQTTConnectMessage(MQTTClientMessage[MQTTConnectPayload]):
                 client_name=client_name,
                 userdata=userdata,
                 flags=flags,
-                rc=rc,
+                rc=SerializedReasonCode.from_paho_reason_code(rc),
             ),
         )
 
@@ -166,13 +186,15 @@ class MQTTDisconnectPayload(MQTTCommEventPayload):
 
 
 class MQTTDisconnectMessage(MQTTClientMessage[MQTTDisconnectPayload]):
-    def __init__(self, client_name: str, userdata: Optional[Any], rc: int) -> None:
+    def __init__(
+        self, client_name: str, userdata: Optional[Any], rc: PahoReasonCode
+    ) -> None:
         super().__init__(
             message_type=MessageType.mqtt_disconnected,
             payload=MQTTDisconnectPayload(
                 client_name=client_name,
                 userdata=userdata,
-                rc=rc,
+                rc=SerializedReasonCode.from_paho_reason_code(rc),
             ),
         )
 
@@ -184,12 +206,16 @@ class MQTTProblemsPayload(MQTTCommEventPayload):
 
 class MQTTProblemsMessage(MQTTClientMessage[MQTTCommEventPayload]):
     def __init__(
-        self, client_name: str, problems: Problems, rc: int = MQTT_ERR_UNKNOWN
+        self, client_name: str, problems: Problems, rc: Optional[PahoReasonCode] = None
     ) -> None:
         super().__init__(
             message_type=MessageType.mqtt_problems,
             payload=MQTTProblemsPayload(
-                client_name=client_name, rc=rc, problems=problems
+                client_name=client_name,
+                rc=SerializedReasonCode.from_paho_reason_code(rc)
+                if rc is not None
+                else rc,
+                problems=problems,
             ),
         )
 
