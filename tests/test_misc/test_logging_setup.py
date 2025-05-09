@@ -56,6 +56,7 @@ def test_get_default_logging_config(
         "message_summary",
         "lifecycle",
         "comm_event",
+        "io_loop",
     }
     for field_name in settings.logging.levels.__pydantic_fields__:
         logger_level = logging.getLogger(logger_names[field_name]).level
@@ -78,15 +79,20 @@ def test_get_default_logging_config(
         logger.debug(msg, i, logger.name)
         assert len(caplog.records) == 0
         logger.info(msg, i, logger.name)
-        assert len(caplog.records) == 1
-        exp_time = get_exp_formatted_time(
-            caplog.records[-1],
-            formatter,
-            settings.logging.formatter.use_utc,
-        )
-        exp_msg = f"{exp_time} {msg % (i, logger.name)}\n"
-        assert capsys.readouterr().err == exp_msg  # type: ignore[attr-defined]
-        text += exp_msg
+        # io_loop does not propagate logs, so caplog doesn't see them.
+        # (https://github.com/pytest-dev/pytest/issues/3697)
+        if logger_name.endswith("io_loop"):
+            assert len(caplog.records) == 0
+        else:
+            assert len(caplog.records) == 1, logger_name
+            exp_time = get_exp_formatted_time(
+                caplog.records[-1],
+                formatter,
+                settings.logging.formatter.use_utc,
+            )
+            exp_msg = f"{exp_time} {msg % (i, logger.name)}\n"
+            assert capsys.readouterr().err == exp_msg  # type: ignore[attr-defined]
+            text += exp_msg
         caplog.clear()
 
     # Check file contents
@@ -94,6 +100,14 @@ def test_get_default_logging_config(
     with log_path.open() as f:
         log_contents = f.read()
     assert log_contents == text
+
+    # Check file contents
+    io_loop_log_path = (
+        Path(settings.paths.log_dir) / settings.logging.io_loop.file_handler.filename
+    )
+    with io_loop_log_path.open() as f:
+        io_loop_log_contents = f.read()
+    assert f"{settings.logging.base_log_name}.io_loop" in io_loop_log_contents
 
 
 def test_rollover() -> None:
@@ -129,5 +143,12 @@ def test_rollover() -> None:
     logger = logging.getLogger("gridworks.general")
     for _ in range(300):
         logger.info("12345678901234567890")
-    assert _log_dir_size() <= bytes_per_log_file * num_log_files
-    assert len(list(Path(paths.log_dir).glob("**/*"))) == num_log_files
+        assert _log_dir_size() <= bytes_per_log_file * num_log_files
+    exp_log_log_files = num_log_files + 1  # +1 for io_loop.log
+    files_in_log_dir = list(Path(paths.log_dir).glob("**/*"))
+    if len(files_in_log_dir) != exp_log_log_files:
+        s = f"ERROR. Expected {exp_log_log_files} but got {len(files_in_log_dir)}.\n"
+        s += f"Files in {paths.log_dir}:\n"
+        for path in files_in_log_dir:
+            s += f"\t{path.name}\n"
+        raise ValueError(s)

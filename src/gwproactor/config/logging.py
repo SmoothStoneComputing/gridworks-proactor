@@ -7,7 +7,7 @@ from typing import Iterable
 
 from pydantic import BaseModel, field_validator
 
-from .paths import DEFAULT_BASE_NAME
+from gwproactor.config.paths import DEFAULT_BASE_NAME
 
 DEFAULT_LOGGING_FORMAT = "%(asctime)s %(message)s"
 DEFAULT_FRACTIONAL_SECOND_FORMAT = "%s.%03d"
@@ -58,6 +58,7 @@ class LoggerLevels(BaseModel):
     message_summary: int | str = logging.WARNING
     lifecycle: int | str = logging.INFO
     comm_event: int | str = logging.INFO
+    io_loop: int | str = logging.INFO
 
     def qualified_logger_names(self, base_log_name: str) -> dict[str, str]:
         return {
@@ -98,12 +99,21 @@ class LoggerLevels(BaseModel):
         return int_v
 
 
+class IOLoopLoggerSettings(BaseModel):
+    file_handler: RotatingFileHandlerSettings = RotatingFileHandlerSettings(
+        filename="io_loop.log",
+        num_log_files=2,
+    )
+    on_screen: bool = False
+
+
 class LoggingSettings(BaseModel):
     base_log_name: str = DEFAULT_BASE_NAME
     base_log_level: int = logging.WARNING
     levels: LoggerLevels = LoggerLevels()
     formatter: FormatterSettings = FormatterSettings()
     file_handler: RotatingFileHandlerSettings = RotatingFileHandlerSettings()
+    io_loop: IOLoopLoggerSettings = IOLoopLoggerSettings()
 
     def qualified_logger_names(self) -> typing.Mapping[str, str]:
         return dict(

@@ -292,7 +292,7 @@ class LinkManager:
             self._stats.link(event.PeerName).comm_event_counts[event.TypeName] += 1
         if isinstance(event, ProblemEvent) and self._logger.path_enabled:
             path_dbg |= 0x00000004
-            self._logger.info(event)
+            self._logger.info(f"ProblemEvent <{event.Summary}>\n{event.Details}")  # noqa: G004
         if (
             self._mqtt_clients.upstream_client
             and self._states[self._mqtt_clients.upstream_client].active_for_send()

@@ -4,7 +4,6 @@ import typing
 import typer
 
 from gwproactor.command_line_utils import run_async_main
-from gwproactor.logging_setup import enable_aiohttp_logging
 from gwproactor_test.dummies.tree.scada1 import DummyScada1App
 
 app = typer.Typer(
@@ -28,9 +27,9 @@ def run(
     verbose: bool = False,
     message_summary: bool = False,
     aiohttp_verbose: bool = False,
+    io_loop_verbose: bool = False,
+    io_loop_on_screen: bool = False,
 ) -> None:
-    if aiohttp_verbose:
-        enable_aiohttp_logging()
     asyncio.run(
         run_async_main(
             app_type=DummyScada1CLIApp,
@@ -38,6 +37,9 @@ def run(
             dry_run=dry_run,
             verbose=verbose,
             message_summary=message_summary,
+            io_loop_verbose=io_loop_verbose,
+            io_loop_on_screen=io_loop_on_screen,
+            aiohttp_logging=aiohttp_verbose,
         )
     )
 

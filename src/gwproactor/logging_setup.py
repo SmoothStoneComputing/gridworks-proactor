@@ -84,9 +84,12 @@ def setup_logging(  # noqa: C901, PLR0912, PLR0915
                 settings.logging.levels.message_summary = logging.DEBUG
             elif getattr(args, "message_summary", None):
                 settings.logging.levels.message_summary = logging.INFO
+            if getattr(args, "io_loop_verbose", None):
+                settings.logging.levels.io_loop = logging.DEBUG
+            if getattr(args, "io_loop_on_screen", None):
+                settings.logging.io_loop.on_screen = True
         except Exception as e:  # noqa: BLE001
             errors.append(e)
-
         # Create formatter from settings
         try:
             formatter = settings.logging.formatter.create()
@@ -149,8 +152,26 @@ def setup_logging(  # noqa: C901, PLR0912, PLR0915
                 base_logger.addHandler(file_handler)
             except Exception as e:  # noqa: BLE001
                 errors.append(e)
+            try:
+                io_loop_logger = logging.getLogger(
+                    f"{settings.logging.base_log_name}.io_loop"
+                )
+                io_loop_logger.propagate = False
+                io_loop_file_handler = settings.logging.io_loop.file_handler.create(
+                    settings.paths.log_dir, formatter
+                )
+                if formatter is not None:
+                    io_loop_file_handler.setFormatter(formatter)
+                io_loop_logger.addHandler(io_loop_file_handler)
+                if settings.logging.io_loop.on_screen:
+                    io_loop_screen_handler = logging.StreamHandler()
+                    if formatter is not None:
+                        io_loop_screen_handler.setFormatter(formatter)
+                    io_loop_logger.addHandler(io_loop_screen_handler)
+            except Exception as e:  # noqa: BLE001
+                errors.append(e)
 
-        # Enable IOLoop logging if requested
+        # Enable aiohttp logging if requested
         if getattr(args, "aiohttp_logging", None):
             enable_aiohttp_logging()
 
