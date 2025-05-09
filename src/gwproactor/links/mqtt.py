@@ -1,7 +1,5 @@
 """MQTT infrastructure providing support for multiple MTQTT clients
 
-TODO: Replace synchronous use of Paho MQTT Client with asyncio usage, per Paho documentation or external library
-
 Main current limitation: each interaction between asyncio code and the mqtt clients must either have thread locking
 (as is provided inside paho for certain functions such as publish()) or an explicit message based API.
 
@@ -17,8 +15,17 @@ import typing
 import uuid
 from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple, Union, cast
 
-from paho.mqtt.client import MQTT_ERR_SUCCESS, MQTTMessage, MQTTMessageInfo
+from paho.mqtt.client import (
+    MQTT_ERR_SUCCESS,
+    ConnectFlags,
+    DisconnectFlags,
+    MQTTMessage,
+    MQTTMessageInfo,
+)
 from paho.mqtt.client import Client as PahoMQTTClient
+from paho.mqtt.enums import CallbackAPIVersion, MQTTErrorCode
+from paho.mqtt.properties import Properties as MQTTProperties
+from paho.mqtt.reasoncodes import ReasonCode
 
 from gwproactor import config
 from gwproactor.links.link_settings import LinkConfig
@@ -68,7 +75,10 @@ class MQTTClientWrapper:
         self.topic_dst = topic_dst
         self._client_config = client_config
         self._receive_queue = receive_queue
-        self._client = PahoMQTTClient("-".join(str(uuid.uuid4()).split("-")[:-1]))
+        self._client = PahoMQTTClient(
+            callback_api_version=CallbackAPIVersion.VERSION2,
+            client_id="-".join(str(uuid.uuid4()).split("-")[:-1]),
+        )
         if self._client_config.username is not None:
             self._client.username_pw_set(
                 username=self._client_config.username,
@@ -152,9 +162,11 @@ class MQTTClientWrapper:
     def subscribe(self, topic: str, qos: int) -> tuple[int, Optional[int]]:
         self._subscriptions[topic] = qos
         self._pending_subscriptions.add(topic)
-        subscribe_result = self._client.subscribe(topic, qos)
+        subscribe_result: tuple[MQTTErrorCode, int | None] = self._client.subscribe(
+            topic, qos
+        )
         if subscribe_result[0] == MQTT_ERR_SUCCESS:
-            self._pending_subacks[subscribe_result[1]] = [topic]
+            self._pending_subacks[typing.cast(int, subscribe_result[1])] = [topic]
         return typing.cast(tuple[int, Optional[int]], subscribe_result)
 
     def subscribe_all(self) -> tuple[int, Optional[int]]:
@@ -221,24 +233,32 @@ class MQTTClientWrapper:
         _: PahoMQTTClient,
         userdata: Any,
         mid: int,
-        granted_qos: typing.Sequence[int],
+        reason_codes: typing.Sequence[ReasonCode],
+        _properties: MQTTProperties,
     ) -> None:
         self._receive_queue.put(
             MQTTSubackMessage(
                 client_name=self._client_name,
                 userdata=userdata,
                 mid=mid,
-                granted_qos=granted_qos,
+                reason_codes=reason_codes,
             )
         )
 
-    def on_connect(self, _: Any, userdata: Any, flags: dict[str, Any], rc: int) -> None:
+    def on_connect(
+        self,
+        _: Any,
+        userdata: Any,
+        flags: ConnectFlags,
+        reason_code: ReasonCode,
+        _properties: Optional[MQTTProperties] = None,
+    ) -> None:
         self._receive_queue.put(
             MQTTConnectMessage(
                 client_name=self._client_name,
                 userdata=userdata,
                 flags=flags,
-                rc=rc,
+                rc=reason_code,
             )
         )
 
@@ -250,7 +270,14 @@ class MQTTClientWrapper:
             )
         )
 
-    def on_disconnect(self, _: Any, userdata: Any, rc: int) -> None:
+    def on_disconnect(
+        self,
+        _: PahoMQTTClient,
+        userdata: Any,
+        _flags: DisconnectFlags,
+        rc: ReasonCode,
+        _properties: Optional[MQTTProperties],
+    ) -> None:
         self._pending_subscriptions = set(self._subscriptions.keys())
         self._receive_queue.put(
             MQTTDisconnectMessage(

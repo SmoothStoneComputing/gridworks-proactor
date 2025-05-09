@@ -10,6 +10,7 @@ from gwproto import Message, MQTTTopic
 from gwproto.messages import Ack
 from paho.mqtt.client import Client as PahoMQTTClient
 from paho.mqtt.client import MQTTMessage
+from paho.mqtt.enums import CallbackAPIVersion
 
 from gwproactor_test.dummies.names import DUMMY_ADMIN_NAME
 from gwproactor_test.dummies.tree.admin_messages import (
@@ -63,9 +64,12 @@ class MQTTAdmin:
         self.json = json
         self.command_message_id = ""
         self.state = AppState.not_started
-        self.client = PahoMQTTClient("-".join(str(uuid.uuid4()).split("-")[:-1]))
+        self.client = PahoMQTTClient(
+            callback_api_version=CallbackAPIVersion.VERSION1,
+            client_id="-".join(str(uuid.uuid4()).split("-")[:-1]),
+        )
         self.client.username_pw_set(
-            username=self.mqtt_config.username,  # type: ignore[arg-type]
+            username=self.mqtt_config.username,
             password=self.mqtt_config.password.get_secret_value(),
         )
         tls_config = self.mqtt_config.tls

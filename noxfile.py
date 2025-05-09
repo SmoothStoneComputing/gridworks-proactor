@@ -142,9 +142,7 @@ def mypy(session: Session) -> None:
         "docs/conf.py",
     ]
     session.install(".")
-    session.install(
-        "mypy", "pytest", "types-paho-mqtt", "typer", "gridworks-cert", "freezegun"
-    )
+    session.install("mypy", "pytest", "typer", "gridworks-cert", "freezegun")
     session.run("mypy", "--version")
     session.run("mypy", *args)
     if not session.posargs:

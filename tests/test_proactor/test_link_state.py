@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from typing import Any, Optional, Sequence
 
 import pytest
-from paho.mqtt.client import MQTTMessage
+from paho.mqtt.client import ConnectFlags, MQTTMessage
+from paho.mqtt.packettypes import PacketTypes
+from paho.mqtt.reasoncodes import ReasonCode
 from result import Result
 
 from gwproactor.links import (
@@ -52,13 +54,18 @@ class _Case:
             match self.input:
                 case TransitionName.mqtt_connected:
                     content = MQTTConnectMessage(
-                        client_name=name, userdata=None, flags={}, rc=0
+                        client_name=name,
+                        userdata=None,
+                        flags=ConnectFlags(session_present=False),
+                        rc=ReasonCode(PacketTypes.CONNACK, "Success"),
                     )
                 case TransitionName.mqtt_connect_failed:
                     content = MQTTConnectFailMessage(client_name=name, userdata=None)
                 case TransitionName.mqtt_disconnected:
                     content = MQTTDisconnectMessage(
-                        client_name=name, userdata=None, rc=0
+                        client_name=name,
+                        userdata=None,
+                        rc=ReasonCode(PacketTypes.DISCONNECT, "Success"),
                     )
                 case TransitionName.mqtt_suback:
                     if content is None:
