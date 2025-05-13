@@ -287,7 +287,11 @@ class LinkManager:
         if not event.Src:
             path_dbg |= 0x00000001
             event.Src = self.publication_name
-        if isinstance(event, CommEvent) and event.Src == self.publication_name:
+        if (
+            isinstance(event, CommEvent)
+            and event.Src == self.publication_name
+            and self._stats.has_link(event.PeerName)
+        ):
             path_dbg |= 0x00000002
             self._stats.link(event.PeerName).comm_event_counts[event.TypeName] += 1
         if isinstance(event, ProblemEvent) and self._logger.path_enabled:

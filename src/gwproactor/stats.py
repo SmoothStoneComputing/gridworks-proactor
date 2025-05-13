@@ -111,6 +111,9 @@ class ProactorStats:
             )
         self.links[link_name] = self.make_link(link_name)
 
+    def has_link(self, name: str) -> bool:
+        return name in self.links
+
     def link(self, name: str) -> LinkStats:
         return self.links[name]
 
