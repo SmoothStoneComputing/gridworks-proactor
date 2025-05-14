@@ -128,6 +128,8 @@ class TreeLiveTest(LiveTest):
     def start_child2(
         self,
     ) -> Self:
+        if self.child2_app.raw_proactor is None:
+            self.add_child2()
         return self.start_proactor(self.child2)
 
     def remove_child2(

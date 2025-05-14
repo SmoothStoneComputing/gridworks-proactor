@@ -145,7 +145,7 @@ class LiveTest:
 
     @property
     def child(self) -> InstrumentedProactor:
-        if self.child_app.proactor is None:
+        if self.child_app.raw_proactor is None:
             raise RuntimeError(
                 "ERROR. CommTestHelper.child accessed before creating child."
                 "pass add_child=True to CommTestHelper constructor or call "
@@ -156,11 +156,15 @@ class LiveTest:
     def start_child(
         self,
     ) -> Self:
+        if self.child_app.raw_proactor is None:
+            self.add_child()
         return self.start_proactor(self.child)
 
     def start_parent(
         self,
     ) -> Self:
+        if self.parent_app.raw_proactor is None:
+            self.add_parent()
         return self.start_proactor(self.parent)
 
     def start_proactor(self, proactor: Proactor) -> Self:
