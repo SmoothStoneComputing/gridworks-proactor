@@ -1,5 +1,4 @@
 import asyncio
-import typing
 
 import typer
 
@@ -14,12 +13,6 @@ app = typer.Typer(
 )
 
 
-class DummyScada1CLIApp(DummyScada1App):
-    def __init__(self, **kwargs: typing.Any) -> None:
-        kwargs["src_layout_path"] = None
-        super().__init__(**kwargs)
-
-
 @app.command()
 def run(
     env_file: str = ".env",
@@ -32,7 +25,7 @@ def run(
 ) -> None:
     asyncio.run(
         run_async_main(
-            app_type=DummyScada1CLIApp,
+            app_type=DummyScada1App,
             env_file=env_file,
             dry_run=dry_run,
             verbose=verbose,

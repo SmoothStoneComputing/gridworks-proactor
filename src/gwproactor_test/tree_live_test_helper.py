@@ -43,7 +43,7 @@ class TreeLiveTest(LiveTest):
             kwargs["child_verbose"] = get_option_value(
                 parameter_value=child1_verbose,
                 option_name="--child1-verbose",
-                request=kwargs["request"],
+                request=kwargs.get("request"),
             )
         kwargs["request"] = kwargs.get("request")
         super().__init__(**kwargs)
@@ -51,12 +51,12 @@ class TreeLiveTest(LiveTest):
         self.child2_verbose = get_option_value(
             parameter_value=child2_verbose,
             option_name="--child2-verbose",
-            request=kwargs["request"],
+            request=kwargs.get("request"),
         )
         self.child2_on_screen = get_option_value(
             parameter_value=child2_on_screen,
             option_name="--child2-on-screen",
-            request=kwargs["request"],
+            request=kwargs.get("request"),
         )
         self.setup_child2_logging()
         if add_child2 or start_child2:
