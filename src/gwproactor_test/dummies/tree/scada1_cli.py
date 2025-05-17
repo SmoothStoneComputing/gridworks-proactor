@@ -1,6 +1,5 @@
 import typer
 
-from gwproactor.command_line_utils import app_main
 from gwproactor_test.dummies.tree.scada1 import DummyScada1App
 
 app = typer.Typer(
@@ -21,8 +20,7 @@ def run(
     io_loop_verbose: bool = False,
     io_loop_on_screen: bool = False,
 ) -> None:
-    app_main(
-        app_type=DummyScada1App,
+    DummyScada1App.main(
         env_file=env_file,
         dry_run=dry_run,
         verbose=verbose,

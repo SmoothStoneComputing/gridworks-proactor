@@ -1,6 +1,5 @@
 import typer
 
-from gwproactor.command_line_utils import app_main
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
 
 app = typer.Typer(
@@ -18,8 +17,7 @@ def run(
     verbose: bool = False,
     message_summary: bool = False,
 ) -> None:
-    app_main(
-        app_type=DummyAtnApp,
+    DummyAtnApp.main(
         env_file=env_file,
         dry_run=dry_run,
         verbose=verbose,
