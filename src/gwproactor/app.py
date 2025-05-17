@@ -1,6 +1,8 @@
 import abc
 import asyncio
+import logging
 import threading
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -8,6 +10,7 @@ from typing import Any, Optional, Self, Sequence, Type
 
 import dotenv
 import rich
+import typer
 from aiohttp.typedefs import Handler as HTTPHandler
 from gwproto import HardwareLayout, Message, ShNode
 from gwproto.messages import EventT
@@ -27,6 +30,7 @@ from gwproactor.external_watchdog import ExternalWatchdogCommandBuilder
 from gwproactor.links.link_settings import LinkConfig
 from gwproactor.links.mqtt import QOS
 from gwproactor.logger import ProactorLogger
+from gwproactor.logging_setup import setup_logging
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.proactor_implementation import Proactor
 from gwproactor.proactor_interface import (
@@ -215,6 +219,8 @@ class App(AppInterface):
                         downstream=link_settings.downstream,
                     ),
                 )
+        if self.settings.logging.paho_logging:
+            proactor.links.enable_mqtt_loggers()
 
     # noinspection PyMethodMayBeStatic
     def _load_hardware_layout(self, layout_path: str | Path) -> HardwareLayout:
@@ -267,6 +273,153 @@ class App(AppInterface):
             if settings is None
             else settings.model_copy(deep=True)
         ).with_paths(name=paths_name if paths_name else cls.paths_name(), paths=paths)
+
+    @classmethod
+    def update_settings_from_command_line(  # noqa: PLR0913
+        cls,
+        app_settings: AppSettings,
+        *,
+        verbose: bool = False,
+        message_summary: bool = False,
+        io_loop_verbose: bool = False,
+        io_loop_on_screen: bool = False,
+        aiohttp_logging: bool = False,
+        paho_logging: bool = False,
+        **kwargs: Any,  # noqa: ARG003
+    ) -> AppSettings:
+        if verbose:
+            app_settings.logging.base_log_level = logging.INFO
+            app_settings.logging.levels.message_summary = logging.DEBUG
+        elif message_summary:
+            app_settings.logging.levels.message_summary = logging.INFO
+        if io_loop_verbose:
+            app_settings.logging.levels.io_loop = logging.DEBUG
+        if io_loop_on_screen:
+            app_settings.logging.io_loop.on_screen = True
+        if aiohttp_logging:
+            app_settings.logging.aiohttp_logging = True
+        if paho_logging:
+            app_settings.logging.paho_logging = True
+        return app_settings
+
+    @classmethod
+    def make_app_for_cli(  # noqa: PLR0913
+        cls,
+        *,
+        app_settings: AppSettings,
+        codec_factory: Optional[CodecFactory] = None,
+        sub_types: Optional[SubTypes] = None,
+        env_file: Optional[str | Path] = ".env",
+        dry_run: bool = False,
+        add_screen_handler: bool = True,
+    ) -> "App":
+        dotenv_file = dotenv.find_dotenv(str(env_file), usecwd=True)
+        app = cls(
+            app_settings=app_settings,
+            codec_factory=codec_factory,
+            sub_types=sub_types,
+            env_file=env_file,
+        )
+        dotenv_file_debug_str = (
+            f"Env file: <{dotenv_file}>  exists:{Path(dotenv_file).exists()}"
+        )
+        if dry_run:
+            rich.print(dotenv_file_debug_str)
+            rich.print(app.settings)
+            missing_tls_paths_ = app.settings.check_tls_paths_present(raise_error=False)
+            if missing_tls_paths_:
+                rich.print(missing_tls_paths_)
+            rich.print("Dry run. Doing nothing.")
+        else:
+            app.settings.paths.mkdirs()
+            setup_logging(app.settings, add_screen_handler=add_screen_handler)
+            logger = logging.getLogger(
+                app.settings.logging.qualified_logger_names()["lifecycle"]
+            )
+            logger.info("")
+            logger.info(dotenv_file_debug_str)
+            logger.info("Settings:")
+            logger.info(app.settings.model_dump_json(indent=2))
+            rich.print(app.settings)
+            app.settings.check_tls_paths_present()
+            app.instantiate()
+        return app
+
+    @classmethod
+    def main(  # noqa: PLR0913
+        cls,
+        *,
+        paths_name: Optional[str] = None,
+        paths: Optional[Paths] = None,
+        app_settings: Optional[AppSettings] = None,
+        codec_factory: Optional[CodecFactory] = None,
+        sub_types: Optional[SubTypes] = None,
+        env_file: Optional[str | Path] = ".env",
+        dry_run: bool = False,
+        verbose: bool = False,
+        message_summary: bool = False,
+        io_loop_verbose: bool = False,
+        io_loop_on_screen: bool = False,
+        aiohttp_logging: bool = False,
+        paho_logging: bool = False,
+        add_screen_handler: bool = True,
+        run_in_thread: bool = False,
+        return_int: bool = False,
+    ) -> int:
+        dotenv_file = dotenv.find_dotenv(str(env_file), usecwd=True)
+        if app_settings is None:
+            app_settings = cls.get_settings(
+                paths_name=paths_name,
+                paths=paths,
+                env_file=dotenv_file,
+            )
+        app_settings = cls.update_settings_from_command_line(
+            app_settings=app_settings,
+            verbose=verbose,
+            message_summary=message_summary,
+            io_loop_verbose=io_loop_verbose,
+            io_loop_on_screen=io_loop_on_screen,
+            aiohttp_logging=aiohttp_logging,
+            paho_logging=paho_logging,
+        )
+        exception_logger: logging.Logger | logging.LoggerAdapter[logging.Logger] = (
+            logging.getLogger(app_settings.logging.base_log_name)
+        )
+        ret = 0
+        try:
+            app = cls.make_app_for_cli(
+                app_settings=app_settings,
+                codec_factory=codec_factory,
+                sub_types=sub_types,
+                env_file=dotenv_file,
+                dry_run=dry_run,
+                add_screen_handler=add_screen_handler,
+            )
+            if not dry_run:
+                if run_in_thread:
+                    app.run_in_thread()
+                else:
+                    try:
+                        asyncio.run(app.proactor.run_forever())
+                    finally:
+                        app.proactor.stop()
+        except SystemExit:
+            ret = 1
+        except KeyboardInterrupt:
+            ret = 2
+        except BaseException as e:  # noqa: BLE001
+            ret = 3
+            try:
+                exception_logger.exception(
+                    "ERROR in app_main. Shutting down: [%s] / [%s]",
+                    e,  # noqa: TRY401
+                    type(e),  # noqa: TRY401
+                )
+            except:  # noqa: E722
+                traceback.print_exception(e)
+        if not return_int:
+            raise typer.Exit(code=ret)
+        return ret
 
     @classmethod
     def print_settings(

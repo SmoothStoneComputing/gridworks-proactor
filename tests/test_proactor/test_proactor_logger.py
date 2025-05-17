@@ -5,8 +5,7 @@ from typing import Any, Mapping
 
 import pytest
 
-from gwproactor import AppSettings, ProactorLogger, setup_logging
-from gwproactor.command_line_utils import command_line_update
+from gwproactor import App, AppSettings, ProactorLogger, setup_logging
 from gwproactor.config import Paths
 from gwproactor_test import LoggerGuards
 
@@ -39,7 +38,7 @@ def test_proactor_logger(caplog: Any) -> None:
 
     errors = []
     setup_logging(
-        command_line_update(settings, verbose=True),
+        App.update_settings_from_command_line(settings, verbose=True),
         errors=errors,
         add_screen_handler=False,
     )

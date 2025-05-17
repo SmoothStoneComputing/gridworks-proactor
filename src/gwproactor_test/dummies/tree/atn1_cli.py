@@ -1,8 +1,5 @@
-import asyncio
-
 import typer
 
-from gwproactor.command_line_utils import run_async_main
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
 
 app = typer.Typer(
@@ -20,14 +17,11 @@ def run(
     verbose: bool = False,
     message_summary: bool = False,
 ) -> None:
-    asyncio.run(
-        run_async_main(
-            app_type=DummyAtnApp,
-            env_file=env_file,
-            dry_run=dry_run,
-            verbose=verbose,
-            message_summary=message_summary,
-        )
+    DummyAtnApp.main(
+        env_file=env_file,
+        dry_run=dry_run,
+        verbose=verbose,
+        message_summary=message_summary,
     )
 
 

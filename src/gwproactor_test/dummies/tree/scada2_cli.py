@@ -1,8 +1,5 @@
-import asyncio
-
 import typer
 
-from gwproactor.command_line_utils import run_async_main
 from gwproactor_test.dummies.tree.scada2 import DummyScada2App
 
 app = typer.Typer(
@@ -20,14 +17,11 @@ def run(
     verbose: bool = False,
     message_summary: bool = False,
 ) -> None:
-    asyncio.run(
-        run_async_main(
-            app_type=DummyScada2App,
-            env_file=env_file,
-            dry_run=dry_run,
-            verbose=verbose,
-            message_summary=message_summary,
-        )
+    DummyScada2App.main(
+        env_file=env_file,
+        dry_run=dry_run,
+        verbose=verbose,
+        message_summary=message_summary,
     )
 
 
