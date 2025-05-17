@@ -1,5 +1,3 @@
-import argparse
-import logging
 import textwrap
 import typing
 from typing import Any, Optional, Self
@@ -47,7 +45,6 @@ class TreeLiveTest(LiveTest):
             )
         kwargs["request"] = kwargs.get("request")
         super().__init__(**kwargs)
-        self._child2_app = self._make_app(self.child2_app_type(), child2_app_settings)
         self.child2_verbose = get_option_value(
             parameter_value=child2_verbose,
             option_name="--child2-verbose",
@@ -57,6 +54,9 @@ class TreeLiveTest(LiveTest):
             parameter_value=child2_on_screen,
             option_name="--child2-on-screen",
             request=kwargs.get("request"),
+        )
+        self._child2_app = self._make_app(
+            self.child2_app_type(), child2_app_settings, app_verbose=self.child2_verbose
         )
         self.setup_child2_logging()
         if add_child2 or start_child2:
@@ -148,15 +148,12 @@ class TreeLiveTest(LiveTest):
     def setup_child2_logging(self) -> None:
         self.child2_app.config.settings.paths.mkdirs(parents=True)
         errors: list[Exception] = []
-        if not self.lifecycle_logging and not self.verbose and not self.child2_verbose:
-            self.child2_app.config.settings.logging.levels.lifecycle = logging.WARNING
         self.logger_guards.add_loggers(
             list(
                 self.child2_app.config.settings.logging.qualified_logger_names().values()
             )
         )
         setup_logging(
-            argparse.Namespace(verbose=self.verbose or self.child2_verbose),
             self.child2_app.config.settings,
             errors=errors,
             add_screen_handler=self.child2_on_screen,

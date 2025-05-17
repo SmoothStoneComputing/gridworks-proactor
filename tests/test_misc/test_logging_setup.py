@@ -1,4 +1,3 @@
-import argparse
 import logging
 import logging.handlers
 from pathlib import Path
@@ -7,6 +6,7 @@ from typing import Any, Optional
 import pytest
 
 from gwproactor import AppSettings, setup_logging
+from gwproactor.command_line_utils import command_line_update
 from gwproactor.config import (
     DEFAULT_LOG_FILE_NAME,
     LoggingSettings,
@@ -28,7 +28,7 @@ def test_get_default_logging_config(
     pytest_root_handlers = len(root.handlers)
     errors: list[Exception] = []
 
-    setup_logging(argparse.Namespace(message_summary=True), settings, errors=errors)
+    setup_logging(command_line_update(settings, message_summary=True), errors=errors)
     assert len(errors) == 0
 
     # root logger changes
@@ -133,8 +133,7 @@ def test_rollover() -> None:
     )
     errors: list[Exception] = []
     setup_logging(
-        argparse.Namespace(verbose=True),
-        settings,
+        command_line_update(settings, verbose=True),
         errors=errors,
         add_screen_handler=False,
     )

@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import contextlib
 import logging
@@ -12,6 +11,7 @@ from pydantic_settings import BaseSettings
 
 from gwproactor import AppSettings, Proactor, setup_logging
 from gwproactor.app import App
+from gwproactor.command_line_utils import command_line_update
 from gwproactor.config import MQTTClient, Paths
 from gwproactor_test import copy_keys
 from gwproactor_test.certs import uses_tls
@@ -59,8 +59,6 @@ class LiveTest:
         parent_on_screen: Optional[bool] = None,
         request: typing.Any = None,
     ) -> None:
-        self._child_app = self._make_app(self.child_app_type(), child_app_settings)
-        self._parent_app = self._make_app(self.parent_app_type(), parent_app_settings)
         self.verbose = get_option_value(
             parameter_value=verbose,
             option_name="--live-test-verbose",
@@ -82,6 +80,16 @@ class LiveTest:
             request=request,
         )
         self.lifecycle_logging = lifecycle_logging
+        self._child_app = self._make_app(
+            self.child_app_type(),
+            child_app_settings,
+            app_verbose=self.child_verbose,
+        )
+        self._parent_app = self._make_app(
+            self.parent_app_type(),
+            parent_app_settings,
+            app_verbose=self.parent_verbose,
+        )
         self.setup_logging()
         if add_child or start_child:
             self.add_child()
@@ -108,8 +116,13 @@ class LiveTest:
     def parent_app(self) -> App:
         return self._parent_app
 
-    @classmethod
-    def _make_app(cls, app_type: type[App], app_settings: Optional[AppSettings]) -> App:
+    def _make_app(
+        self,
+        app_type: type[App],
+        app_settings: Optional[AppSettings],
+        *,
+        app_verbose: bool = False,
+    ) -> App:
         # Copy hardware layout file.
         paths = Paths(name=app_type.paths_name())
         paths.mkdirs(parents=True, exist_ok=True)
@@ -117,6 +130,13 @@ class LiveTest:
         # Use an instrumented proactor
         sub_types = app_type.make_subtypes()
         sub_types.proactor_type = InstrumentedProactor
+        app_settings = command_line_update(
+            app_type.get_settings(settings=app_settings, paths=paths),
+            verbose=self.verbose or app_verbose,
+        )
+        if not self.lifecycle_logging and not self.verbose and not app_verbose:
+            app_settings.logging.levels.lifecycle = logging.WARNING
+
         # Create the app
         app = app_type(
             paths=paths,
@@ -246,7 +266,6 @@ class LiveTest:
             + list(parent_settings.logging.qualified_logger_names().values())
         )
         setup_logging(
-            argparse.Namespace(verbose=self.verbose or self.child_verbose),
             child_settings,
             errors=errors,
             add_screen_handler=True,
@@ -254,7 +273,6 @@ class LiveTest:
         )
         assert not errors
         setup_logging(
-            argparse.Namespace(verbose=self.verbose or self.parent_verbose),
             parent_settings,
             errors=errors,
             add_screen_handler=self.parent_on_screen,
