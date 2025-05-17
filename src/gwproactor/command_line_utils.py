@@ -2,7 +2,7 @@ import asyncio
 import logging
 import traceback
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import dotenv
 import rich
@@ -13,33 +13,6 @@ from gwproactor.codecs import CodecFactory
 from gwproactor.config import Paths
 from gwproactor.config.app_settings import AppSettings
 from gwproactor.logging_setup import setup_logging
-
-
-def command_line_update(  # noqa: PLR0913
-    app_settings: AppSettings,
-    *,
-    verbose: bool = False,
-    message_summary: bool = False,
-    io_loop_verbose: bool = False,
-    io_loop_on_screen: bool = False,
-    aiohttp_logging: bool = False,
-    paho_logging: bool = False,
-    **kwargs: Any,  # noqa: ARG001
-) -> AppSettings:
-    if verbose:
-        app_settings.logging.base_log_level = logging.INFO
-        app_settings.logging.levels.message_summary = logging.DEBUG
-    elif message_summary:
-        app_settings.logging.levels.message_summary = logging.INFO
-    if io_loop_verbose:
-        app_settings.logging.levels.io_loop = logging.DEBUG
-    if io_loop_on_screen:
-        app_settings.logging.io_loop.on_screen = True
-    if aiohttp_logging:
-        app_settings.logging.aiohttp_logging = True
-    if paho_logging:
-        app_settings.logging.paho_logging = True
-    return app_settings
 
 
 def make_app_for_cli(  # noqa: PLR0913
@@ -112,7 +85,7 @@ def app_main(  # noqa: PLR0913
             paths=paths,
             env_file=dotenv_file,
         )
-    app_settings = command_line_update(
+    app_settings = app_type.update_settings_from_command_line(
         app_settings=app_settings,
         verbose=verbose,
         message_summary=message_summary,

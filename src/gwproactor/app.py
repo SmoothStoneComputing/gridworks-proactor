@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import logging
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -269,6 +270,34 @@ class App(AppInterface):
             if settings is None
             else settings.model_copy(deep=True)
         ).with_paths(name=paths_name if paths_name else cls.paths_name(), paths=paths)
+
+    @classmethod
+    def update_settings_from_command_line(  # noqa: PLR0913
+        cls,
+        app_settings: AppSettings,
+        *,
+        verbose: bool = False,
+        message_summary: bool = False,
+        io_loop_verbose: bool = False,
+        io_loop_on_screen: bool = False,
+        aiohttp_logging: bool = False,
+        paho_logging: bool = False,
+        **kwargs: Any,  # noqa: ARG003
+    ) -> AppSettings:
+        if verbose:
+            app_settings.logging.base_log_level = logging.INFO
+            app_settings.logging.levels.message_summary = logging.DEBUG
+        elif message_summary:
+            app_settings.logging.levels.message_summary = logging.INFO
+        if io_loop_verbose:
+            app_settings.logging.levels.io_loop = logging.DEBUG
+        if io_loop_on_screen:
+            app_settings.logging.io_loop.on_screen = True
+        if aiohttp_logging:
+            app_settings.logging.aiohttp_logging = True
+        if paho_logging:
+            app_settings.logging.paho_logging = True
+        return app_settings
 
     @classmethod
     def print_settings(

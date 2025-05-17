@@ -11,7 +11,6 @@ from pydantic_settings import BaseSettings
 
 from gwproactor import AppSettings, Proactor, setup_logging
 from gwproactor.app import App
-from gwproactor.command_line_utils import command_line_update
 from gwproactor.config import MQTTClient, Paths
 from gwproactor_test import copy_keys
 from gwproactor_test.certs import uses_tls
@@ -130,7 +129,7 @@ class LiveTest:
         # Use an instrumented proactor
         sub_types = app_type.make_subtypes()
         sub_types.proactor_type = InstrumentedProactor
-        app_settings = command_line_update(
+        app_settings = app_type.update_settings_from_command_line(
             app_type.get_settings(settings=app_settings, paths=paths),
             verbose=self.verbose or app_verbose,
         )
