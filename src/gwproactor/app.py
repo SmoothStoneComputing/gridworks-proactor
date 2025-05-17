@@ -215,6 +215,8 @@ class App(AppInterface):
                         downstream=link_settings.downstream,
                     ),
                 )
+        if self.settings.logging.paho_logging:
+            proactor.links.enable_mqtt_loggers()
 
     # noinspection PyMethodMayBeStatic
     def _load_hardware_layout(self, layout_path: str | Path) -> HardwareLayout:
