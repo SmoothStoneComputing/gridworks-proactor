@@ -1,6 +1,9 @@
 import abc
 import asyncio
+import functools
 import logging
+import os
+import signal
 import threading
 import traceback
 from dataclasses import dataclass, field
@@ -31,6 +34,7 @@ from gwproactor.links.link_settings import LinkConfig
 from gwproactor.links.mqtt import QOS
 from gwproactor.logger import ProactorLogger
 from gwproactor.logging_setup import setup_logging
+from gwproactor.message import InternalShutdownMessage
 from gwproactor.persister import PersisterInterface, StubPersister
 from gwproactor.proactor_implementation import Proactor
 from gwproactor.proactor_interface import (
@@ -41,6 +45,27 @@ from gwproactor.proactor_interface import (
     T,
 )
 from gwproactor.stats import ProactorStats
+
+
+class SignalException(Exception):
+    signalnum: int
+
+    def __init__(self, signalnum: int, msg: str = "") -> None:
+        super().__init__(msg)
+        self.signalnum = signalnum
+
+    def __str__(self) -> str:
+        s = self.__class__.__name__
+        super_str = super().__str__()
+        if super_str:
+            s += f" <{super_str}>"
+        enum_str = (
+            str(signal.Signals(self.signalnum).name)
+            if self.signalnum in signal.Signals
+            else "Unknown signal"
+        )
+        s += f"  {enum_str}  ({self.signalnum})"
+        return s
 
 
 @dataclass
@@ -345,6 +370,49 @@ class App(AppInterface):
             app.instantiate()
         return app
 
+    def signal_handler(self, signum: int, _frame: Any, *, tag: str) -> None:
+        try:
+            try:
+                enum_str = signal.Signals(signum).name
+            except:  # noqa: E722
+                enum_str = "Unknown Signal"
+            tag_str = f"  {tag}" if tag else ""
+            self.send_threadsafe(
+                InternalShutdownMessage(
+                    Src="SignalHandler",
+                    Reason=f"Signal received: {enum_str} ({signum}){tag_str}",
+                )
+            )
+        except BaseException as e:
+            raise SignalException(
+                signum, msg=f"Signal received. Exception while sending to Proactor: {e}"
+            ) from e
+
+    def install_signal_handlers(self) -> None:
+        signal.signal(
+            signal.SIGTERM,
+            functools.partial(
+                self.signal_handler,
+                tag="Service stopped" if self.running_as_service() else "",
+            ),
+        )
+        signal.signal(
+            signal.SIGABRT,
+            functools.partial(
+                self.signal_handler,
+                tag="Service failed to path SystemD watchdog"
+                if self.running_as_service()
+                else "",
+            ),
+        )
+        signal.signal(
+            signal.SIGINT,
+            functools.partial(
+                self.signal_handler,
+                tag="KeyboardInterrupt",
+            ),
+        )
+
     @classmethod
     def main(  # noqa: PLR0913
         cls,
@@ -399,6 +467,7 @@ class App(AppInterface):
                 if run_in_thread:
                     app.run_in_thread()
                 else:
+                    app.install_signal_handlers()
                     try:
                         asyncio.run(app.proactor.run_forever())
                     finally:
@@ -436,6 +505,17 @@ class App(AppInterface):
         missing_tls_paths_ = app.settings.check_tls_paths_present(raise_error=False)
         if missing_tls_paths_:
             rich.print(missing_tls_paths_)
+
+    @classmethod
+    def service_variable_name(cls) -> str:
+        return f"{(cls.paths_name() or 'GWPROACTOR').upper()}_RUNNING_AS_SERVICE"
+
+    @classmethod
+    def running_as_service(cls) -> bool:
+        return os.getenv(cls.service_variable_name(), "").lower() in [
+            "1",
+            "true",
+        ]
 
     @property
     def name(self) -> str:
