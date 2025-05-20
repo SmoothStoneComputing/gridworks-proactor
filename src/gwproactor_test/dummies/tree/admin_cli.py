@@ -1,12 +1,13 @@
 from enum import StrEnum
 from pathlib import Path
 
-import dotenv
 import rich
 import typer
 
+from gwproactor.config import Paths
 from gwproactor_test.dummies.tree.admin import MQTTAdmin
 from gwproactor_test.dummies.tree.admin_settings import (
+    AdminLinkSettings,
     DummyAdminSettings,
 )
 
@@ -81,13 +82,18 @@ def run(
 @app.command()
 def config(
     target: str = DummyAdminSettings.DEFAULT_TARGET,
-    env_file: str = ".env",
+    env_file: str = "",
 ) -> None:
-    settings = DummyAdminSettings(_env_file=env_file, target_gnode=target)  # noqa
-    dotenv_file = dotenv.find_dotenv(str(env_file))
+    env_path = Path(
+        env_file
+        if env_file
+        else Paths.default_env_path(name=AdminLinkSettings.DUMMY_ADMIN_PATHS_NAME)
+    ).absolute()
     rich.print(
-        f"Env file: <{dotenv_file}>  exists:{env_file and Path(dotenv_file).exists()}"
+        f"Env file: <{env_path!s}>  exists: {bool(env_file and Path(env_path).exists())}"
     )
+    settings = DummyAdminSettings(_env_file=str(env_path), target_gnode=target)  # noqa
+
     rich.print(settings)
     missing_tls_paths_ = settings.check_tls_paths_present(raise_error=False)
     if missing_tls_paths_:
