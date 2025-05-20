@@ -11,7 +11,6 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Optional, Self, Sequence, Type
 
-import dotenv
 import rich
 import typer
 from aiohttp.typedefs import Handler as HTTPHandler
@@ -282,6 +281,13 @@ class App(AppInterface):
                 )
 
     @classmethod
+    def default_env_path(cls) -> Path:
+        paths_name = cls.paths_name()
+        if paths_name is None:
+            raise ValueError("ERROR. default_env_path() requires a non-None paths_name")
+        return Paths.default_env_path(paths_name)
+
+    @classmethod
     def get_settings(
         cls,
         paths_name: Optional[str] = None,
@@ -334,22 +340,22 @@ class App(AppInterface):
         app_settings: AppSettings,
         codec_factory: Optional[CodecFactory] = None,
         sub_types: Optional[SubTypes] = None,
-        env_file: Optional[str | Path] = ".env",
+        env_file: Optional[str | Path] = None,
         dry_run: bool = False,
         add_screen_handler: bool = True,
     ) -> "App":
-        dotenv_file = dotenv.find_dotenv(str(env_file), usecwd=True)
+        env_file = cls.default_env_path() if not env_file else Path(env_file)
         app = cls(
             app_settings=app_settings,
             codec_factory=codec_factory,
             sub_types=sub_types,
             env_file=env_file,
         )
-        dotenv_file_debug_str = (
-            f"Env file: <{dotenv_file}>  exists:{Path(dotenv_file).exists()}"
+        env_file_debug_str = (
+            f"Env file: <{env_file}>  exists: {Path(env_file).exists()}"
         )
         if dry_run:
-            rich.print(dotenv_file_debug_str)
+            rich.print(env_file_debug_str)
             rich.print(app.settings)
             missing_tls_paths_ = app.settings.check_tls_paths_present(raise_error=False)
             if missing_tls_paths_:
@@ -362,7 +368,7 @@ class App(AppInterface):
                 app.settings.logging.qualified_logger_names()["lifecycle"]
             )
             logger.info("")
-            logger.info(dotenv_file_debug_str)
+            logger.info(env_file_debug_str)
             logger.info("Settings:")
             logger.info(app.settings.model_dump_json(indent=2))
             rich.print(app.settings)
@@ -422,7 +428,7 @@ class App(AppInterface):
         app_settings: Optional[AppSettings] = None,
         codec_factory: Optional[CodecFactory] = None,
         sub_types: Optional[SubTypes] = None,
-        env_file: Optional[str | Path] = ".env",
+        env_file: Optional[str | Path] = "",
         dry_run: bool = False,
         verbose: bool = False,
         message_summary: bool = False,
@@ -434,12 +440,12 @@ class App(AppInterface):
         run_in_thread: bool = False,
         return_int: bool = False,
     ) -> int:
-        dotenv_file = dotenv.find_dotenv(str(env_file), usecwd=True)
+        env_file = cls.default_env_path() if not env_file else Path(env_file)
         if app_settings is None:
             app_settings = cls.get_settings(
                 paths_name=paths_name,
                 paths=paths,
-                env_file=dotenv_file,
+                env_file=env_file,
             )
         app_settings = cls.update_settings_from_command_line(
             app_settings=app_settings,
@@ -459,7 +465,7 @@ class App(AppInterface):
                 app_settings=app_settings,
                 codec_factory=codec_factory,
                 sub_types=sub_types,
-                env_file=dotenv_file,
+                env_file=env_file,
                 dry_run=dry_run,
                 add_screen_handler=add_screen_handler,
             )
@@ -494,11 +500,11 @@ class App(AppInterface):
     def print_settings(
         cls,
         *,
-        env_file: str | Path = ".env",
+        env_file: Optional[str | Path] = None,
     ) -> None:
-        dotenv_file = dotenv.find_dotenv(str(env_file), usecwd=True)
+        env_file = cls.default_env_path() if not env_file else Path(env_file)
         rich.print(
-            f"Env file: <{dotenv_file}>  exists: {bool(dotenv_file and Path(dotenv_file).exists())}"
+            f"Env file: <{env_file}>  exists: {bool(env_file and Path(env_file).exists())}"
         )
         app = cls(env_file=env_file)
         rich.print(app.settings)

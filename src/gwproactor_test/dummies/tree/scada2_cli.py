@@ -12,7 +12,7 @@ app = typer.Typer(
 
 @app.command()
 def run(
-    env_file: str = ".env",
+    env_file: str = "",
     dry_run: bool = False,
     verbose: bool = False,
     message_summary: bool = False,
@@ -27,7 +27,7 @@ def run(
 
 @app.command()
 def config(
-    env_file: str = ".env",
+    env_file: str = "",
 ) -> None:
     DummyScada2App.print_settings(env_file=env_file)
 
