@@ -1,8 +1,5 @@
-import asyncio
-
 import typer
 
-from gwproactor.command_line_utils import run_async_main
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
 
 app = typer.Typer(
@@ -15,25 +12,22 @@ app = typer.Typer(
 
 @app.command()
 def run(
-    env_file: str = ".env",
+    env_file: str = "",
     dry_run: bool = False,
     verbose: bool = False,
     message_summary: bool = False,
 ) -> None:
-    asyncio.run(
-        run_async_main(
-            app_type=DummyAtnApp,
-            env_file=env_file,
-            dry_run=dry_run,
-            verbose=verbose,
-            message_summary=message_summary,
-        )
+    DummyAtnApp.main(
+        env_file=env_file,
+        dry_run=dry_run,
+        verbose=verbose,
+        message_summary=message_summary,
     )
 
 
 @app.command()
 def config(
-    env_file: str = ".env",
+    env_file: str = "",
 ) -> None:
     DummyAtnApp.print_settings(env_file=env_file)
 

@@ -1,4 +1,3 @@
-import argparse
 import contextlib
 import logging
 import logging.config
@@ -55,7 +54,6 @@ def format_exceptions(exceptions: list[Exception]) -> str:
 
 
 def setup_logging(  # noqa: C901, PLR0912, PLR0915
-    args: argparse.Namespace,
     settings: AppSettings,
     *,
     errors: Optional[list[Exception]] = None,
@@ -77,19 +75,6 @@ def setup_logging(  # noqa: C901, PLR0912, PLR0915
         errors.clear()
     config_finished = False
     try:
-        # Take any arguments from command line
-        try:
-            if getattr(args, "verbose", None):
-                settings.logging.base_log_level = logging.INFO
-                settings.logging.levels.message_summary = logging.DEBUG
-            elif getattr(args, "message_summary", None):
-                settings.logging.levels.message_summary = logging.INFO
-            if getattr(args, "io_loop_verbose", None):
-                settings.logging.levels.io_loop = logging.DEBUG
-            if getattr(args, "io_loop_on_screen", None):
-                settings.logging.io_loop.on_screen = True
-        except Exception as e:  # noqa: BLE001
-            errors.append(e)
         # Create formatter from settings
         try:
             formatter = settings.logging.formatter.create()
@@ -171,8 +156,7 @@ def setup_logging(  # noqa: C901, PLR0912, PLR0915
             except Exception as e:  # noqa: BLE001
                 errors.append(e)
 
-        # Enable aiohttp logging if requested
-        if getattr(args, "aiohttp_logging", None):
+        if settings.logging.aiohttp_logging:
             enable_aiohttp_logging()
 
         config_finished = True

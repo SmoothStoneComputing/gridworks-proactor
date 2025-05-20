@@ -1,4 +1,3 @@
-import argparse  # noqa: I001
 import logging
 import typing
 import warnings
@@ -6,7 +5,7 @@ from typing import Any, Mapping
 
 import pytest
 
-from gwproactor import ProactorLogger, AppSettings, setup_logging
+from gwproactor import App, AppSettings, ProactorLogger, setup_logging
 from gwproactor.config import Paths
 from gwproactor_test import LoggerGuards
 
@@ -23,7 +22,7 @@ def test_proactor_logger(caplog: Any) -> None:
     settings = AppSettings()
     with LoggerGuards():
         errors: list[Exception] = []
-        setup_logging(argparse.Namespace(), settings, errors=errors)
+        setup_logging(settings, errors=errors)
         assert len(errors) == 0
         logger = _prlogger(settings)
         assert not logger.isEnabledFor(logging.INFO)
@@ -39,8 +38,7 @@ def test_proactor_logger(caplog: Any) -> None:
 
     errors = []
     setup_logging(
-        argparse.Namespace(verbose=True),
-        settings,
+        App.update_settings_from_command_line(settings, verbose=True),
         errors=errors,
         add_screen_handler=False,
     )

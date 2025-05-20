@@ -114,6 +114,8 @@ class LoggingSettings(BaseModel):
     formatter: FormatterSettings = FormatterSettings()
     file_handler: RotatingFileHandlerSettings = RotatingFileHandlerSettings()
     io_loop: IOLoopLoggerSettings = IOLoopLoggerSettings()
+    aiohttp_logging: bool = False
+    paho_logging: bool = False
 
     def qualified_logger_names(self) -> typing.Mapping[str, str]:
         return dict(

@@ -183,3 +183,12 @@ class Paths(BaseModel):
         )
         fields.update(**kwargs)
         return Paths(**fields)
+
+    @classmethod
+    def default_env_path(
+        cls,
+        name: str,
+        paths: Optional["Paths"] = None,
+    ) -> Path:
+        paths = Paths(name=name) if paths is None else paths.duplicate(name=name)
+        return Path(paths.config_dir).absolute() / ".env"

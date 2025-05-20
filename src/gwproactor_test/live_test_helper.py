@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import contextlib
 import logging
@@ -59,8 +58,6 @@ class LiveTest:
         parent_on_screen: Optional[bool] = None,
         request: typing.Any = None,
     ) -> None:
-        self._child_app = self._make_app(self.child_app_type(), child_app_settings)
-        self._parent_app = self._make_app(self.parent_app_type(), parent_app_settings)
         self.verbose = get_option_value(
             parameter_value=verbose,
             option_name="--live-test-verbose",
@@ -82,6 +79,16 @@ class LiveTest:
             request=request,
         )
         self.lifecycle_logging = lifecycle_logging
+        self._child_app = self._make_app(
+            self.child_app_type(),
+            child_app_settings,
+            app_verbose=self.child_verbose,
+        )
+        self._parent_app = self._make_app(
+            self.parent_app_type(),
+            parent_app_settings,
+            app_verbose=self.parent_verbose,
+        )
         self.setup_logging()
         if add_child or start_child:
             self.add_child()
@@ -108,8 +115,13 @@ class LiveTest:
     def parent_app(self) -> App:
         return self._parent_app
 
-    @classmethod
-    def _make_app(cls, app_type: type[App], app_settings: Optional[AppSettings]) -> App:
+    def _make_app(
+        self,
+        app_type: type[App],
+        app_settings: Optional[AppSettings],
+        *,
+        app_verbose: bool = False,
+    ) -> App:
         # Copy hardware layout file.
         paths = Paths(name=app_type.paths_name())
         paths.mkdirs(parents=True, exist_ok=True)
@@ -117,6 +129,13 @@ class LiveTest:
         # Use an instrumented proactor
         sub_types = app_type.make_subtypes()
         sub_types.proactor_type = InstrumentedProactor
+        app_settings = app_type.update_settings_from_command_line(
+            app_type.get_settings(settings=app_settings, paths=paths),
+            verbose=self.verbose or app_verbose,
+        )
+        if not self.lifecycle_logging and not self.verbose and not app_verbose:
+            app_settings.logging.levels.lifecycle = logging.WARNING
+
         # Create the app
         app = app_type(
             paths=paths,
@@ -145,7 +164,7 @@ class LiveTest:
 
     @property
     def child(self) -> InstrumentedProactor:
-        if self.child_app.proactor is None:
+        if self.child_app.raw_proactor is None:
             raise RuntimeError(
                 "ERROR. CommTestHelper.child accessed before creating child."
                 "pass add_child=True to CommTestHelper constructor or call "
@@ -156,11 +175,15 @@ class LiveTest:
     def start_child(
         self,
     ) -> Self:
+        if self.child_app.raw_proactor is None:
+            self.add_child()
         return self.start_proactor(self.child)
 
     def start_parent(
         self,
     ) -> Self:
+        if self.parent_app.raw_proactor is None:
+            self.add_parent()
         return self.start_proactor(self.parent)
 
     def start_proactor(self, proactor: Proactor) -> Self:
@@ -242,7 +265,6 @@ class LiveTest:
             + list(parent_settings.logging.qualified_logger_names().values())
         )
         setup_logging(
-            argparse.Namespace(verbose=self.verbose or self.child_verbose),
             child_settings,
             errors=errors,
             add_screen_handler=True,
@@ -250,7 +272,6 @@ class LiveTest:
         )
         assert not errors
         setup_logging(
-            argparse.Namespace(verbose=self.verbose or self.parent_verbose),
             parent_settings,
             errors=errors,
             add_screen_handler=self.parent_on_screen,

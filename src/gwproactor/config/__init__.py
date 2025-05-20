@@ -23,14 +23,11 @@ from gwproactor.config.paths import (
 )
 from gwproactor.config.proactor_settings import ProactorSettings
 
-DEFAULT_ENV_FILE = ".env"
-
 __all__ = [
     "DEFAULT_BASE_DIR",
     "DEFAULT_BASE_NAME",
     "DEFAULT_BYTES_PER_LOG_FILE",
     # paths
-    "DEFAULT_ENV_FILE",
     "DEFAULT_FRACTIONAL_SECOND_FORMAT",
     "DEFAULT_LAYOUT_FILE",
     # logging

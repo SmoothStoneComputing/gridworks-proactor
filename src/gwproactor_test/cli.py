@@ -1,11 +1,14 @@
-import dotenv
 import typer
 from trogon import Trogon
 from typer.main import get_group
 
+from gwproactor.config import Paths
 from gwproactor_test.certs import generate_dummy_certs
 from gwproactor_test.dummies.tree import admin_cli, atn1_cli, scada1_cli, scada2_cli
-from gwproactor_test.dummies.tree.admin_settings import DummyAdminSettings
+from gwproactor_test.dummies.tree.admin_settings import (
+    AdminLinkSettings,
+    DummyAdminSettings,
+)
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
 from gwproactor_test.dummies.tree.scada1 import DummyScada1App
 from gwproactor_test.dummies.tree.scada2 import DummyScada2App
@@ -24,16 +27,20 @@ app.add_typer(admin_cli.app, name="admin", help="Use dummy admin")
 
 
 @app.command()
-def gen_dummy_certs(
-    dry_run: bool = False, env_file: str = ".env", only: str = ""
-) -> None:
+def gen_dummy_certs(dry_run: bool = False, only: str = "") -> None:
     """Generate certs for dummy proactors."""
-    env_file = dotenv.find_dotenv(env_file, usecwd=True)
     for app_name, settings in [
-        ("atn", DummyAtnApp(env_file=env_file).settings),
-        ("scada1", DummyScada1App(env_file=env_file).settings),
-        ("scada2", DummyScada2App(env_file=env_file).settings),
-        ("admin", DummyAdminSettings(_env_file=env_file)),  # noqa
+        ("atn", DummyAtnApp(env_file=DummyAtnApp.default_env_path()).settings),
+        ("scada1", DummyScada1App(env_file=DummyScada1App.default_env_path()).settings),
+        ("scada2", DummyScada2App(env_file=DummyScada2App.default_env_path()).settings),
+        (
+            "admin",
+            DummyAdminSettings(
+                _env_file=Paths.default_env_path(  # noqa
+                    name=AdminLinkSettings.DUMMY_ADMIN_PATHS_NAME
+                )
+            ),
+        ),  # noqa
     ]:
         if only and only != app_name:
             continue
