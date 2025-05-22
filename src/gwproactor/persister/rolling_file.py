@@ -1,195 +1,34 @@
-import abc
 import contextlib
 import datetime
 import re
 import shutil
 import subprocess
 import time
-from abc import abstractmethod
 from pathlib import Path
 from typing import NamedTuple, Optional
 
 from result import Err, Ok, Result
 
+from gwproactor.persister.exceptions import (
+    ContentTooLarge,
+    FileExistedWarning,
+    FileMissing,
+    FileMissingWarning,
+    PersisterError,
+    ReadFailed,
+    ReindexError,
+    TrimFailed,
+    UIDExistedWarning,
+    UIDMissingWarning,
+    WriteFailed,
+)
+from gwproactor.persister.interface import PersisterInterface
 from gwproactor.problems import Problems
-
-
-class PersisterException(Exception):
-    path: Optional[Path] = None
-    uid: str = ""
-
-    def __init__(
-        self, msg: str = "", uid: str = "", path: Optional[Path] = None
-    ) -> None:
-        self.path = path
-        self.uid = uid
-        super().__init__(msg)
-
-    def __str__(self) -> str:
-        s = self.__class__.__name__
-        super_str = super().__str__()
-        if super_str:
-            s += f" [{super_str}]"
-        s += f"  for uid: {self.uid}  path:{self.path}"
-        return s
-
-
-class PersisterError(PersisterException): ...
-
-
-class PersisterWarning(PersisterException): ...
-
-
-class WriteFailed(PersisterError): ...
-
-
-class ContentTooLarge(PersisterError): ...
-
-
-class FileMissing(PersisterError): ...
-
-
-class ReadFailed(PersisterError): ...
-
-
-class TrimFailed(PersisterError): ...
-
-
-class ReindexError(PersisterError): ...
-
-
-class DecodingError(PersisterError): ...
-
-
-class ByteDecodingError(DecodingError): ...
-
-
-class JSONDecodingError(DecodingError): ...
-
-
-class UIDExistedWarning(PersisterWarning): ...
-
-
-class FileExistedWarning(PersisterWarning): ...
-
-
-class FileMissingWarning(PersisterWarning): ...
-
-
-class UIDMissingWarning(PersisterWarning): ...
-
-
-class FileEmptyWarning(PersisterWarning): ...
-
-
-class PersisterInterface(abc.ABC):
-    @abstractmethod
-    def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:
-        """Persist content, indexed by uid"""
-
-    @abstractmethod
-    def clear(self, uid: str) -> Result[bool, Problems]:
-        """Delete content persisted for uid. It is error to clear a uid which is not currently persisted."""
-
-    @abstractmethod
-    def pending_ids(self) -> list[str]:
-        """Get list of pending (persisted and not cleared) uids"""
-
-    @property
-    @abstractmethod
-    def num_pending(self) -> int:
-        """Get number of pending uids"""
-
-    @property
-    @abstractmethod
-    def curr_bytes(self) -> int:
-        """Return number of bytes used to store events, if known."""
-
-    @abstractmethod
-    def __contains__(self, uid: str) -> bool:
-        """Check whether a uid is pending"""
-
-    @abstractmethod
-    def retrieve(self, uid: str) -> Result[Optional[bytes], Problems]:
-        """Load and return persisted content for uid"""
-
-    @abstractmethod
-    def reindex(self) -> Result[Optional[bool], Problems]:
-        """Re-created pending index from persisted storage"""
 
 
 class _PersistedItem(NamedTuple):
     uid: str
     path: Path
-
-
-class StubPersister(PersisterInterface):
-    def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:  # noqa: ARG002
-        return Ok()
-
-    def clear(self, uid: str) -> Result[bool, Problems]:  # noqa: ARG002
-        return Ok()
-
-    def pending_ids(self) -> list[str]:
-        return []
-
-    @property
-    def num_pending(self) -> int:
-        return 0
-
-    @property
-    def curr_bytes(self) -> int:
-        return 0
-
-    def __contains__(self, uid: str) -> bool:
-        return False
-
-    def retrieve(self, uid: str) -> Result[Optional[bytes], Problems]:  # noqa: ARG002
-        return Ok(None)
-
-    def reindex(self) -> Result[Optional[bool], Problems]:
-        return Ok()
-
-
-class SimpleDirectoryWriter(StubPersister):
-    _base_dir: Path
-
-    def __init__(
-        self,
-        base_dir: Path | str,
-    ) -> None:
-        self._base_dir = Path(base_dir).resolve()
-
-    @classmethod
-    def _make_name(cls, dt: datetime.datetime, uid: str) -> str:
-        return f"{dt.isoformat()}.uid[{uid}].json"
-
-    def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:
-        problems = Problems()
-        try:
-            if not self._base_dir.exists():
-                self._base_dir.mkdir(parents=True, exist_ok=True)
-            path = self._base_dir / self._make_name(
-                datetime.datetime.now(tz=datetime.timezone.utc), uid
-            )
-            try:
-                with path.open("wb") as f:
-                    f.write(content)
-            except Exception as e:  # pragma: no cover  # noqa: BLE001
-                return Err(
-                    problems.add_error(e).add_error(
-                        WriteFailed("Open or write failed", uid=uid, path=path)
-                    )
-                )
-        except Exception as e:  # noqa: BLE001
-            return Err(
-                problems.add_error(e).add_error(
-                    PersisterError("Unexpected error", uid=uid)
-                )
-            )
-        if problems:
-            return Err(problems)
-        return Ok()
 
 
 class TimedRollingFilePersister(PersisterInterface):

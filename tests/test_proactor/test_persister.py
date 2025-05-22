@@ -26,8 +26,8 @@ from gwproactor.persister import (
     TrimFailed,
     UIDExistedWarning,
     UIDMissingWarning,
-    _PersistedItem,  # noqa
 )
+from gwproactor.persister.rolling_file import _PersistedItem  # noqa
 
 
 def _day_start(dt: datetime.datetime) -> datetime.datetime:
