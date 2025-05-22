@@ -1,4 +1,3 @@
-from gwproactor.persister.directory_writer import SimpleDirectoryWriter
 from gwproactor.persister.exceptions import (
     ByteDecodingError,
     ContentTooLarge,
@@ -19,8 +18,9 @@ from gwproactor.persister.exceptions import (
     WriteFailed,
 )
 from gwproactor.persister.interface import PersisterInterface
-from gwproactor.persister.rolling_file import TimedRollingFilePersister
+from gwproactor.persister.simple_directory_writer import SimpleDirectoryWriter
 from gwproactor.persister.stub import StubPersister
+from gwproactor.persister.timed_rolling_file import TimedRollingFilePersister
 
 __all__ = [
     "ByteDecodingError",

@@ -1,5 +1,6 @@
 from typing import Optional
 
+from gwproto.messages import EventBase
 from result import Ok, Result
 
 from gwproactor.persister.interface import PersisterInterface
@@ -7,6 +8,14 @@ from gwproactor.problems import Problems
 
 
 class StubPersister(PersisterInterface):
+    ENCODING = "utf-8"
+
+    def persist_event(self, event: EventBase) -> Result[bool, Problems]:  # noqa: ARG002
+        """Persist content, indexed by uid"""
+        return self.persist(
+            event.MessageId, event.model_dump_json(indent=2).encode(self.ENCODING)
+        )
+
     def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:  # noqa: ARG002
         return Ok()
 

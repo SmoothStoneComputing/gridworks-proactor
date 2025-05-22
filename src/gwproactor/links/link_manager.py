@@ -303,10 +303,7 @@ class LinkManager:
         ):
             path_dbg |= 0x00000008
             self.publish_upstream(event, AckRequired=True)
-        result = self._event_persister.persist(
-            event.MessageId,
-            event.model_dump_json(indent=2).encode(self.PERSISTER_ENCODING),
-        )
+        result = self._event_persister.persist_event(event)
         self._logger.path(
             "--generate_event %s  path:0x%08X  %d - %d",
             event.TypeName,
