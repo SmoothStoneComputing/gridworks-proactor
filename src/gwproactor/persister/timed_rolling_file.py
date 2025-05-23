@@ -7,7 +7,6 @@ import time
 from pathlib import Path
 from typing import NamedTuple, Optional
 
-from gwproto.messages import EventBase
 from result import Err, Ok, Result
 
 from gwproactor.persister.exceptions import (
@@ -36,7 +35,6 @@ class TimedRollingFilePersister(PersisterInterface):
     DEFAULT_MAX_BYTES: int = 500 * 1024 * 1024
     FILENAME_RGX: re.Pattern[str] = re.compile(r"(?P<dt>.*)\.uid\[(?P<uid>.*)].json$")
     REINDEX_PAT_SECONDS = 1.0
-    ENCODING = "utf-8"
 
     _base_dir: Path
     _max_bytes: int = DEFAULT_MAX_BYTES
@@ -76,12 +74,6 @@ class TimedRollingFilePersister(PersisterInterface):
     @property
     def curr_dir(self) -> Path:
         return self._curr_dir
-
-    def persist_event(self, event: EventBase) -> Result[bool, Problems]:  # noqa: ARG002
-        """Persist content, indexed by uid"""
-        return self.persist(
-            event.MessageId, event.model_dump_json(indent=2).encode(self.ENCODING)
-        )
 
     def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:
         problems = Problems()

@@ -42,7 +42,7 @@ async def await_for(  # noqa: C901, PLR0912, PLR0913
     timeout: float,  # noqa: ASYNC109
     tag: str = "",
     raise_timeout: bool = True,  # noqa: FBT001, FBT002
-    retry_duration: float = 0.1,
+    retry_duration: float = 0.01,
     err_str_f: Optional[ErrorStringFunction] = None,
     logger: Optional[logging.Logger | logging.LoggerAdapter[logging.Logger]] = None,
     error_dict: Optional[dict[str, Any]] = None,

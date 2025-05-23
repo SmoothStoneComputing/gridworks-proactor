@@ -5,7 +5,7 @@ from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.links import QOS
-from gwproactor.persister import PersisterInterface, TimedRollingFilePersister
+from gwproactor.persister import PersisterInterface, SQLitePersister
 from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
 
 
@@ -47,7 +47,7 @@ class DummyChildApp(App):
 
     @classmethod
     def _make_persister(cls, settings: AppSettings) -> PersisterInterface:
-        return TimedRollingFilePersister(settings.paths.event_dir)
+        return SQLitePersister(settings.paths.event_dir)
 
     def _connect_links(self, proactor: Proactor) -> None:
         super()._connect_links(proactor)

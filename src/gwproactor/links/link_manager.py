@@ -51,6 +51,7 @@ from gwproactor.persister import (
     PersisterInterface,
     UIDMissingWarning,
 )
+from gwproactor.persister.interface import ENCODING as PERSISTER_ENCODING
 from gwproactor.problems import Problems
 from gwproactor.stats import ProactorStats
 
@@ -61,7 +62,7 @@ class LinkManagerTransition(Transition):
 
 
 class LinkManager:
-    PERSISTER_ENCODING = "utf-8"
+    PERSISTER_ENCODING = PERSISTER_ENCODING
     publication_name: str
     subscription_name: str
     _settings: ProactorSettings
@@ -303,7 +304,9 @@ class LinkManager:
         ):
             path_dbg |= 0x00000008
             self.publish_upstream(event, AckRequired=True)
-        result = self._event_persister.persist_event(event)
+        result = self._event_persister.persist(
+            event.MessageId, event.model_dump_json().encode(PERSISTER_ENCODING)
+        )
         self._logger.path(
             "--generate_event %s  path:0x%08X  %d - %d",
             event.TypeName,

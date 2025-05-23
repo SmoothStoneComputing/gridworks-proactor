@@ -2,19 +2,16 @@ import abc
 from abc import abstractmethod
 from typing import Optional
 
-from gwproto.messages import EventBase
 from result import Result
 
 from gwproactor.problems import Problems
+
+ENCODING: str = "utf-8"
 
 
 class PersisterInterface(abc.ABC):
     @abstractmethod
     def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:
-        """Persist content, indexed by uid"""
-
-    @abstractmethod
-    def persist_event(self, event: EventBase) -> Result[bool, Problems]:
         """Persist content, indexed by uid"""
 
     @abstractmethod

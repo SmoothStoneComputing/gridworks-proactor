@@ -9,93 +9,15 @@ import pytest
 from gwproto import MQTTTopic
 from result import Err
 
-from gwproactor import Proactor
+from gwproactor import App, AppSettings, Proactor
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
-from gwproactor.persister import TimedRollingFilePersister
+from gwproactor.persister import PersisterInterface, TimedRollingFilePersister
+from gwproactor_test.dummies import DummyChildApp
 from gwproactor_test.live_test_helper import (
     LiveTest,
 )
 from gwproactor_test.wait import await_for
-
-
-@dataclass
-class _EventEntry:
-    uid: str
-    path: Path
-
-
-class _EventGen:
-    ok: list[_EventEntry]
-    corrupt: list[_EventEntry]
-    empty: list[_EventEntry]
-    missing: list[_EventEntry]
-
-    persister: TimedRollingFilePersister
-
-    def __len__(self) -> int:
-        return len(self.ok) + len(self.corrupt) + len(self.empty)
-
-    def __init__(self, proactor: Proactor) -> None:
-        self.ok = []
-        self.corrupt = []
-        self.empty = []
-        self.missing = []
-        persister = proactor.event_persister
-        assert isinstance(persister, TimedRollingFilePersister)
-        self.persister = persister
-
-    def _generate_event(self, member_name: str) -> _EventEntry:
-        event = DBGEvent(Command=DBGPayload(), Msg=f"event {len(self)} {member_name}")
-        match self.persister.persist(
-            event.MessageId, event.model_dump_json(indent=2).encode()
-        ):
-            case Err(exception):
-                raise exception
-        entry = _EventEntry(
-            event.MessageId,
-            self.persister.get_path(event.MessageId),  # type: ignore[arg-type]
-        )
-        getattr(self, member_name).append(entry)
-        return entry
-
-    def _generate_ok(self) -> _EventEntry:
-        return self._generate_event("ok")
-
-    def _generate_corrupt(self) -> _EventEntry:
-        entry = self._generate_event("corrupt")
-        with entry.path.open() as f:
-            contents = f.read()
-        with entry.path.open("w") as f:
-            f.write(contents[:-6])
-        return entry
-
-    def _generate_empty(self) -> _EventEntry:
-        entry = self._generate_event("empty")
-        with entry.path.open("w") as f:
-            f.write("")
-        return entry
-
-    def _generate_missing(self) -> _EventEntry:
-        entry = self._generate_event("missing")
-        entry.path.unlink()
-        return entry
-
-    def generate(
-        self,
-        num_ok: int = 0,
-        num_corrupt: int = 0,
-        num_empty: int = 0,
-        num_missing: int = 0,
-    ) -> None:
-        for _ in range(num_ok):
-            self._generate_ok()
-        for _ in range(num_corrupt):
-            self._generate_corrupt()
-        for _ in range(num_empty):
-            self._generate_empty()
-        for _ in range(num_missing):
-            self._generate_missing()
 
 
 @pytest.mark.asyncio
@@ -399,9 +321,100 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         assert not child_links.reuploading()
 
 
+@dataclass
+class _EventEntry:
+    uid: str
+    path: Path
+
+
+class _EventGen:
+    ok: list[_EventEntry]
+    corrupt: list[_EventEntry]
+    empty: list[_EventEntry]
+    missing: list[_EventEntry]
+
+    persister: TimedRollingFilePersister
+
+    def __len__(self) -> int:
+        return len(self.ok) + len(self.corrupt) + len(self.empty)
+
+    def __init__(self, proactor: Proactor) -> None:
+        self.ok = []
+        self.corrupt = []
+        self.empty = []
+        self.missing = []
+        persister = proactor.event_persister
+        assert isinstance(persister, TimedRollingFilePersister)
+        self.persister = persister
+
+    def _generate_event(self, member_name: str) -> _EventEntry:
+        event = DBGEvent(Command=DBGPayload(), Msg=f"event {len(self)} {member_name}")
+        match self.persister.persist(
+            event.MessageId, event.model_dump_json(indent=2).encode()
+        ):
+            case Err(exception):
+                raise exception
+        entry = _EventEntry(
+            event.MessageId,
+            self.persister.get_path(event.MessageId),  # type: ignore[arg-type]
+        )
+        getattr(self, member_name).append(entry)
+        return entry
+
+    def _generate_ok(self) -> _EventEntry:
+        return self._generate_event("ok")
+
+    def _generate_corrupt(self) -> _EventEntry:
+        entry = self._generate_event("corrupt")
+        with entry.path.open() as f:
+            contents = f.read()
+        with entry.path.open("w") as f:
+            f.write(contents[:-6])
+        return entry
+
+    def _generate_empty(self) -> _EventEntry:
+        entry = self._generate_event("empty")
+        with entry.path.open("w") as f:
+            f.write("")
+        return entry
+
+    def _generate_missing(self) -> _EventEntry:
+        entry = self._generate_event("missing")
+        entry.path.unlink()
+        return entry
+
+    def generate(
+        self,
+        num_ok: int = 0,
+        num_corrupt: int = 0,
+        num_empty: int = 0,
+        num_missing: int = 0,
+    ) -> None:
+        for _ in range(num_ok):
+            self._generate_ok()
+        for _ in range(num_corrupt):
+            self._generate_corrupt()
+        for _ in range(num_empty):
+            self._generate_empty()
+        for _ in range(num_missing):
+            self._generate_missing()
+
+
+class RollingFileChildApp(DummyChildApp):
+    @classmethod
+    def _make_persister(cls, settings: AppSettings) -> PersisterInterface:
+        return TimedRollingFilePersister(settings.paths.event_dir)
+
+
+class RollingLiveTest(LiveTest):
+    @classmethod
+    def child_app_type(cls) -> type[App]:
+        return RollingFileChildApp
+
+
 @pytest.mark.asyncio
 async def test_reupload_errors(request: Any) -> None:
-    async with LiveTest(
+    async with RollingLiveTest(
         start_child=True,
         add_parent=True,
         request=request,
