@@ -28,31 +28,35 @@ This diagram approximates how the "active" state is achieved, maintained and los
 
 ```{mermaid}
 flowchart TB
-    linkStyle default interpolate basis
-    NonExistent(Non existent) -- constructed --> not_started
-    subgraph NotActive[not active &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp]
-        not_started -- start_called --> connecting
+linkStyle default interpolate basis
+NonExistent(Non existent) -- constructed --> not_started
+subgraph NotActive[not active &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp]
+not_started -- start_called --> connecting
 
-        connecting -- mqtt_connect_failed --> connecting
-        connecting -- mqtt_connected --> awaiting_setup_and_peer
+connecting -- mqtt_connect_failed --> connecting
+connecting -- mqtt_connected --> awaiting_setup_and_peer
 
-        awaiting_setup_and_peer -- mqtt_suback --> awaiting_setup_and_peer
-        awaiting_setup_and_peer -- mqtt_suback --> awaiting_peer
-        awaiting_setup_and_peer -- message_from_peer --> awaiting_setup
-        awaiting_setup_and_peer -- mqtt_disconnected  --> connecting
+awaiting_setup_and_peer -- mqtt_suback --> awaiting_setup_and_peer
+awaiting_setup_and_peer -- mqtt_suback --> optimism
+awaiting_setup_and_peer -- message_from_peer --> awaiting_setup
+awaiting_setup_and_peer -- mqtt_disconnected  --> connecting
 
-        awaiting_setup -- mqtt_suback --> awaiting_setup
-        awaiting_setup -- mqtt_disconnected  --> connecting
+awaiting_setup -- mqtt_suback --> awaiting_setup
+awaiting_setup -- mqtt_disconnected  --> connecting
 
-        awaiting_peer -- mqtt_disconnected  --> connecting
-    end
+optimism -- mqtt_disconnected --> connecting
+optimism -- response_timeout --> awaiting_peer
 
-    awaiting_setup -- mqtt_suback --> active
+awaiting_peer -- mqtt_disconnected  --> connecting
+end
 
-    awaiting_peer -- message_from_peer --> active
+awaiting_setup -- mqtt_suback --> active
 
-    active -- response_timeout --> awaiting_peer
-    active -- mqtt_disconnected --> connecting
+optimism -- message_from_peer --> active
+awaiting_peer -- message_from_peer --> active
+
+active -- response_timeout --> awaiting_peer
+active -- mqtt_disconnected --> connecting
 ```
 
 Much of the complexity in this diagram results from asynchronously accumulating input channel establishments and a
@@ -69,15 +73,15 @@ The [](gwproactor.links) package implements most of the Proactor's communication
 interface to this package used by [](Proactor). The interaction between them can be seen by searching the code for
 `_links`. This search should produce approximately the following entry points in the message processing loop:
 
-1.  Start on user request.
-2.  Stop on user request (omitted from the diagram for clarity).
-3.  Handle connect of underlying comm mechanism (e.g. broker connect of MQTT).
-4.  Handle disconnect of underlying comm mechanism.
-5.  Handle intermediate connection establishment events from underlying comm mechanism (e.g. subscription ack of MQTT).
-6.  Send acks for incoming messages that require ack.
-7.  Receive acks for outgoing messages that require acks.
-8.  Handle timeouts for ack receipt.
-9.  Update “heard from recently” on message receipt.
+1. Start on user request.
+2. Stop on user request (omitted from the diagram for clarity).
+3. Handle connect of underlying comm mechanism (e.g. broker connect of MQTT).
+4. Handle disconnect of underlying comm mechanism.
+5. Handle intermediate connection establishment events from underlying comm mechanism (e.g. subscription ack of MQTT).
+6. Send acks for incoming messages that require ack.
+7. Receive acks for outgoing messages that require acks.
+8. Handle timeouts for ack receipt.
+9. Update “heard from recently” on message receipt.
 10. Handle timeouts for “heard from recently”.
 
 ### LinkManager helpers

@@ -17,6 +17,7 @@ from gwproactor_test.wait import await_for
 async def test_response_timeout(request: Any) -> None:
     """
     Test:
+        (optimistic_send -> response_timeout -> awaiting_peer)
         (awaiting_peer -> response_timeout -> awaiting_peer)
         (active -> response_timeout -> awaiting_peer)
     """
@@ -33,13 +34,13 @@ async def test_response_timeout(request: Any) -> None:
         parent_link = parent.links.link(parent.downstream_client)
 
         # Timeout while awaiting setup
-        # (awaiting_peer -> response_timeout -> awaiting_peer)
+        # (awaiting_peer -> response_timeout -> optimistic_send)
 
         # start parent
         parent.pause_acks()
         h.start_parent()
         await await_for(
-            lambda: parent_link.in_state(StateName.awaiting_peer),
+            lambda: parent_link.in_state(StateName.optimistic_send),
             3,
             "ERROR waiting for parent to connect to broker",
             err_str_f=parent.summary_str,
@@ -50,12 +51,12 @@ async def test_response_timeout(request: Any) -> None:
         assert stats.timeouts == 0
         h.start_child()
         await await_for(
-            lambda: link.in_state(StateName.awaiting_peer),
+            lambda: link.in_state(StateName.optimistic_send),
             3,
             "ERROR waiting for child to connect to broker",
             err_str_f=parent.summary_str,
         )
-        # (awaiting_peer -> response_timeout -> awaiting_peer)
+        # (optimistic_send -> response_timeout -> awaiting_peer)
         await await_for(
             lambda: stats.timeouts > 0,
             1,
@@ -81,7 +82,6 @@ async def test_response_timeout(request: Any) -> None:
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )
-
         # Timeout while active
         # (active -> response_timeout -> awaiting_peer)
         parent.pause_acks()
@@ -93,15 +93,15 @@ async def test_response_timeout(request: Any) -> None:
             lambda: stats.timeouts == exp_timeouts,
             1,
             "ERROR waiting for child to timeout",
-            err_str_f=child.summary_str,
+            err_str_f=h.summary_str,
         )
         assert link.state == StateName.awaiting_peer
         assert child.event_persister.num_pending > 0
         await await_for(
-            lambda: len(parent.needs_ack) == 2,
+            lambda: len(parent.needs_ack) == 1,
             1,
             "ERROR waiting for child to timeout",
-            err_str_f=child.summary_str,
+            err_str_f=h.summary_str,
         )
 
         # (awaiting_peer -> message_from_peer -> active)
@@ -110,7 +110,7 @@ async def test_response_timeout(request: Any) -> None:
             lambda: link.in_state(StateName.active),
             1,
             "ERROR waiting for parent to restore link #1",
-            err_str_f=parent.summary_str,
+            err_str_f=h.summary_str,
         )
 
 

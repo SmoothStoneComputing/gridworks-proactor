@@ -305,8 +305,8 @@ class LiveTest:
         return (
             f"CommTestHelper caught error {exc}.\n"
             "Working log dirs:"
-            f"\n\t[{self.child_app.config.settings.paths.log_dir}]"
-            f"\n\t[{self.parent_app.config.settings.paths.log_dir}]"
+            f"\n\t{self.child_app.config.settings.paths.log_dir}"
+            f"\n\t{self.parent_app.config.settings.paths.log_dir}"
         )
 
     async def __aexit__(

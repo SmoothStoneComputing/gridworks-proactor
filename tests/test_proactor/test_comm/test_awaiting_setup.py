@@ -14,7 +14,7 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_awaiting_setup_and_peer(request: Any) -> None:
+async def test_awaiting_setup_and_peer_basic(request: Any) -> None:
     """
     Test:
      (connecting -> connected -> awaiting_setup_and_peer)
@@ -54,7 +54,7 @@ async def test_awaiting_setup_and_peer(request: Any) -> None:
         # Allow suback to arrive
         child.release_upstream_subacks()
         await await_for(
-            lambda: link.in_state(StateName.awaiting_peer),
+            lambda: link.in_state(StateName.optimistic_send),
             1,
             "ERROR waiting mqtt_suback",
             err_str_f=h.summary_str,
@@ -66,8 +66,11 @@ async def test_awaiting_setup_and_peer(request: Any) -> None:
         assert comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 1
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert len(stats.comm_events) == 2
-        for comm_event in stats.comm_events:
+        # The "fully subscribed" event is generated *after* the link state is
+        # "active for send" so it should be "in-flight", not in the persister.
+        for comm_event in stats.comm_events[:-1]:
             assert comm_event.MessageId in child.event_persister
+        assert stats.comm_events[-1].MessageId in child.links.in_flight_events
 
         # Tell client we lost comm
         child.pause_upstream_subacks()
@@ -117,7 +120,7 @@ async def test_awaiting_setup_and_peer(request: Any) -> None:
         # Allow suback to arrive
         child.release_upstream_subacks()
         await await_for(
-            lambda: link.in_state(StateName.awaiting_peer),
+            lambda: link.in_state(StateName.optimistic_send),
             1,
             "ERROR waiting mqtt_suback",
             err_str_f=h.summary_str,
@@ -129,8 +132,11 @@ async def test_awaiting_setup_and_peer(request: Any) -> None:
         assert comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 2
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 2
         assert len(stats.comm_events) == 7
-        for comm_event in stats.comm_events:
+        # The last "fully subscribed" event is generated *after* the link state
+        # is "active for send" so it should be "in-flight", not in the persister.
+        for comm_event in stats.comm_events[:-1]:
             assert comm_event.MessageId in child.event_persister
+        assert stats.comm_events[-1].MessageId in child.links.in_flight_events
 
 
 @pytest.mark.asyncio
@@ -213,7 +219,7 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         assert StateName(link.state) == StateName.awaiting_setup_and_peer
 
         # suback 3/3
-        # (mqtt_suback -> awaiting_peer)
+        # (mqtt_suback -> optimistic_send)
         child.release_upstream_subacks(1)
         exp_subacks += 1
         await await_for(
@@ -222,7 +228,7 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
             f"ERROR waiting mqtt_suback {exp_subacks} (3/3)",
             err_str_f=child.summary_str,
         )
-        assert StateName(link.state) == StateName.awaiting_peer
+        assert StateName(link.state) == StateName.optimistic_send
         assert not link.active_for_recv()
         assert not link.active()
         assert link.active_for_send()
@@ -230,8 +236,11 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         assert comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 1
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert len(stats.comm_events) == 2
-        for comm_event in stats.comm_events:
+        # The "fully subscribed" event is generated *after* the link state is
+        # "active for send" so it should be "in-flight", not in the persister.
+        for comm_event in stats.comm_events[:-1]:
             assert comm_event.MessageId in child.event_persister
+        assert stats.comm_events[-1].MessageId in child.links.in_flight_events
 
         # (message_from_peer -> awaiting_setup)
         # Tell client we lost comm
@@ -289,7 +298,7 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_awaiting_setup2__(request: Any) -> None:
+async def test_awaiting_setup_state(request: Any) -> None:
     """
     Test awaiting_setup (corner state):
      (awaiting_setup_and_peer -> message_from_peer -> awaiting_setup)

@@ -165,27 +165,43 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
             "ERROR waiting for child to connect to mqtt",
             err_str_f=h.summary_str,
         )
-        # Some events should happened already, through the startup and mqtt connect process, and they should have
-        # all been sent.
-        # These events include: There are at least 3 non-generated events: startup, (mqtt connect, mqtt subscribed)/mqtt client.
+        # Some events should have happened already, through the startup and mqtt
+        # connect process, and they should have all been sent. There are at
+        # least 3 non-test=generated events:
+        #   startup, (mqtt connect, mqtt subscribed) x (mqtt clients).
+        # Some of these events will be in the database, but those that are
+        # generated after suback (e.g. the event for the suback itself), will
+        # be "in flight", assuming it has been < 5 seconds since the we got
+        # the suback.
         base_num_pending = child_links.num_pending
+        base_num_in_flight = child_links.num_in_flight
         assert base_num_pending > 0
+        assert base_num_in_flight > 0
         assert child_links.num_reupload_pending == 0
         assert child_links.num_reuploaded_unacked == 0
         assert not child_links.reuploading()
 
-        # Generate more events than fit in pipe.
+        # Generate more events than fit in reupload pipe.
         events_to_generate = child.settings.proactor.num_initial_event_reuploads * 2
         for i in range(events_to_generate):
-            child.generate_event(
-                DBGEvent(
-                    Command=DBGPayload(),
-                    Msg=f"event {i + 1} / {events_to_generate}",
-                )
+            event = DBGEvent(
+                Command=DBGPayload(),
+                Msg=f"event {i + 1} / {events_to_generate}",
             )
+            child.generate_event(event)
         child.logger.info(
             f"Generated {events_to_generate} events. Total pending events: {child_links.num_pending}"
         )
+        child.timeout_an_ack(child.upstream_client)
+        await await_for(
+            lambda: child_links.link_state(child.upstream_client)
+            == StateName.awaiting_peer,
+            1,
+            "ERROR wait for child to flush all events to database",
+            err_str_f=h.summary_str,
+        )
+
+        assert child.links.num_pending == base_num_pending + 1 + events_to_generate
         assert child_links.num_reupload_pending == 0
         assert child_links.num_reuploaded_unacked == 0
         assert not child_links.reuploading()
@@ -197,7 +213,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         h.start_parent()
         await await_for(
             lambda: h.parent.links.link_state(h.parent.downstream_client)
-            == StateName.awaiting_peer,
+            == StateName.optimistic_send,
             1,
             "ERROR waiting for parent awaiting_peer",
             err_str_f=h.summary_str,
@@ -225,7 +241,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         # A "PeerActive" event is also pending but that is _not_ part of re-upload because it is
         # generated _after_ the peer is active (and therefore has its own ack timeout running, so does not need to
         # be managed by reupload).
-        last_num_to_reupload = events_to_generate + base_num_pending
+        last_num_to_reupload = events_to_generate + base_num_pending + 1
         last_num_reuploaded_unacked = (
             child.settings.proactor.num_initial_event_reuploads
         )
@@ -241,7 +257,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         )
         assert child_links.num_reuploaded_unacked == last_num_reuploaded_unacked, err_s
         assert child_links.num_reupload_pending == last_num_repuload_pending, err_s
-        assert child_links.num_pending == last_num_to_reupload + 1
+        assert child_links.num_pending == last_num_to_reupload
         assert child_links.reuploading()
 
         # noinspection PyTypeChecker
@@ -255,8 +271,10 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
 
         # Release acks one by one.
         #
-        #   Bound this loop by time, not by total number of acks since at least one non-reupload ack should arrive
-        #   (for the PeerActive event) and others could arrive if, for example, a duplicate MQTT message appeared.
+        #   Bound this loop by time, not by total number of acks, since at least
+        #   one non-reupload ack should arrive (for the PeerActive event) and
+        #   others could arrive if, for example, a duplicate MQTT message
+        #   appeared.
         #
         end_time = time.time() + 5
         # loop_count_dbg = 0

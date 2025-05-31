@@ -20,17 +20,30 @@ class StateName(enum.Enum):
     connecting = "connecting"
     awaiting_setup_and_peer = "awaiting_setup_and_peer"
     awaiting_setup = "awaiting_setup"
+    optimistic_send = "optimistic_send"
     awaiting_peer = "awaiting_peer"
     active = "active"
     stopped = "stopped"
+
+
+ACTIVE_FOR_SEND = {StateName.active, StateName.optimistic_send, StateName.awaiting_peer}
+ACTIVE_FOR_NEW_EVENTS = {StateName.active, StateName.optimistic_send}
 
 
 def state_is_active(state: StateName) -> bool:
     return state == StateName.active
 
 
+def state_is_optimistic_send(state: StateName) -> bool:
+    return state == StateName.optimistic_send
+
+
 def state_is_active_for_send(state: StateName) -> bool:
-    return state in {StateName.active, StateName.awaiting_peer}
+    return state in ACTIVE_FOR_SEND
+
+
+def state_is_active_for_new_events(state: StateName) -> bool:
+    return state in ACTIVE_FOR_NEW_EVENTS
 
 
 def state_is_active_for_recv(state: StateName) -> bool:
@@ -85,6 +98,12 @@ class Transition:
 
     def recv_deactivated(self) -> bool:
         return self.deactivated()
+
+    def optimistic_send_timed_out(self) -> bool:
+        return (
+            self.new_state == StateName.awaiting_peer
+            and self.old_state == StateName.optimistic_send
+        )
 
 
 class InvalidCommStateInput(Exception):
@@ -201,6 +220,9 @@ class State(abc.ABC):
     def active_for_recv(self) -> bool:
         return state_is_active_for_recv(self.name)
 
+    def active_for_new_events(self) -> bool:
+        return state_is_active_for_new_events(self.name)
+
 
 class NotStarted(State):
     @property
@@ -251,10 +273,9 @@ class AwaitingSetupAndPeer(State):
     def process_mqtt_suback(
         self, num_pending_subscriptions: int
     ) -> Result[Transition, InvalidCommStateInput]:
-        if num_pending_subscriptions == 0:
-            new_state = StateName.awaiting_peer
-        else:
-            new_state = self.name
+        new_state = (
+            StateName.optimistic_send if num_pending_subscriptions == 0 else self.name
+        )
         return Ok(Transition("", TransitionName.mqtt_suback, self.name, new_state))
 
     def process_mqtt_message(self) -> Result[Transition, InvalidCommStateInput]:
@@ -289,6 +310,33 @@ class AwaitingSetup(State):
     def process_mqtt_message(self) -> Result[Transition, InvalidCommStateInput]:
         return Ok(
             Transition("", TransitionName.message_from_peer, self.name, self.name)
+        )
+
+
+class OptimisticSend(State):
+    @property
+    def name(self) -> StateName:
+        return StateName.optimistic_send
+
+    def process_mqtt_disconnected(self) -> Result[Transition, InvalidCommStateInput]:
+        return Ok(
+            Transition(
+                "", TransitionName.mqtt_disconnected, self.name, StateName.connecting
+            )
+        )
+
+    def process_mqtt_message(self) -> Result[Transition, InvalidCommStateInput]:
+        return Ok(
+            Transition(
+                "", TransitionName.message_from_peer, self.name, StateName.active
+            )
+        )
+
+    def process_ack_timeout(self) -> Result[Transition, InvalidCommStateInput]:
+        return Ok(
+            Transition(
+                "", TransitionName.response_timeout, self.name, StateName.awaiting_peer
+            )
         )
 
 
@@ -364,6 +412,7 @@ class LinkState:
                 Connecting(),
                 AwaitingSetupAndPeer(),
                 AwaitingSetup(),
+                OptimisticSend(),
                 AwaitingPeer(),
                 Active(),
                 Stopped(),
@@ -383,6 +432,9 @@ class LinkState:
 
     def active_for_send(self) -> bool:
         return self.curr_state.active_for_send()
+
+    def active_for_new_events(self) -> bool:
+        return self.curr_state.active_for_new_events()
 
     def active_for_recv(self) -> bool:
         return self.curr_state.active_for_recv()

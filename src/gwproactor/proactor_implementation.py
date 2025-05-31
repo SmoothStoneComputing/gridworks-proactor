@@ -795,6 +795,7 @@ class Proactor(AppInterface, Runnable):
     def _process_shutdown_message(self, message: Message[Shutdown]) -> None:
         self._stop_requested = True
         self.generate_event(ShutdownEvent(Reason=message.Payload.Reason))
+        self._links.flush_in_flight_events()
         self._logger.lifecycle(
             f"Shutting down due to ShutdownMessage, [{message.Payload.Reason}]"
         )

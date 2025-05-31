@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, Sequence
 
 import pytest
-from paho.mqtt.client import ConnectFlags, MQTTMessage
+from paho.mqtt.client import ConnectFlags, MQTTMessage  # noqa
 from paho.mqtt.packettypes import PacketTypes
 from paho.mqtt.reasoncodes import ReasonCode
 from result import Result
@@ -57,7 +57,7 @@ class _Case:
                         client_name=name,
                         userdata=None,
                         flags=ConnectFlags(session_present=False),
-                        rc=ReasonCode(PacketTypes.CONNACK, "Success"),
+                        rc=ReasonCode(PacketTypes.CONNACK, "Success"),  # noqa
                     )
                 case TransitionName.mqtt_connect_failed:
                     content = MQTTConnectFailMessage(client_name=name, userdata=None)
@@ -65,7 +65,7 @@ class _Case:
                     content = MQTTDisconnectMessage(
                         client_name=name,
                         userdata=None,
-                        rc=ReasonCode(PacketTypes.DISCONNECT, "Success"),
+                        rc=ReasonCode(PacketTypes.DISCONNECT, "Success"),  # noqa
                     )
                 case TransitionName.mqtt_suback:
                     if content is None:
@@ -245,7 +245,7 @@ all_cases = _Cases(
             _Case(
                 StateName.awaiting_setup_and_peer,
                 TransitionName.mqtt_suback,
-                StateName.awaiting_peer,
+                StateName.optimistic_send,
                 input_content=0,
             ),
         ],
@@ -289,6 +289,22 @@ all_cases = _Cases(
             StateName.awaiting_setup,
         ),
         _Case(StateName.awaiting_setup, TransitionName.stop_called, StateName.stopped),
+        _Case(
+            StateName.optimistic_send,
+            TransitionName.message_from_peer,
+            StateName.active,
+        ),
+        _Case(
+            StateName.optimistic_send,
+            TransitionName.response_timeout,
+            StateName.awaiting_peer,
+        ),
+        _Case(
+            StateName.optimistic_send,
+            TransitionName.mqtt_disconnected,
+            StateName.connecting,
+        ),
+        _Case(StateName.optimistic_send, TransitionName.stop_called, StateName.stopped),
         _Case(
             StateName.awaiting_peer, TransitionName.message_from_peer, StateName.active
         ),

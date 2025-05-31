@@ -1,6 +1,7 @@
 # ruff: noqa: ERA001
 
 import dataclasses
+import functools
 import typing
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -93,6 +94,14 @@ class RecorderLinks(LinkManager):
         if link is None:
             raise RuntimeError(f"Link {name} not found.")
         return link
+
+    @property
+    def in_flight_events(self) -> dict[str, EventBase]:
+        return self._in_flight_events
+
+    @property
+    def num_in_flight(self) -> int:
+        return len(self._in_flight_events)
 
     def publish_message(
         self,
@@ -189,10 +198,35 @@ class InstrumentedProactor(Proactor):
     def needs_ack(self) -> list[_PausedAck]:
         return self.recorder_links.needs_ack
 
+    def timeout_an_ack(
+        self,
+        link_name: str,
+        message_id: Optional[str] = None,
+    ) -> None:
+        """Timeout an"""
+        link_acks = self.links.ack_manager._acks[link_name]  # noqa
+        if message_id is None and len(link_acks):
+            message_id = next(iter(link_acks))
+        if message_id is None or message_id not in link_acks:
+            raise RuntimeError(
+                f"Message {message_id} is not pending for link '{link_name}'."
+            )
+        if self._loop is None or self._receive_queue is None:
+            raise RuntimeError(
+                "ERROR. send_threadsafe() called before Proactor started."
+            )
+        self._loop.call_soon_threadsafe(
+            functools.partial(
+                self.links.ack_manager._timeout,  # noqa
+                link_name,
+                message_id,
+            )
+        )  # noqa
+
     def force_mqtt_disconnect(self, client_name: str) -> None:
         mqtt_client = self.mqtt_client_wrapper(client_name).mqtt_client
         # noinspection PyProtectedMember
-        mqtt_client._loop_rc_handle(MQTT_ERR_CONN_LOST)  # noqa: SLF001
+        mqtt_client._loop_rc_handle(MQTT_ERR_CONN_LOST)  # noqa
 
     def _process_mqtt_message(
         self, mqtt_receipt_message: Message[MQTTReceiptPayload]
@@ -294,7 +328,8 @@ class InstrumentedProactor(Proactor):
 
     def summary_str(self) -> str:
         s = str(self.stats)
-        s += "\nLink states:\n"
+        s += f"\nIn-flight events: {len(self.links.in_flight_events)}\n"
+        s += "Link states:\n"
         for link_name in self.stats.links:
             link_state = self._links.link_state(link_name)
             if link_state is None:

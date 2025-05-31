@@ -34,13 +34,16 @@ async def test_no_parent(request: Any) -> None:
         )
         assert not link.active_for_recv()
         assert not link.active()
-        assert StateName(link.state) == StateName.awaiting_peer
+        assert StateName(link.state) == StateName.optimistic_send
         assert comm_event_counts["gridworks.event.comm.mqtt.connect"] == 1
         assert comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 1
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert len(stats.comm_events) == 2
-        for comm_event in stats.comm_events:
+        # The "fully subscribed" event is generated *after* the link state is
+        # "active for send" so it should be "in-flight", not in the persister.
+        for comm_event in stats.comm_events[:-1]:
             assert comm_event.MessageId in child.event_persister
+        assert stats.comm_events[-1].MessageId in child.links.in_flight_events
 
         # Tell client we lost comm.
         child.force_mqtt_disconnect("parent")
@@ -58,13 +61,17 @@ async def test_no_parent(request: Any) -> None:
         assert link.active_for_send()
         assert not link.active_for_recv()
         assert not link.active()
-        assert StateName(link.state) == StateName.awaiting_peer
+        assert StateName(link.state) == StateName.optimistic_send
         assert comm_event_counts["gridworks.event.comm.mqtt.connect"] == 2
         assert comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 2
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 1
         assert len(stats.comm_events) == 5
-        for comm_event in stats.comm_events:
+        # All comm events prior to the suback should have been flushed to the
+        # the database ...
+        for comm_event in stats.comm_events[:-1]:
             assert comm_event.MessageId in child.event_persister
+        # ... but the suback event should be "in flight", as above
+        assert stats.comm_events[-1].MessageId in child.links.in_flight_events
 
 
 @pytest.mark.asyncio
@@ -89,7 +96,7 @@ async def test_basic_comm_child_first(request: Any) -> None:
         )
         assert not child_link.active_for_recv()
         assert not child_link.active()
-        assert StateName(child_link.state) == StateName.awaiting_peer
+        assert StateName(child_link.state) == StateName.optimistic_send
         assert child_comm_event_counts["gridworks.event.comm.mqtt.connect"] == 1
         assert (
             child_comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 1
@@ -97,8 +104,11 @@ async def test_basic_comm_child_first(request: Any) -> None:
         assert child_comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert child_comm_event_counts["gridworks.event.comm.peer.active"] == 0
         assert len(child_stats.comm_events) == 2
-        for comm_event in child_stats.comm_events:
+        # The "fully subscribed" event is generated *after* the link state is
+        # "active for send" so it should be "in-flight", not in the persister.
+        for comm_event in child_stats.comm_events[:-1]:
             assert comm_event.MessageId in child.event_persister
+        assert child_stats.comm_events[-1].MessageId in child.links.in_flight_events
 
         # start parent
         h.start_parent()
