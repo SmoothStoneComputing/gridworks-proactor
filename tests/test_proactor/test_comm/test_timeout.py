@@ -26,6 +26,8 @@ async def test_response_timeout(request: Any) -> None:
         add_child=True,
         add_parent=True,
         request=request,
+        verbose=True,
+        child_verbose=True,
     ) as h:
         child = h.child
         link = child.links.link(child.upstream_client)
@@ -92,7 +94,7 @@ async def test_response_timeout(request: Any) -> None:
         await await_for(
             lambda: stats.timeouts == exp_timeouts,
             3,
-            "ERROR waiting for child to timeout",
+            f"ERROR waiting for child to timeout, exp_timeouts: {exp_timeouts}",
             err_str_f=h.summary_str,
         )
         assert link.state == StateName.awaiting_peer
@@ -100,7 +102,7 @@ async def test_response_timeout(request: Any) -> None:
         await await_for(
             lambda: len(parent.needs_ack) == 1,
             3,
-            "ERROR waiting for child to timeout",
+            f"ERROR waiting for parent.needs_ack: {parent.needs_ack}",
             err_str_f=h.summary_str,
         )
 
