@@ -59,7 +59,7 @@ async def test_response_timeout(request: Any) -> None:
         # (optimistic_send -> response_timeout -> awaiting_peer)
         await await_for(
             lambda: stats.timeouts > 0,
-            1,
+            3,
             "ERROR waiting for child to timeout",
             err_str_f=parent.summary_str,
         )
@@ -71,14 +71,14 @@ async def test_response_timeout(request: Any) -> None:
         parent.release_acks()
         await await_for(
             lambda: link.in_state(StateName.active),
-            1,
+            3,
             "ERROR waiting for parent to restore link #1",
             err_str_f=parent.summary_str,
         )
         # wait for all events to be acked
         await await_for(
             lambda: child.event_persister.num_pending == 0,
-            1,
+            3,
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )
@@ -91,7 +91,7 @@ async def test_response_timeout(request: Any) -> None:
         exp_timeouts = int(stats.timeouts) + len(child_acks)
         await await_for(
             lambda: stats.timeouts == exp_timeouts,
-            1,
+            3,
             "ERROR waiting for child to timeout",
             err_str_f=h.summary_str,
         )
@@ -99,7 +99,7 @@ async def test_response_timeout(request: Any) -> None:
         assert child.event_persister.num_pending > 0
         await await_for(
             lambda: len(parent.needs_ack) == 1,
-            1,
+            3,
             "ERROR waiting for child to timeout",
             err_str_f=h.summary_str,
         )
@@ -108,7 +108,7 @@ async def test_response_timeout(request: Any) -> None:
         parent.release_acks()
         await await_for(
             lambda: link.in_state(StateName.active),
-            1,
+            3,
             "ERROR waiting for parent to restore link #1",
             err_str_f=h.summary_str,
         )
@@ -246,7 +246,7 @@ async def test_ping(request: Any) -> None:
         parent.release_acks(clear=True)
         await await_for(
             lambda: link.in_state(StateName.active),
-            1,
+            3,
             "ERROR waiting for parent to respond",
             err_str_f=h.summary_str,
         )

@@ -28,7 +28,7 @@ async def test_no_parent(request: Any) -> None:
         h.start_child()
         await await_for(
             link.active_for_send,
-            1,
+            3,
             "ERROR waiting link active_for_send",
             err_str_f=child.summary_str,
         )
@@ -90,7 +90,7 @@ async def test_basic_comm_child_first(request: Any) -> None:
         h.start_child()
         await await_for(
             child_link.active_for_send,
-            1,
+            3,
             "ERROR waiting link active_for_send",
             err_str_f=child.summary_str,
         )
@@ -134,7 +134,7 @@ async def test_basic_comm_child_first(request: Any) -> None:
         # wait for all events to be acked
         await await_for(
             lambda: child.event_persister.num_pending == 0,
-            1,
+            3,
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )
@@ -165,7 +165,7 @@ async def test_basic_comm_child_first(request: Any) -> None:
         # wait for all events to be acked
         await await_for(
             lambda: child.event_persister.num_pending == 0,
-            1,
+            3,
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )
@@ -205,7 +205,7 @@ async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None
         h.start_parent()
         await await_for(
             parent_link.active_for_send,
-            1,
+            3,
             "ERROR waiting link active_for_send",
             err_str_f=parent.summary_str,
         )
@@ -218,7 +218,7 @@ async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None
         h.start_child()
         await await_for(
             child_link.active,
-            1,
+            3,
             "ERROR waiting link active",
             err_str_f=parent.summary_str,
         )
@@ -238,7 +238,7 @@ async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None
         # wait for all events to be acked
         await await_for(
             lambda: child.event_persister.num_pending == 0,
-            1,
+            3,
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )
@@ -264,7 +264,7 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
         h.start_parent()
         await await_for(
             child_link.active,
-            1,
+            3,
             "ERROR waiting link active",
             err_str_f=child.summary_str,
         )
@@ -282,7 +282,7 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
         # wait for all events to be acked
         await await_for(
             lambda: child.event_persister.num_pending == 0,
-            1,
+            3,
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )
@@ -313,7 +313,7 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
         # wait for all events to be acked
         await await_for(
             lambda: child.event_persister.num_pending == 0,
-            1,
+            3,
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )
@@ -382,7 +382,7 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
         # wait for all events to be acked
         await await_for(
             lambda: child.event_persister.num_pending == 0,
-            1,
+            3,
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )

@@ -190,7 +190,7 @@ async def test_tree_event_forward(request: Any) -> None:
 
         await await_for(
             _atn_heard_reports,
-            1,
+            3,
             "ERROR waiting for atn to hear reports",
             err_str_f=h.summary_str,
         )

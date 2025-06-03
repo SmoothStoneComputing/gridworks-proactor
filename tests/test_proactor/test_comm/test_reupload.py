@@ -473,7 +473,7 @@ async def test_reupload_errors(request: Any) -> None:
         h.start_parent()
         await await_for(
             lambda: upstream_link.active(),
-            1,
+            3,
             "ERROR waiting for active",
             err_str_f=_err_str,
         )

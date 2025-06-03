@@ -10,7 +10,7 @@ class StopMe:
     def __init__(self, running: bool = True, step_duration: float = 0.1) -> None:
         self.running = running
         self.step_duration = step_duration
-        self.thread = threading.Thread(target=self.loop)
+        self.thread = threading.Thread(target=self.loop, daemon=True)
 
     def loop(self) -> None:
         while self.running:
@@ -34,6 +34,19 @@ MAX_DELAY = 0.01
 
 def test_responsive_sleep() -> None:
     sw = StopWatch()
+    # Attempt to force recompilation before running tests:
+    with sw:
+        responsive_sleep(StopMe(), 0.1, running_field_name="running")
+    with sw:
+        responsive_sleep(StopMe(), 0.01, running_field_name="running")
+    with sw:
+        responsive_sleep(StopMe(running=False), 0.01, running_field_name="running")
+    stop_me = StopMe(step_duration=0.1)
+    stop_me.start()
+    with sw:
+        stop_me.stop()
+
+    # Now run the tests
     seconds = 0.1
     with sw:
         responsive_sleep(StopMe(), seconds, running_field_name="running")

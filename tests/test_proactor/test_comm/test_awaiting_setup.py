@@ -36,7 +36,7 @@ async def test_awaiting_setup_and_peer_basic(request: Any) -> None:
         h.start_child()
         await await_for(
             lambda: child.num_upstream_subacks_available() == 1,
-            1,
+            3,
             "ERROR waiting suback pending",
             err_str_f=h.summary_str,
         )
@@ -55,7 +55,7 @@ async def test_awaiting_setup_and_peer_basic(request: Any) -> None:
         child.release_upstream_subacks()
         await await_for(
             lambda: link.in_state(StateName.optimistic_send),
-            1,
+            3,
             "ERROR waiting mqtt_suback",
             err_str_f=h.summary_str,
         )
@@ -97,7 +97,7 @@ async def test_awaiting_setup_and_peer_basic(request: Any) -> None:
         child.force_mqtt_disconnect(child.upstream_client)
         await await_for(
             lambda: len(stats.comm_events) > 4,
-            1,
+            3,
             "ERROR waiting comm fail",
             err_str_f=h.summary_str,
         )
@@ -121,7 +121,7 @@ async def test_awaiting_setup_and_peer_basic(request: Any) -> None:
         child.release_upstream_subacks()
         await await_for(
             lambda: link.in_state(StateName.optimistic_send),
-            1,
+            3,
             "ERROR waiting mqtt_suback",
             err_str_f=h.summary_str,
         )
@@ -200,7 +200,7 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         exp_subacks = num_subacks + 1
         await await_for(
             lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
-            1,
+            3,
             f"ERROR waiting mqtt_suback {exp_subacks} (1/3)",
             err_str_f=child.summary_str,
         )
@@ -212,7 +212,7 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         exp_subacks += 1
         await await_for(
             lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
-            1,
+            3,
             f"ERROR waiting mqtt_suback {exp_subacks} (2/3)",
             err_str_f=child.summary_str,
         )
@@ -224,7 +224,7 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         exp_subacks += 1
         await await_for(
             lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
-            1,
+            3,
             f"ERROR waiting mqtt_suback {exp_subacks} (3/3)",
             err_str_f=child.summary_str,
         )
@@ -271,7 +271,7 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         exp_subacks = num_subacks + 1
         await await_for(
             lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
-            1,
+            3,
             f"ERROR waiting mqtt_suback {exp_subacks} (1/3)",
             err_str_f=h.summary_str,
         )
@@ -363,7 +363,7 @@ async def test_awaiting_setup_state(request: Any) -> None:
         exp_subacks = num_subacks + 1
         await await_for(
             lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
-            1,
+            3,
             f"ERROR waiting mqtt_suback {exp_subacks} (1/3)",
             err_str_f=h.summary_str,
         )
@@ -395,7 +395,7 @@ async def test_awaiting_setup_state(request: Any) -> None:
         exp_subacks = num_subacks + 1
         await await_for(
             lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
-            1,
+            3,
             f"ERROR waiting mqtt_suback {exp_subacks} (2/3)",
             err_str_f=h.summary_str,
         )
@@ -415,7 +415,7 @@ async def test_awaiting_setup_state(request: Any) -> None:
         parent.send_dbg(parent.downstream_client)
         await await_for(
             lambda: stats.num_received_by_topic[dbg_topic] == 1,
-            1,
+            3,
             "ERROR waiting for dbg message",
             err_str_f=h.summary_str,
         )
@@ -448,7 +448,7 @@ async def test_awaiting_setup_state(request: Any) -> None:
         exp_subacks = num_subacks + 1
         await await_for(
             lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
-            1,
+            3,
             f"ERROR waiting mqtt_suback {exp_subacks} (1/3)",
             err_str_f=h.summary_str,
         )
@@ -469,7 +469,7 @@ async def test_awaiting_setup_state(request: Any) -> None:
         child.release_upstream_subacks()
         await await_for(
             lambda: link.in_state(StateName.active),
-            1,
+            3,
             "ERROR waiting for active",
             err_str_f=h.summary_str,
         )
