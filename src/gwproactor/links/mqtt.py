@@ -111,7 +111,9 @@ class MQTTClientWrapper:
         self._pending_subscriptions = set()
         self._pending_subacks = {}
         self._thread = threading.Thread(
-            target=self._client_thread, name=f"MQTT-client-thread-{self._client_name}"
+            target=self._client_thread,
+            name=f"MQTT-client-thread-{self._client_name}",
+            daemon=True,
         )
         self._stop_requested = False
 
