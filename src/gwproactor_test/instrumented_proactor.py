@@ -94,6 +94,14 @@ class RecorderLinks(LinkManager):
             raise RuntimeError(f"Link {name} not found.")
         return link
 
+    @property
+    def in_flight_events(self) -> dict[str, EventBase]:
+        return self._in_flight_events
+
+    @property
+    def num_in_flight(self) -> int:
+        return len(self._in_flight_events)
+
     def publish_message(
         self,
         link_name: str,
@@ -194,7 +202,7 @@ class InstrumentedProactor(Proactor):
     def force_mqtt_disconnect(self, client_name: str) -> None:
         mqtt_client = self.mqtt_client_wrapper(client_name).mqtt_client
         # noinspection PyProtectedMember
-        mqtt_client._loop_rc_handle(MQTT_ERR_CONN_LOST)  # noqa: SLF001
+        mqtt_client._loop_rc_handle(MQTT_ERR_CONN_LOST)  # noqa
 
     def _process_mqtt_message(
         self, mqtt_receipt_message: Message[MQTTReceiptPayload]
@@ -301,7 +309,8 @@ class InstrumentedProactor(Proactor):
 
     def summary_str(self) -> str:
         s = str(self.stats)
-        s += "\nLink states:\n"
+        s += f"\nIn-flight events: {len(self.links.in_flight_events)}\n"
+        s += "Link states:\n"
         for link_name in self.stats.links:
             link_state = self._links.link_state(link_name)
             if link_state is None:

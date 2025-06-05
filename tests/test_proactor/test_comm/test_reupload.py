@@ -252,7 +252,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         )
         assert child_links.num_reuploaded_unacked == last_num_reuploaded_unacked, err_s
         assert child_links.num_reupload_pending == last_num_repuload_pending, err_s
-        assert child_links.num_pending == last_num_to_reupload + 1
+        assert child_links.num_pending == last_num_to_reupload
         assert child_links.reuploading()
 
         parent_ack_topic = MQTTTopic.encode(

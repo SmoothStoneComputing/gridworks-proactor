@@ -7,6 +7,7 @@ from gwproto import Message, MQTTCodec, MQTTTopic
 from gwproto.messages import (
     Ack,
     CommEvent,
+    EventBase,
     EventT,
     MQTTConnectEvent,
     MQTTDisconnectEvent,
@@ -75,6 +76,7 @@ class LinkManager:
     _states: LinkStates
     _message_times: MessageTimes
     _acks: AckManager
+    _in_flight_events: dict[str, EventBase]
 
     def __init__(  # noqa: PLR0913, PLR0917
         self,
@@ -92,6 +94,7 @@ class LinkManager:
         self._settings = settings
         self._logger = logger
         self._stats = stats
+        self._in_flight_events = {}
         self._event_persister = event_persister
         self._reuploads = Reuploads(
             self._logger,
@@ -304,17 +307,30 @@ class LinkManager:
             self._logger.info(f"ProblemEvent <{event.Summary}>\n{event.Details}")  # noqa: G004
         if (
             self._mqtt_clients.upstream_client
-            and self._states[self._mqtt_clients.upstream_client].active_for_send()
+            and self._states[self._mqtt_clients.upstream_client].active()
         ):
             path_dbg |= 0x00000008
+            if len(self._in_flight_events) >= self._settings.num_inflight_events:
+                path_dbg |= 0x00000010
+                oldest_event_id = next(iter(self._in_flight_events))
+                oldest_event = self._in_flight_events.pop(oldest_event_id)
+                result = self._event_persister.persist(
+                    oldest_event.MessageId,
+                    oldest_event.model_dump_json().encode(PERSISTER_ENCODING),
+                )
+            else:
+                path_dbg |= 0x00000020
+                result = Ok()
+            self._in_flight_events[event.MessageId] = event
             self.publish_upstream(event, AckRequired=True)
-        result = self._event_persister.persist(
-            event.MessageId, event.model_dump_json().encode(PERSISTER_ENCODING)
-        )
+        else:
+            result = self._event_persister.persist(
+                event.MessageId, event.model_dump_json().encode(PERSISTER_ENCODING)
+            )
         self._logger.path(
             "--generate_event %s  f: %d  (p: %d)  path:0x%08X",
             event.TypeName,
-            0,  # len(self._in_flight_events),
+            len(self._in_flight_events),
             self._event_persister.num_pending,
             path_dbg,
         )
@@ -505,9 +521,17 @@ class LinkManager:
                         message.Payload.client_name
                     )
                     self._reuploads.clear()
+                    self.flush_in_flight_events()
             case _:
                 result = state_result
         return result
+
+    def flush_in_flight_events(self) -> None:
+        for event_id, event in self._in_flight_events.items():
+            self._event_persister.persist(
+                event_id, event.model_dump_json().encode(PERSISTER_ENCODING)
+            )
+        self._in_flight_events.clear()
 
     def process_mqtt_connect_fail(
         self, message: Message[MQTTConnectFailPayload]
@@ -540,23 +564,21 @@ class LinkManager:
         match state_result := self._states.process_ack_timeout(wait_info.link_name):
             case Ok():
                 path_dbg |= 0x00000001
-                # https://youtrack.jetbrains.com/issue/PY-76059/Incorrect-Type-warning-with-asdict-and-Dataclass
-                # noinspection PyTypeChecker
-                result = Ok(
-                    LinkManagerTransition(
-                        canceled_acks=[wait_info], **(asdict(state_result.value))
-                    )
+                transition = LinkManagerTransition(
+                    canceled_acks=[wait_info], **(asdict(state_result.value))
                 )
-                if result.value.deactivated():
+                if transition.deactivated():
                     path_dbg |= 0x00000002
+                    self.flush_in_flight_events()
                     self._reuploads.clear()
                     self.generate_event(
-                        ResponseTimeoutEvent(PeerName=result.value.link_name)
+                        ResponseTimeoutEvent(PeerName=transition.link_name)
                     )
-                    self._logger.comm_event(str(result.value))
-                    result.value.canceled_acks.extend(
+                    self._logger.comm_event(str(transition))
+                    transition.canceled_acks.extend(
                         self._acks.cancel_ack_timers(wait_info.link_name)
                     )
+                result = Ok(transition)
             case _:
                 result = Err(state_result.err())
         self._logger.path("--LinkManager.process_ack_timeout path:0x%08X", path_dbg)
@@ -566,17 +588,22 @@ class LinkManager:
         self._logger.path("++LinkManager.process_ack  <%s>  %s", link_name, message_id)
         path_dbg = 0
         wait_info = self._acks.cancel_ack_timer(link_name, message_id)
-        if wait_info is not None and message_id in self._event_persister:
+        if wait_info is not None:
             path_dbg |= 0x00000001
-            self._event_persister.clear(message_id)
-            if self._reuploads.reuploading() and link_name == self.upstream_client:
+            if message_id in self._in_flight_events:
                 path_dbg |= 0x00000002
-                self._continue_reupload(
-                    self._reuploads.process_ack_for_reupload(message_id)
-                )
-                if not self._reuploads.reuploading():
-                    path_dbg |= 0x00000004
-                    self._logger.info("reupload complete.")
+                self._in_flight_events.pop(message_id)
+            elif message_id in self._event_persister:
+                path_dbg |= 0x00000004
+                self._event_persister.clear(message_id)
+                if self._reuploads.reuploading() and link_name == self.upstream_client:
+                    path_dbg |= 0x00000008
+                    self._continue_reupload(
+                        self._reuploads.process_ack_for_reupload(message_id)
+                    )
+                    if not self._reuploads.reuploading():
+                        path_dbg |= 0x00000010
+                        self._logger.info("reupload complete.")
         self._logger.path("--LinkManager.process_ack path:0x%08X", path_dbg)
 
     def send_ack(self, link_name: str, message: Message[Any]) -> None:
