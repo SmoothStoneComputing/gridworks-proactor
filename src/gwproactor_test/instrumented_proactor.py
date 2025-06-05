@@ -161,6 +161,8 @@ class InstrumentedProactor(Proactor):
     _subacks_paused: dict[str, bool]
     _subacks_available: dict[str, list[Message[Any]]]
     _mqtt_messages_dropped: dict[str, bool]
+    DELIMIT_CHAR = "#"
+    DELIMIT_STR = DELIMIT_CHAR * 150
 
     def __init__(self, config: ProactorConfig) -> None:
         super().__init__(config)
@@ -289,6 +291,11 @@ class InstrumentedProactor(Proactor):
     def set_ack_timeout_seconds(self, delay: float) -> None:
         self.links.ack_manager._default_delay_seconds = delay  # noqa: SLF001
 
+    def restore_ack_timeout_seconds(self) -> None:
+        self.links.ack_manager._default_delay_seconds = (  # noqa: SLF001
+            self.settings.proactor.ack_timeout_seconds
+        )
+
     def drop_mqtt(self, client_name: str, drop: bool) -> None:
         self._mqtt_messages_dropped[client_name] = drop
 
@@ -316,6 +323,14 @@ class InstrumentedProactor(Proactor):
 
     def summarize(self) -> None:
         self._logger.info(self.summary_str())
+
+    def delimit(self, text: str = "") -> None:
+        if self._logger.general_enabled:
+            self._logger.info(
+                f"\n\n{self.DELIMIT_STR}\n"
+                f"{self.DELIMIT_CHAR}  {text}\n"
+                f"{self.DELIMIT_STR}\n"
+            )
 
     def force_ping(self, client_name: str) -> None:
         self._links.publish_message(client_name, PingMessage(Src=self.publication_name))

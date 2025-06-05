@@ -282,9 +282,13 @@ class LinkManager:
         )
 
     def generate_event(self, event: EventT) -> Result[bool, Exception]:
-        num_pending_dbg = self._event_persister.num_pending
-        self._logger.path("++generate_event %s  %d", event.TypeName, num_pending_dbg)
         path_dbg = 0
+        self._logger.path(
+            "++generate_event %s  f: %d  (p: %d)",
+            event.TypeName,
+            0,  # len(self._in_flight_events),
+            self._event_persister.num_pending,
+        )
         if not event.Src:
             path_dbg |= 0x00000001
             event.Src = self.publication_name
@@ -308,11 +312,11 @@ class LinkManager:
             event.MessageId, event.model_dump_json().encode(PERSISTER_ENCODING)
         )
         self._logger.path(
-            "--generate_event %s  path:0x%08X  %d - %d",
+            "--generate_event %s  f: %d  (p: %d)  path:0x%08X",
             event.TypeName,
-            path_dbg,
-            num_pending_dbg,
+            0,  # len(self._in_flight_events),
             self._event_persister.num_pending,
+            path_dbg,
         )
         return result
 

@@ -11,6 +11,7 @@ from pydantic_settings import BaseSettings
 
 from gwproactor import AppSettings, Proactor, setup_logging
 from gwproactor.app import App
+from gwproactor.config import DEFAULT_BASE_NAME as DEFAULT_LOG_BASE_NAME
 from gwproactor.config import MQTTClient, Paths
 from gwproactor_test import copy_keys
 from gwproactor_test.certs import uses_tls
@@ -135,6 +136,8 @@ class LiveTest:
         )
         if not self.lifecycle_logging and not self.verbose and not app_verbose:
             app_settings.logging.levels.lifecycle = logging.WARNING
+        if app_settings.logging.base_log_name == str(DEFAULT_LOG_BASE_NAME):
+            app_settings.logging.base_log_name = f"{DEFAULT_LOG_BASE_NAME}-{paths.name}"
 
         # Create the app
         app = app_type(

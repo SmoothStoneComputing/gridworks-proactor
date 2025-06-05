@@ -1,5 +1,4 @@
 # ruff: noqa: ERA001
-
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -174,7 +173,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         assert child_links.num_reuploaded_unacked == 0
         assert not child_links.reuploading()
 
-        # Generate more events than fit in pipe.
+        # Generate more events than fit in reupload pipe.
         events_to_generate = child.settings.proactor.num_initial_event_reuploads * 2
         for i in range(events_to_generate):
             child.generate_event(
@@ -186,9 +185,21 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         child.logger.info(
             f"Generated {events_to_generate} events. Total pending events: {child_links.num_pending}"
         )
+        await await_for(
+            lambda: child_links.link_state(child.upstream_client)
+            == StateName.awaiting_peer,
+            1,
+            "ERROR wait for child to flush all events to database",
+            err_str_f=h.summary_str,
+        )
+
+        assert child.links.num_pending == base_num_pending + events_to_generate
         assert child_links.num_reupload_pending == 0
         assert child_links.num_reuploaded_unacked == 0
         assert not child_links.reuploading()
+
+        # Restore child to normal ack timeout
+        child.restore_ack_timeout_seconds()
 
         # pause parent acks so that we watch flow control
         h.parent.pause_acks()
@@ -244,7 +255,6 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         assert child_links.num_pending == last_num_to_reupload + 1
         assert child_links.reuploading()
 
-        # noinspection PyTypeChecker
         parent_ack_topic = MQTTTopic.encode(
             "gw",
             h.parent.publication_name,
@@ -259,11 +269,11 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         #   (for the PeerActive event) and others could arrive if, for example, a duplicate MQTT message appeared.
         #
         end_time = time.time() + 5
-        # loop_count_dbg = 0
+        loop_count_dbg = 0
         acks_released = 0
         while child_links.reuploading() and time.time() < end_time:
-            # loop_path_dbg = 0
-            # loop_count_dbg += 1
+            loop_path_dbg = 0
+            loop_count_dbg += 1
 
             # release one ack
             acks_released += h.parent.release_acks(num_to_release=1)
@@ -308,11 +318,12 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
                     f"({curr_num_reuploaded_unacked}, {curr_num_repuload_pending})"
                 )
 
-            # child.logger.info(
-            #     f"ack loop: {loop_count_dbg} / {acks_released}:"
-            #     f"({last_num_reuploaded_unacked}, {last_num_repuload_pending}) -> "
-            #     f"({curr_num_reuploaded_unacked}, {curr_num_repuload_pending})"
-            #     f" loop_path_dbg: 0x{loop_path_dbg:08X}")
+            child.logger.info(
+                f"ack loop: {loop_count_dbg} / {acks_released}:"
+                f"({last_num_reuploaded_unacked}, {last_num_repuload_pending}) -> "
+                f"({curr_num_reuploaded_unacked}, {curr_num_repuload_pending})"
+                f" loop_path_dbg: 0x{loop_path_dbg:08X}"
+            )
 
             last_num_to_reupload = curr_num_to_reuplad
             last_num_reuploaded_unacked = curr_num_reuploaded_unacked
