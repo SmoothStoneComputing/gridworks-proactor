@@ -166,16 +166,12 @@ async def test_basic_comm_child_first(request: Any) -> None:
 
         # wait for all events to be acked
         await await_for(
-            lambda: child.event_persister.num_pending == 0,
+            lambda: child.event_persister.num_pending == 0
+            and child.links.num_in_flight == 0,
             1,
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )
-        if child.links.num_in_flight > 0:
-            import rich
-
-            rich.print(child.links.in_flight_events)
-        assert child.links.num_in_flight == 0
         # peer active event should never be persisted
         assert child.event_persister.num_persists == 6
         assert child.event_persister.num_retrieves == 6
