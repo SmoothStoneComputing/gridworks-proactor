@@ -14,7 +14,7 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_awaiting_setup_and_peer(request: Any) -> None:
+async def test_awaiting_setup_and_peer_happy_path(request: Any) -> None:
     """
     Test:
      (connecting -> connected -> awaiting_setup_and_peer)
@@ -68,6 +68,8 @@ async def test_awaiting_setup_and_peer(request: Any) -> None:
         assert len(stats.comm_events) == 2
         for comm_event in stats.comm_events:
             assert comm_event.MessageId in child.event_persister
+        assert child.event_persister.num_persists == 3
+        assert child.links.num_in_flight == 0
 
         # Tell client we lost comm
         child.pause_upstream_subacks()
@@ -88,6 +90,8 @@ async def test_awaiting_setup_and_peer(request: Any) -> None:
         assert len(stats.comm_events) == 4
         for comm_event in stats.comm_events:
             assert comm_event.MessageId in child.event_persister
+        assert child.event_persister.num_persists == 5
+        assert child.links.num_in_flight == 0
 
         # Tell client we lost comm
         child.clear_upstream_subacks()
@@ -113,6 +117,8 @@ async def test_awaiting_setup_and_peer(request: Any) -> None:
         assert len(stats.comm_events) == 6
         for comm_event in stats.comm_events:
             assert comm_event.MessageId in child.event_persister
+        assert child.event_persister.num_persists == 7
+        assert child.links.num_in_flight == 0
 
         # Allow suback to arrive
         child.release_upstream_subacks()
@@ -131,6 +137,8 @@ async def test_awaiting_setup_and_peer(request: Any) -> None:
         assert len(stats.comm_events) == 7
         for comm_event in stats.comm_events:
             assert comm_event.MessageId in child.event_persister
+        assert child.event_persister.num_persists == 8
+        assert child.links.num_in_flight == 0
 
 
 @pytest.mark.asyncio
@@ -141,14 +149,18 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
      (awaiting_setup_and_peer -> mqtt_suback -> awaiting_setup_and_peer)
      (awaiting_setup_and_peer -> mqtt_suback -> awaiting_peer)
      (awaiting_setup_and_peer -> message_from_peer -> awaiting_setup)
-    Force 1 suback per subscription. By default MQTTClientWrapper packs as many subscriptions as possible into a
-    single subscribe message, so by default child only receives a single suback for all subscriptions.
-    So that we can test (awaiting_setup_and_peer -> mqtt_suback -> awaiting_setup_and_peer) self-loop transition,
-    which might occur if we have too many subscriptions for that to be possible, we force the suback response to
+
+    Force 1 suback per subscription. By default MQTTClientWrapper packs as many
+    subscriptions as possible into a single subscribe message, so by default
+    child only receives a single suback for all subscriptions. So that we can
+    test (awaiting_setup_and_peer -> mqtt_suback -> awaiting_setup_and_peer)
+    self-loop transition, which might occur if we have too many subscriptions
+    for single-message-packing to be possible, we force the suback response to
     be split into multiple messages.
 
-    In practice these might be corner cases that rarely or never occur, since by default all subacks will come and
-    one message and we should not receive any messages before subscribing.
+    In practice these might be corner cases that rarely or never occur, since
+    by default all subacks will come and one message and we should not receive
+    any messages before subscribing.
     """
     async with LiveTest(add_child=True, request=request) as h:
         child = h.child
@@ -185,6 +197,8 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         assert len(stats.comm_events) == 1
         for comm_event in stats.comm_events:
             assert comm_event.MessageId in child.event_persister
+        assert child.event_persister.num_persists == 2
+        assert child.links.num_in_flight == 0
 
         # Allow one suback at a time to arrive
         # suback 1/3
@@ -199,6 +213,8 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
             err_str_f=child.summary_str,
         )
         assert StateName(link.state) == StateName.awaiting_setup_and_peer
+        assert child.event_persister.num_persists == 2
+        assert child.links.num_in_flight == 0
 
         # suback 2/3
         # (mqtt_suback -> awaiting_setup_and_peer)
@@ -211,6 +227,8 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
             err_str_f=child.summary_str,
         )
         assert StateName(link.state) == StateName.awaiting_setup_and_peer
+        assert child.event_persister.num_persists == 2
+        assert child.links.num_in_flight == 0
 
         # suback 3/3
         # (mqtt_suback -> awaiting_peer)
@@ -232,6 +250,8 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         assert len(stats.comm_events) == 2
         for comm_event in stats.comm_events:
             assert comm_event.MessageId in child.event_persister
+        assert child.event_persister.num_persists == 3
+        assert child.links.num_in_flight == 0
 
         # (message_from_peer -> awaiting_setup)
         # Tell client we lost comm
@@ -253,10 +273,12 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         assert len(stats.comm_events) == 4
         for comm_event in stats.comm_events:
             assert comm_event.MessageId in child.event_persister
+        assert child.event_persister.num_persists == 5
+        assert child.links.num_in_flight == 0
 
         # Allow one suback at a time to arrive
-        # (Not strictly necessary, since message receiving code does not check if the source topic suback
-        #  has arrived).
+        # (Not strictly necessary, since message receiving code does not check
+        # if the source topic suback has arrived).
         num_subacks = child.stats.num_received_by_type["mqtt_suback"]
         child.release_upstream_subacks(1)
         exp_subacks = num_subacks + 1
@@ -267,6 +289,8 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
             err_str_f=h.summary_str,
         )
         assert StateName(link.state) == StateName.awaiting_setup_and_peer
+        assert child.event_persister.num_persists == 5
+        assert child.links.num_in_flight == 0
 
         # Start the parent, wait for it to send us a message, which will
         # transition us into awaiting_setup
@@ -286,10 +310,12 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
         assert comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 1
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 1
         assert len(stats.comm_events) == 4
+        assert child.event_persister.num_persists == 5
+        assert child.links.num_in_flight == 0
 
 
 @pytest.mark.asyncio
-async def test_awaiting_setup2__(request: Any) -> None:
+async def test_awaiting_setup_state(request: Any) -> None:
     """
     Test awaiting_setup (corner state):
      (awaiting_setup_and_peer -> message_from_peer -> awaiting_setup)
@@ -297,14 +323,17 @@ async def test_awaiting_setup2__(request: Any) -> None:
      (awaiting_setup -> mqtt_suback -> active)
      (awaiting_setup -> message_from_peer -> awaiting_setup)
      (awaiting_setup -> disconnected -> connecting)
-    Force 1 suback per subscription. By default MQTTClientWrapper packs as many subscriptions as possible into a
-    single subscribe message, so by default child only receives a single suback for all subscriptions.
-    So that we can test (awaiting_setup_and_peer -> mqtt_suback -> awaiting_setup_and_peer) self-loop transition,
-    which might occur if we have too many subscriptions for that to be possible, we force the suback response to
-    be split into multiple messages.
+    Force 1 suback per subscription. By default MQTTClientWrapper packs as many
+    subscriptions as possible into a single subscribe message, so by default
+    child only receives a single suback for all subscriptions. So that we can
+    test (awaiting_setup_and_peer -> mqtt_suback -> awaiting_setup_and_peer)
+    self-loop transition, which might occur if we have too many subscriptions
+    for that to be possible, we force the suback response to be split into
+    multiple messages.
 
-    In practice these might be corner cases that rarely or never occur, since by default all subacks will come and
-    one message and we should not receive any messages before subscribing.
+    In practice these might be corner cases that rarely or never occur, since by
+    default all subacks will come and one message and we should not receive any
+    messages before subscribing.
     """
     async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
@@ -345,6 +374,8 @@ async def test_awaiting_setup2__(request: Any) -> None:
         assert len(stats.comm_events) == 1
         for comm_event in stats.comm_events:
             assert comm_event.MessageId in child.event_persister
+        assert child.event_persister.num_persists == 2
+        assert child.links.num_in_flight == 0
 
         # Allow one suback at a time to arrive
         # (Not strictly necessary, since message receiving code does not check if the source topic suback
@@ -359,6 +390,8 @@ async def test_awaiting_setup2__(request: Any) -> None:
             err_str_f=h.summary_str,
         )
         assert StateName(link.state) == StateName.awaiting_setup_and_peer
+        assert child.event_persister.num_persists == 2
+        assert child.links.num_in_flight == 0
 
         # (awaiting_setup_and_peer -> message_from_peer -> awaiting_setup)
         # Start the parent, wait for it to send us a message, which will
@@ -379,6 +412,16 @@ async def test_awaiting_setup2__(request: Any) -> None:
         assert comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 0
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert len(stats.comm_events) == 1
+        assert child.event_persister.num_persists == 2
+        assert child.links.num_in_flight == 0
+        # parent should have persisted:
+        exp_events = sum(
+            [
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+            ]
+        )
+        assert h.parent.event_persister.num_persists == exp_events
 
         # (awaiting_setup -> mqtt_suback -> awaiting_setup)
         # Allow another suback to arrive, remaining in awaiting_setup
@@ -391,11 +434,12 @@ async def test_awaiting_setup2__(request: Any) -> None:
             err_str_f=h.summary_str,
         )
         assert StateName(link.state) == StateName.awaiting_setup
+        assert child.event_persister.num_persists == 2
+        assert child.links.num_in_flight == 0
 
         # (awaiting_setup -> message_from_peer -> awaiting_setup)
         # Receive another message from peer, remaining in awaiting_setup
 
-        # noinspection PyTypeChecker
         dbg_topic = MQTTTopic.encode(
             "gw",
             parent.publication_name,
@@ -411,6 +455,8 @@ async def test_awaiting_setup2__(request: Any) -> None:
             err_str_f=h.summary_str,
         )
         assert StateName(link.state) == StateName.awaiting_setup
+        assert child.event_persister.num_persists == 3
+        assert child.links.num_in_flight == 0
 
         # (awaiting_setup -> disconnected -> connecting)
         # Tell client we lost comm
@@ -430,6 +476,8 @@ async def test_awaiting_setup2__(request: Any) -> None:
         assert len(stats.comm_events) == 3
         for comm_event in stats.comm_events:
             assert comm_event.MessageId in child.event_persister
+        assert child.event_persister.num_persists == 5
+        assert child.links.num_in_flight == 0
 
         # Allow one suback at a time to arrive
         # (Not strictly necessary, since message receiving code does not check if the source topic suback
@@ -444,6 +492,8 @@ async def test_awaiting_setup2__(request: Any) -> None:
             err_str_f=h.summary_str,
         )
         assert StateName(link.state) == StateName.awaiting_setup_and_peer
+        assert child.event_persister.num_persists == 5
+        assert child.links.num_in_flight == 0
 
         # (awaiting_setup_and_peer -> message_from_peer -> awaiting_setup)
         # Force parent to restore comm, delivering a message, sending us to awaiting_setup
@@ -454,6 +504,17 @@ async def test_awaiting_setup2__(request: Any) -> None:
             "ERROR waiting for message from peer",
             err_str_f=h.summary_str,
         )
+        assert child.event_persister.num_persists == 5
+        assert child.links.num_in_flight == 0
+        # parent should have persisted:
+        exp_events = sum(
+            [
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+                4,  # parent disconnect, connect, subscribe, peer active
+            ]
+        )
+        assert h.parent.event_persister.num_persists == exp_events
 
         # (awaiting_setup -> mqtt_suback -> active)
         # Release all subacks, allowing child to go active
@@ -463,4 +524,24 @@ async def test_awaiting_setup2__(request: Any) -> None:
             1,
             "ERROR waiting for active",
             err_str_f=h.summary_str,
+        )
+        await await_for(
+            lambda: child.links.num_pending == 0 and child.links.num_in_flight == 0,
+            1,
+            "ERROR waiting for active",
+            err_str_f=h.summary_str,
+        )
+        # suback never gets persisted, since we've already heard from peer when
+        # it arrives.
+        assert child.event_persister.num_persists == 5
+        assert child.links.num_in_flight == 0
+        exp_events = sum(
+            [
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+                4,  # parent disconnect, connect, subscribe, peer active
+                1,  # child startup
+                1,  # child connect,
+                4,  # child disconnect, connect, subscribed,peer active
+            ]
         )
