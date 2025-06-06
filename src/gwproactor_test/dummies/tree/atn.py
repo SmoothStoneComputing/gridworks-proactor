@@ -30,6 +30,7 @@ class DummyAtn(PrimeActor):
         match decoded.Payload:
             case EventBase():
                 path_dbg |= 0x00000001
+                self.services.generate_event(decoded.Payload)
             case _:
                 path_dbg |= 0x00000002
         self.services.logger.path(

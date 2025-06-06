@@ -4,6 +4,7 @@ import typing
 from typing import Any
 
 from gwproto import HardwareLayout, Message
+from gwproto.messages import EventBase
 from result import Ok, Result
 
 from gwproactor import App, AppSettings
@@ -11,7 +12,7 @@ from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
-from gwproactor.message import DBGPayload
+from gwproactor.message import DBGPayload, MQTTReceiptPayload
 from gwproactor.persister import PersisterInterface, SimpleDirectoryWriter
 from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
 
@@ -28,6 +29,25 @@ class DummyParent(PrimeActor):
                 message.Header.Dst = ""
                 self.services.publish_message(dst_client, message)
         return Ok(True)
+
+    def process_mqtt_message(
+        self, mqtt_client_message: Message[MQTTReceiptPayload], decoded: Message[Any]
+    ) -> None:
+        self.services.logger.path(
+            f"++{self.name}.process_mqtt_message %s",
+            mqtt_client_message.Payload.message.topic,
+        )
+        path_dbg = 0
+        self.services.stats.add_message(decoded)
+        match decoded.Payload:
+            case EventBase():
+                path_dbg |= 0x00000001
+                self.services.generate_event(decoded.Payload)
+            case _:
+                path_dbg |= 0x00000002
+        self.services.logger.path(
+            f"--{self.name}.process_mqtt_message  path:0x%08X", path_dbg
+        )
 
 
 class DummyParentSettings(AppSettings):

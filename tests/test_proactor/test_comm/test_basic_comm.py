@@ -176,6 +176,11 @@ async def test_basic_comm_child_first(request: Any) -> None:
         assert child.event_persister.num_persists == 6
         assert child.event_persister.num_retrieves == 6
         assert child.event_persister.num_clears == 6
+        # parent persists:
+        #   parent-startup, parent-connect, parent-subscribe +
+        #   events persisted and then reuploaded by child +
+        #   1 peer active event for parent and *2* for child.
+        assert h.parent.event_persister.num_persists == (3 + 6 + 3)
 
 
 @pytest.mark.asyncio
@@ -253,6 +258,11 @@ async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None
         assert child.event_persister.num_persists == 3
         assert child.event_persister.num_retrieves == 3
         assert child.event_persister.num_clears == 3
+        # parent persists:
+        #   parent-startup, parent-connect, parent-subscribe +
+        #   events persisted and then reuploaded by child +
+        #   1 peer active event for parent and 1 for child.
+        assert parent.event_persister.num_persists == 8
 
 
 @pytest.mark.asyncio
@@ -298,10 +308,20 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
         )
-        # peer-active event should never be persisted
+        # peer-active event should never be persisted on the child
         assert child.event_persister.num_persists == 3
         assert child.event_persister.num_retrieves == 3
         assert child.event_persister.num_clears == 3
+        # parent should have persisted:
+        exp_events = sum(
+            [
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+                1,  # child startup
+                3,  # child connect, subscribe, peer active
+            ]
+        )
+        assert h.parent.event_persister.num_persists == exp_events
 
         # Tell *child* client we lost comm.
         child.force_mqtt_disconnect(child.upstream_client)
@@ -337,6 +357,17 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
         assert child.event_persister.num_persists == 6
         assert child.event_persister.num_retrieves == 6
         assert child.event_persister.num_clears == 6
+        # parent should have persisted:
+        exp_events = sum(
+            [
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+                1,  # child startup
+                3,  # child connect, subscribe, peer active
+                4,  # child disconnect, connect, subscribe, peer active
+            ]
+        )
+        assert h.parent.event_persister.num_persists == exp_events
 
         # get ping topic and current number of pings
         parent_ping_topic = MQTTTopic.encode(
@@ -379,6 +410,26 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
         assert child.event_persister.num_retrieves == 6
         assert child.event_persister.num_clears == 6
 
+        await await_for(
+            lambda: parent.links.link_state(parent.downstream_client)
+            == StateName.active,
+            3,
+            "ERROR waiting for arent to be active",
+            err_str_f=child.summary_str,
+        )
+        # parent should have persisted:
+        exp_events = sum(
+            [
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+                1,  # child startup
+                3,  # child connect, subscribe, peer active
+                4,  # child disconnect, connect, subscribe, peer active
+                4,  # parent disconnect, connect, subscribe, peer active
+            ]
+        )
+        assert h.parent.event_persister.num_persists == exp_events
+
         # Tell *both* clients we lost comm.
         parent.force_mqtt_disconnect(parent.downstream_client)
         child.force_mqtt_disconnect(child.upstream_client)
@@ -414,3 +465,18 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
         assert child.event_persister.num_persists == 9
         assert child.event_persister.num_retrieves == 9
         assert child.event_persister.num_clears == 9
+
+        # parent should have persisted:
+        exp_events = sum(
+            [
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+                1,  # child startup
+                3,  # child connect, subscribe, peer active
+                4,  # child disconnect, connect, subscribe, peer active
+                4,  # parent disconnect, connect, subscribe, peer active
+                4,  # child disconnect, connect, subscribe, peer active
+                4,  # parent disconnect, connect, subscribe, peer active
+            ]
+        )
+        assert h.parent.event_persister.num_persists == exp_events
