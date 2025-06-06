@@ -1,4 +1,4 @@
-# ruff: noqa: ERA001
+# ruff: noqa: ERA001,PLR2004
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -59,7 +59,9 @@ async def test_reupload_basic(request: Any) -> None:
 
         # Wait for reuploading to complete
         await await_for(
-            lambda: reupload_counts.completed > 0,
+            lambda: reupload_counts.completed > 0
+            and child.links.num_pending == 0
+            and child.links.num_in_flight == 0,
             1,
             "ERROR waiting for re-upload to complete",
             err_str_f=h.summary_str,
@@ -69,6 +71,21 @@ async def test_reupload_basic(request: Any) -> None:
         assert child.links.num_reupload_pending == 0
         assert child.links.num_reuploaded_unacked == 0
         assert not child.links.reuploading()
+
+        assert child.event_persister.num_persists == 3
+        assert child.event_persister.num_retrieves == 3
+        assert child.event_persister.num_clears == 3
+
+        # parent should have persisted:
+        exp_events = sum(
+            [
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+                1,  # child startup
+                3,  # child connect, subscribe, peer active
+            ]
+        )
+        assert h.parent.event_persister.num_persists == exp_events
 
 
 @pytest.mark.asyncio
@@ -100,8 +117,7 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
             err_str_f=h.summary_str,
         )
         # Some events should have been generated, and they should have all been sent
-        base_num_pending = child.links.num_pending
-        assert base_num_pending > 0
+        assert child.links.num_pending == 3
         assert child.links.num_reupload_pending == 0
         assert child.links.num_reuploaded_unacked == 0
         assert not child.links.reuploading()
@@ -115,9 +131,15 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
                     Msg=f"event {i + 1} / {events_to_generate}",
                 )
             )
+            assert child.links.num_pending == 3 + i + 1
         child.logger.info(
             f"Generated {events_to_generate} events. Total pending events: {child.links.num_pending}"
         )
+        assert child.links.num_pending == (3 + events_to_generate)
+        assert child.links.num_in_flight == 0
+        assert child.event_persister.num_persists == (3 + events_to_generate)
+        assert child.event_persister.num_retrieves == 0
+        assert child.event_persister.num_clears == 0
 
         # Start parent, wait for connect.
         h.start_parent()
@@ -130,11 +152,27 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
 
         # Wait for reupload to complete
         await await_for(
-            lambda: reupload_counts.completed > 0,
+            lambda: reupload_counts.completed > 0
+            and child.links.num_pending == 0
+            and child.links.num_in_flight == 0,
             1,
             "ERROR waiting for reupload to complete",
             err_str_f=h.summary_str,
         )
+        assert child.event_persister.num_persists == (3 + events_to_generate)
+        assert child.event_persister.num_retrieves == child.event_persister.num_persists
+        assert child.event_persister.num_clears == child.event_persister.num_persists
+        # parent should have persisted:
+        exp_events = sum(
+            [
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+                1,  # child startup
+                3,  # child connect, subscribe, peer active
+                events_to_generate,  # generated events
+            ]
+        )
+        assert h.parent.event_persister.num_persists == exp_events
 
 
 @pytest.mark.asyncio
@@ -167,8 +205,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         # Some events should happened already, through the startup and mqtt connect process, and they should have
         # all been sent.
         # These events include: There are at least 3 non-generated events: startup, (mqtt connect, mqtt subscribed)/mqtt client.
-        base_num_pending = child_links.num_pending
-        assert base_num_pending > 0
+        assert child_links.num_pending == 3
         assert child_links.num_reupload_pending == 0
         assert child_links.num_reuploaded_unacked == 0
         assert not child_links.reuploading()
@@ -193,7 +230,11 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
             err_str_f=h.summary_str,
         )
 
-        assert child.links.num_pending == base_num_pending + events_to_generate
+        assert child.links.num_pending == 3 + events_to_generate
+        assert child.links.num_in_flight == 0
+        assert child.event_persister.num_persists == (3 + events_to_generate)
+        assert child.event_persister.num_retrieves == 0
+        assert child.event_persister.num_clears == 0
         assert child_links.num_reupload_pending == 0
         assert child_links.num_reuploaded_unacked == 0
         assert not child_links.reuploading()
@@ -236,7 +277,7 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         # A "PeerActive" event is also pending but that is _not_ part of re-upload because it is
         # generated _after_ the peer is active (and therefore has its own ack timeout running, so does not need to
         # be managed by reupload).
-        last_num_to_reupload = events_to_generate + base_num_pending
+        last_num_to_reupload = events_to_generate + 3
         last_num_reuploaded_unacked = (
             child.settings.proactor.num_initial_event_reuploads
         )
@@ -252,8 +293,15 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         )
         assert child_links.num_reuploaded_unacked == last_num_reuploaded_unacked, err_s
         assert child_links.num_reupload_pending == last_num_repuload_pending, err_s
-        assert child_links.num_pending == last_num_to_reupload
         assert child_links.reuploading()
+        assert child_links.num_pending == last_num_to_reupload
+        assert child.links.num_in_flight == 1
+        assert child.event_persister.num_persists == last_num_to_reupload
+        assert (
+            child.event_persister.num_retrieves
+            == child.settings.proactor.num_initial_event_reuploads
+        )
+        assert child.event_persister.num_clears == 0
 
         parent_ack_topic = MQTTTopic.encode(
             "gw",
@@ -270,12 +318,41 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
         #
         end_time = time.time() + 5
         loop_count_dbg = 0
+        loop_path_dbg = 0
         acks_released = 0
+        last_pending = child_links.num_pending
+        last_in_flight = child.links.num_in_flight
+        assert last_in_flight == 1
+        last_persists = child.event_persister.num_persists
+        initial_persists = child.event_persister.num_persists
+        last_retrieves = child.event_persister.num_retrieves
+        last_clears = child.event_persister.num_clears
+        curr_num_reuploaded_unacked = child_links.num_reuploaded_unacked
+        curr_num_repuload_pending = child_links.num_reupload_pending
+        curr_num_to_reuplad = curr_num_reuploaded_unacked + curr_num_repuload_pending
+
+        def _loop_dbg(tag: str = "") -> str:
+            return (
+                f"ack loop: {loop_count_dbg} ({acks_released}): "
+                f"reupload: ({last_num_reuploaded_unacked}, {last_num_repuload_pending}) -> "
+                f"({curr_num_reuploaded_unacked}, {curr_num_repuload_pending})  "
+                f"in-flight/pending: ({last_in_flight}, {last_pending}) -> "
+                f"({child.links.num_in_flight}, {child_links.num_pending})  "
+                f"persister: ({last_persists}, {last_retrieves}, {last_clears}) -> "
+                f"({child.event_persister.num_persists}, "
+                f"{child.event_persister.num_retrieves}, "
+                f"{child.event_persister.num_clears})  "
+                f"loop_path_dbg: 0x{loop_path_dbg:08X}{f'  [{tag}]' if tag else ''}"
+            )
+
+        assert child_links.num_pending == last_num_to_reupload
+        child.logger.info(_loop_dbg("pre-loop"))
         while child_links.reuploading() and time.time() < end_time:
             loop_path_dbg = 0
             loop_count_dbg += 1
 
             # release one ack
+            assert child_links.num_pending == last_pending
             acks_released += h.parent.release_acks(num_to_release=1)
 
             # Wait for child to receive an ack
@@ -295,12 +372,37 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
             curr_num_to_reuplad = (
                 curr_num_reuploaded_unacked + curr_num_repuload_pending
             )
+
+            # There should be no persisting during reupload.
+            assert child.event_persister.num_persists == initial_persists
+
+            # The peer active event is not part of re-upload, and might get
+            # acked during the re-upload. There should be no other in-flight
+            # events.
+            if child.links.num_in_flight not in (1, 0):
+                raise ValueError(
+                    f"ERROR got unexpected num_in_flight "
+                    f"({child.links.num_in_flight}). Expected 1 or 0"
+                )
+            # ack of a re-upload event
+            if child.links.num_in_flight == 1:
+                assert child_links.num_pending == last_pending - 1
+                assert child.event_persister.num_retrieves == last_retrieves + 1
+                assert child.event_persister.num_clears == last_clears + 1
+            # ack of the peer-active, in-flight event
+            elif last_in_flight == 1 and child.links.num_in_flight == 0:
+                assert child_links.num_pending == last_pending
+                assert child.event_persister.num_retrieves == last_retrieves
+                assert child.event_persister.num_clears == last_clears
+
+            # ack of the peer active event
             if curr_num_to_reuplad == last_num_to_reupload:
-                # loop_path_dbg |= 0x00000001
+                loop_path_dbg |= 0x00000001
                 assert curr_num_reuploaded_unacked == last_num_reuploaded_unacked
                 assert curr_num_repuload_pending == last_num_repuload_pending
+            # ack of a re-upload event
             elif curr_num_to_reuplad == last_num_to_reupload - 1:
-                # loop_path_dbg |= 0x00000002
+                loop_path_dbg |= 0x00000002
                 if curr_num_reuploaded_unacked == last_num_reuploaded_unacked:
                     assert curr_num_repuload_pending == last_num_repuload_pending - 1
                 else:
@@ -318,16 +420,15 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
                     f"({curr_num_reuploaded_unacked}, {curr_num_repuload_pending})"
                 )
 
-            child.logger.info(
-                f"ack loop: {loop_count_dbg} / {acks_released}:"
-                f"({last_num_reuploaded_unacked}, {last_num_repuload_pending}) -> "
-                f"({curr_num_reuploaded_unacked}, {curr_num_repuload_pending})"
-                f" loop_path_dbg: 0x{loop_path_dbg:08X}"
-            )
-
+            child.logger.info(_loop_dbg("iteration complete"))
             last_num_to_reupload = curr_num_to_reuplad
             last_num_reuploaded_unacked = curr_num_reuploaded_unacked
             last_num_repuload_pending = curr_num_repuload_pending
+            last_pending = child_links.num_pending
+            last_in_flight = child.links.num_in_flight
+            last_persists = child.event_persister.num_persists
+            last_retrieves = child.event_persister.num_retrieves
+            last_clears = child.event_persister.num_clears
 
         assert not child_links.reuploading()
 
@@ -449,8 +550,11 @@ async def test_reupload_errors(request: Any) -> None:
             "ERROR waiting for child to connect to mqtt",
             err_str_f=_err_str,
         )
-        base_num_pending = child_links.num_pending
-        assert base_num_pending > 0
+        assert child.links.num_pending == 3
+        assert child.links.num_in_flight == 0
+        assert child.event_persister.num_persists == 3
+        assert child.event_persister.num_retrieves == 0
+        assert child.event_persister.num_clears == 0
         assert child_links.num_reupload_pending == 0
         assert child_links.num_reuploaded_unacked == 0
         assert not child_links.reuploading()
@@ -462,6 +566,11 @@ async def test_reupload_errors(request: Any) -> None:
         generator.generate(num_ok=10)
         generator.generate(num_missing=10)
         generator.generate(num_ok=10)
+        assert child.links.num_pending == 63
+        assert child.links.num_in_flight == 0
+        assert child.event_persister.num_persists == 63
+        assert child.event_persister.num_retrieves == 0
+        assert child.event_persister.num_clears == 0
 
         h.start_parent()
         await await_for(
@@ -473,10 +582,17 @@ async def test_reupload_errors(request: Any) -> None:
 
         # Wait for reupload to complete
         await await_for(
-            lambda: reupload_counts.completed > 0,
+            lambda: reupload_counts.completed > 0
+            and child.links.num_pending == 0
+            and child.links.num_in_flight == 0,
             3,
             "ERROR waiting for reupload to complete",
             err_str_f=_err_str,
         )
         assert reupload_counts.started == reupload_counts.completed
-        assert parent.stats.num_events_received >= base_num_pending + 60
+        assert parent.stats.num_events_received == 64
+        assert child.links.num_pending == 0
+        assert child.links.num_in_flight == 0
+        assert child.event_persister.num_persists == 63
+        assert child.event_persister.num_retrieves == 63
+        assert child.event_persister.num_clears == 63
