@@ -289,7 +289,7 @@ class LinkManager:
         self._logger.path(
             "++generate_event %s  f: %d  (p: %d)",
             event.TypeName,
-            0,  # len(self._in_flight_events),
+            len(self._in_flight_events),
             self._event_persister.num_pending,
         )
         if not event.Src:

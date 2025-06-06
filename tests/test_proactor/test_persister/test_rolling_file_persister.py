@@ -96,6 +96,9 @@ def assert_contents(
     curr_dir: Optional[Union[str, Path]] = None,
     check_index: bool = True,
     max_bytes: Optional[int] = None,
+    num_persists: Optional[int] = None,
+    num_retrieves: Optional[int] = None,
+    num_clears: Optional[int] = None,
 ) -> None:
     assert p.num_pending == len(p.pending_ids())
     if num_pending is not None:
@@ -144,6 +147,12 @@ def assert_contents(
                 possible_day_strs
             ), f"\ngot: {got_day_strs}\nexp: {possible_day_strs}"
             assert p.curr_dir.name in possible_days_str_list
+    if num_persists is not None:
+        assert p.num_persists == num_persists
+    if num_retrieves is not None:
+        assert p.num_retrieves == num_retrieves
+    if num_clears is not None:
+        assert p.num_clears == num_clears
     if check_index:
         p2 = TimedRollingFilePersister(
             base_dir=p.base_dir,
@@ -182,6 +191,9 @@ def test_persister_happy_path(tmp_path: Path) -> None:
         num_pending=0,
         max_bytes=TimedRollingFilePersister.DEFAULT_MAX_BYTES,
         curr_bytes=0,
+        num_persists=0,
+        num_retrieves=0,
+        num_clears=0,
     )
 
     # add one
@@ -192,12 +204,16 @@ def test_persister_happy_path(tmp_path: Path) -> None:
         uids=[event.MessageId],
         num_pending=1,
         curr_bytes=len(event_bytes),
+        num_persists=1,
+        num_retrieves=0,
+        num_clears=0,
     )
 
     # retrieve
     retrieved = persister.retrieve(event.MessageId)
     assert retrieved.is_ok(), str(retrieved)
     assert retrieved.value == event_bytes
+    assert persister.num_retrieves == 1
 
     # deserialize
     loaded = json.loads(retrieved.value.decode("utf-8"))
@@ -220,6 +236,9 @@ def test_persister_happy_path(tmp_path: Path) -> None:
         uids=[event.MessageId, event2.MessageId],
         num_pending=2,
         curr_bytes=len(event_bytes) + len(event2_bytes),
+        num_persists=2,
+        num_retrieves=1,
+        num_clears=0,
     )
 
     # reindex
@@ -241,6 +260,9 @@ def test_persister_happy_path(tmp_path: Path) -> None:
         uids=[event.MessageId],
         num_pending=1,
         curr_bytes=len(event_bytes),
+        num_persists=2,
+        num_retrieves=1,
+        num_clears=1,
     )
 
     # clear first one
@@ -255,6 +277,9 @@ def test_persister_happy_path(tmp_path: Path) -> None:
         persister,
         num_pending=0,
         curr_bytes=0,
+        num_persists=2,
+        num_retrieves=1,
+        num_clears=2,
     )
 
     # reindex
@@ -269,6 +294,9 @@ def test_persister_happy_path(tmp_path: Path) -> None:
         persister,
         num_pending=0,
         curr_bytes=0,
+        num_persists=2,
+        num_retrieves=1,
+        num_clears=2,
     )
 
 
@@ -303,11 +331,17 @@ def test_persister_max_size() -> None:
             result = p.persist(event.MessageId, event.model_dump_json().encode())
             assert result.is_ok(), str(result)
             assert_contents(
-                p, num_pending=i, curr_bytes=i * len(event_bytes), uids=uids
+                p,
+                num_pending=i,
+                curr_bytes=i * len(event_bytes),
+                uids=uids,
+                num_persists=i,
+                num_retrieves=0,
+                num_clears=0,
             )
 
         # a few more - now size should not change
-        for _ in range(1, num_events_supported * 2):
+        for i in range(1, (num_events_supported * 2) + 1):
             inc_event()
             uids.append(event.MessageId)
             uids = uids[1:]
@@ -318,7 +352,11 @@ def test_persister_max_size() -> None:
                 num_pending=num_events_supported,
                 curr_bytes=num_events_supported * len(event_bytes),
                 uids=uids,
+                num_persists=num_events_supported + i,
+                num_retrieves=0,
+                num_clears=i,
             )
+        assert p.num_persists == num_events_supported * 3
 
         # add a bigger item; more than one must be removed.
         inc_event()
@@ -330,8 +368,17 @@ def test_persister_max_size() -> None:
         uids.append(event.MessageId)
         uids = uids[2:]
         result = p.persist(event.MessageId, big_event_bytes)
+        assert p.num_persists == (num_events_supported * 3) + 1
         assert result.is_ok(), str(result)
-        assert_contents(p, num_pending=exp_pending, curr_bytes=exp_size, uids=uids)
+        assert_contents(
+            p,
+            num_pending=exp_pending,
+            curr_bytes=exp_size,
+            uids=uids,
+            num_persists=(num_events_supported * 3) + 1,
+            num_retrieves=0,
+        )
+        assert p.num_clears > (num_events_supported + 1)
 
         # Cannot add one too large, state of persister doesn't change
         inc_event()
@@ -339,6 +386,7 @@ def test_persister_max_size() -> None:
         result = p.persist(event.MessageId, event.model_dump_json().encode())
         assert not result.is_ok()
         assert_contents(p, num_pending=exp_pending, curr_bytes=exp_size, uids=uids)
+        assert p.num_persists == (num_events_supported * 3) + 2
 
 
 def test_persister_roll_day() -> None:
@@ -827,18 +875,32 @@ def test_persister_problems() -> None:
 
         # _trim_old_storage, clear error, file missing
         p = TimedRollingFilePersister(settings.paths.event_dir, max_bytes=len(buf) + 50)
+        assert p.num_clears == 0
+        assert p.num_retrieves == 0
+        assert p.num_persists == 0
+
         assert p.reindex().is_ok()
         p.get_path(uids[-1]).unlink()
+        assert p.num_clears == 0
+        assert p.num_retrieves == 0
+        assert p.num_persists == 0
         problems = p.persist("xxxbla", buf).unwrap_err()
+        assert p.num_clears == 1
+        assert p.num_retrieves == 0
+        assert p.num_persists == 1
         assert len(problems.errors) == 0
         assert len(problems.warnings) == 1
         assert isinstance(problems.warnings[0], FileMissingWarning)
 
         # clear, uid missing
+        assert p.num_clears == 1
         problems = p.clear("foo").unwrap_err()
         assert len(problems.errors) == 0
         assert len(problems.warnings) == 1
         assert isinstance(problems.warnings[0], UIDMissingWarning)
+        assert p.num_clears == 2
+        assert p.num_retrieves == 0
+        assert p.num_persists == 1
 
         # retrieve, file missing
         p.persist(uids[-1], buf).expect("")
@@ -847,6 +909,9 @@ def test_persister_problems() -> None:
         assert len(problems.errors) == 1
         assert len(problems.warnings) == 0
         assert isinstance(problems.errors[0], FileMissing)
+        assert p.num_clears == 3
+        assert p.num_retrieves == 1
+        assert p.num_persists == 2
 
         # reindex, _persisted_item_from_file_path exception
         shutil.rmtree(p.base_dir)
