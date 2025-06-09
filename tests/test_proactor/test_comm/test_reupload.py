@@ -85,7 +85,13 @@ async def test_reupload_basic(request: Any) -> None:
                 3,  # child connect, subscribe, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )
 
 
 @pytest.mark.asyncio
@@ -172,7 +178,13 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
                 events_to_generate,  # generated events
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )
 
 
 @pytest.mark.asyncio

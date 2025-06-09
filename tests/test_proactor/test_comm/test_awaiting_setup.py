@@ -414,7 +414,6 @@ async def test_awaiting_setup_state(request: Any) -> None:
         assert len(stats.comm_events) == 1
         assert child.event_persister.num_persists == 2
         assert child.links.num_in_flight == 0
-        # wait for parent to finish persisting
         # parent should have persisted:
         exp_events = sum(
             [
@@ -422,10 +421,11 @@ async def test_awaiting_setup_state(request: Any) -> None:
                 3,  # parent connect, subscribe, peer active
             ]
         )
+        # wait for parent to finish persisting
         await await_for(
             lambda: h.parent.event_persister.num_persists == exp_events,
             3,
-            "ERROR waiting suback pending",
+            f"ERROR waiting for parent to finish persisting {exp_events}",
             err_str_f=h.summary_str,
         )
 
@@ -512,6 +512,7 @@ async def test_awaiting_setup_state(request: Any) -> None:
         )
         assert child.event_persister.num_persists == 5
         assert child.links.num_in_flight == 0
+
         # parent should have persisted:
         exp_events = sum(
             [
@@ -520,7 +521,13 @@ async def test_awaiting_setup_state(request: Any) -> None:
                 4,  # parent disconnect, connect, subscribe, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events}",
+            err_str_f=h.summary_str,
+        )
 
         # (awaiting_setup -> mqtt_suback -> active)
         # Release all subacks, allowing child to go active
@@ -541,6 +548,7 @@ async def test_awaiting_setup_state(request: Any) -> None:
         # it arrives.
         assert child.event_persister.num_persists == 5
         assert child.links.num_in_flight == 0
+        # parent should have persisted:
         exp_events = sum(
             [
                 1,  # parent startup
@@ -548,6 +556,14 @@ async def test_awaiting_setup_state(request: Any) -> None:
                 4,  # parent disconnect, connect, subscribe, peer active
                 1,  # child startup
                 1,  # child connect,
-                4,  # child disconnect, connect, subscribed,peer active
+                4,  # child disconnect, connect, subscribed, peer active
+                1,  # child dbg
             ]
+        )
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events}",
+            err_str_f=h.summary_str,
         )

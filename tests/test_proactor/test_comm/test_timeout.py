@@ -142,7 +142,13 @@ async def test_response_timeout(request: Any) -> None:
                 2,  # child timeout, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )
 
 
 @pytest.mark.asyncio
@@ -208,7 +214,13 @@ async def test_ping(request: Any) -> None:
                 3,  # child connect, subscribe, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )
 
         # Test that ping sent peridoically if no messages sent
         start_pings_from_parent = stats.num_received_by_topic[pings_from_parent_topic]
@@ -304,7 +316,13 @@ async def test_ping(request: Any) -> None:
                 reps,  # dbg events
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )
 
         parent.pause_acks()
         await await_for(
@@ -337,4 +355,10 @@ async def test_ping(request: Any) -> None:
                 2,  # child timeout, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )

@@ -321,7 +321,13 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
                 3,  # child connect, subscribe, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )
 
         # Tell *child* client we lost comm.
         child.force_mqtt_disconnect(child.upstream_client)
@@ -367,7 +373,13 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
                 4,  # child disconnect, connect, subscribe, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )
 
         # get ping topic and current number of pings
         parent_ping_topic = MQTTTopic.encode(
@@ -428,7 +440,13 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
                 4,  # parent disconnect, connect, subscribe, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )
 
         # Tell *both* clients we lost comm.
         parent.force_mqtt_disconnect(parent.downstream_client)
@@ -479,4 +497,10 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
                 4,  # parent disconnect, connect, subscribe, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        # wait for parent to finish persisting
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            f"ERROR waiting for parent to finish persisting {exp_events} events",
+            err_str_f=h.summary_str,
+        )

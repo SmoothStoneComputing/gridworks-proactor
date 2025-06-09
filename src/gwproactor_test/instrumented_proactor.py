@@ -309,7 +309,12 @@ class InstrumentedProactor(Proactor):
 
     def summary_str(self) -> str:
         s = str(self.stats)
-        s += f"\nIn-flight events: {len(self.links.in_flight_events)}\n"
+        s += "\nEvents:\n"
+        s += f"  pending: {self.links.num_pending}\n"
+        s += f"  in-flight: {self.links.num_in_flight}\n"
+        s += f"  persisted: {self.event_persister.num_persists}\n"
+        s += f"  retrieved: {self.event_persister.num_retrieves}\n"
+        s += f"  cleared: {self.event_persister.num_clears}\n"
         s += "Link states:\n"
         for link_name in self.stats.links:
             link_state = self._links.link_state(link_name)
