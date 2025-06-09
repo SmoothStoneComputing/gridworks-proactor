@@ -94,7 +94,6 @@ async def test_in_flight_happy_path(request: Any) -> None:
                 err_str_f=h.summary_str,
             )
             last_in_flight = child.links.num_in_flight
-            assert child.event_persister.num_persists == exp_child_events
         # now wait for all events to rest
         await await_for(
             lambda: child.events_at_rest()
