@@ -321,6 +321,7 @@ class InstrumentedProactor(Proactor):
         for link_name in self.stats.links:
             s += f"  {link_name:10s}  {self._links.num_acks(link_name):3d}\n"
         s += self._links.get_reuploads_str() + "\n"
+        s += f"Paused acks: {len(self.needs_ack)}\n"
         s += "Paused Subacks:"
         for link_name in self.stats.links:
             s += (
