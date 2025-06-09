@@ -414,6 +414,7 @@ async def test_awaiting_setup_state(request: Any) -> None:
         assert len(stats.comm_events) == 1
         assert child.event_persister.num_persists == 2
         assert child.links.num_in_flight == 0
+        # wait for parent to finish persisting
         # parent should have persisted:
         exp_events = sum(
             [
@@ -421,7 +422,12 @@ async def test_awaiting_setup_state(request: Any) -> None:
                 3,  # parent connect, subscribe, peer active
             ]
         )
-        assert h.parent.event_persister.num_persists == exp_events
+        await await_for(
+            lambda: h.parent.event_persister.num_persists == exp_events,
+            3,
+            "ERROR waiting suback pending",
+            err_str_f=h.summary_str,
+        )
 
         # (awaiting_setup -> mqtt_suback -> awaiting_setup)
         # Allow another suback to arrive, remaining in awaiting_setup
