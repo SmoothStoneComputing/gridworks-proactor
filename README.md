@@ -18,7 +18,7 @@
 
 [tests]: https://github.com/thegridelectric/gridworks-proactor/actions?workflow=Tests
 
-[codecov]: https://app.codecov.io/gh/thegridelectric/gridworks-proactor
+[codecov]: https://app.codecov.io/gh/SmoothStoneComputing/gridworks-proactor
 
 [pre-commit]: https://github.com/pre-commit/pre-commit
 
