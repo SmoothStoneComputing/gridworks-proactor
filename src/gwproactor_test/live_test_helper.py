@@ -349,3 +349,18 @@ class LiveTest:
         else:
             s += "PARENT: None\n"
         return s
+
+    def assert_child_events_at_rest(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> None:
+        self.child.assert_events_at_rest(*args, **kwargs)
+
+    def assert_child1_events_at_rest(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> None:
+        self.child.assert_events_at_rest(*args, **kwargs)
+
+    def assert_parent_events_at_rest(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> None:
+        self.child.assert_events_at_rest(*args, **kwargs)

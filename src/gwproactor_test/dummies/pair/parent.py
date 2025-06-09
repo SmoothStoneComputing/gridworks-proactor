@@ -13,7 +13,7 @@ from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import DBGPayload, MQTTReceiptPayload
-from gwproactor.persister import PersisterInterface, SimpleDirectoryWriter
+from gwproactor.persister import PersisterInterface, SQLitePersister
 from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
 
 
@@ -96,4 +96,4 @@ class DummyParentApp(App):
 
     @classmethod
     def _make_persister(cls, settings: AppSettings) -> PersisterInterface:
-        return SimpleDirectoryWriter(settings.paths.event_dir)
+        return SQLitePersister(settings.paths.event_dir)

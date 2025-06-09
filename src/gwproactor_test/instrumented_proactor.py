@@ -4,6 +4,8 @@ import dataclasses
 import typing
 from collections import defaultdict
 from dataclasses import dataclass, field
+from inspect import getframeinfo, stack
+from pathlib import Path
 from typing import Any, Optional, Tuple, cast
 
 from gwproto import Message
@@ -28,6 +30,28 @@ def split_subscriptions(client_wrapper: MQTTClientWrapper) -> Tuple[int, Optiona
     for topic, qos in client_wrapper.subscription_items():
         MQTTClientWrapper.subscribe(client_wrapper, topic, qos)
     return MQTT_ERR_SUCCESS, None
+
+
+def caller_str(depth: int = 3) -> str:
+    caller = getframeinfo(stack()[depth][0])
+    return f"{Path(caller.filename).relative_to(Path.cwd())}:{caller.lineno}, {caller.function}()"
+
+
+def assert_count(
+    exp: Optional[int | tuple[int | None, int | None] | typing.Sequence[int | None]],
+    got: int,
+    tag: str = "",
+    err_str: str = "",
+) -> None:
+    err_str = f"{tag}  exp: {exp}  got: {got}  {caller_str()}\n{err_str}"
+    if exp is not None:
+        if isinstance(exp, int):
+            assert got == exp, err_str
+        else:
+            if isinstance(exp[0], int):
+                assert got >= exp[0], err_str
+            if isinstance(exp[1], int):
+                assert got <= exp[1], err_str
 
 
 @dataclass
@@ -410,3 +434,53 @@ class InstrumentedProactor(Proactor):
 
     def enable_derived_events(self) -> None:
         self._call_super_if_present("enable_dervived_events")
+
+    def events_at_rest(
+        self,
+        num_pending: int = 0,
+        *,
+        exact_pending: bool = True,
+        num_persists: Optional[int] = None,
+        exact_persists: bool = True,
+    ) -> bool:
+        if exact_pending:
+            pending_check = self.links.num_pending == num_pending
+        else:
+            pending_check = self.links.num_pending >= num_pending
+        if num_persists is None:
+            persist_check = True
+        elif exact_persists:
+            persist_check = self.event_persister.num_persists == num_persists
+        else:
+            persist_check = self.event_persister.num_persists >= num_persists
+        return pending_check and self.links.num_in_flight == 0 and persist_check
+
+    def assert_events_at_rest(
+        self,
+        *,
+        num_pending: Optional[int | tuple[int | None, int | None]] = 0,
+        num_in_flight: Optional[int | tuple[int | None, int | None]] = 0,
+        all_pending: bool = False,
+        num_persists: Optional[int | tuple[int | None, int | None]] = None,
+        num_retrieves: Optional[int | tuple[int | None, int | None]] = None,
+        num_clears: Optional[int | tuple[int | None, int | None]] = None,
+        all_clear: bool = False,
+        tag: str = "",
+        err_str: str = "",
+    ) -> None:
+        assert_count(num_pending, self.links.num_pending, tag + " num_pending", err_str)
+        assert_count(
+            num_in_flight, self.links.num_in_flight, tag + " num_in_flight", err_str
+        )
+        p = self.event_persister
+        if all_pending:
+            assert_count(num_pending, p.num_persists, tag + " num_persists", err_str)
+            assert_count(0, p.num_retrieves, tag + " num_retrieves", err_str)
+            assert_count(0, p.num_clears, tag + " num_clears", err_str)
+        if all_clear:
+            assert_count(0, self.links.num_pending, tag + " num_pending", err_str)
+            assert_count(num_persists, p.num_persists, tag + " num_persists", err_str)
+            assert_count(num_persists, p.num_retrieves, tag + " num_retrieves", err_str)
+            assert_count(num_persists, p.num_clears, tag + " num_clears", err_str)
+        assert_count(num_retrieves, p.num_retrieves, tag + " num_retrieves", err_str)
+        assert_count(num_clears, p.num_clears, tag + " num_clears", err_str)
