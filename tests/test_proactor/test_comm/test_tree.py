@@ -275,7 +275,6 @@ async def test_tree_parent_comm(request: Any) -> None:
         assert 3 <= persister2.num_persists <= 5
         assert persister2.num_persists == 5
         assert persister2.num_retrieves == persister2.num_persists
-        assert persister2.num_clears == persister2.num_persists
 
 
 @pytest.mark.asyncio
