@@ -383,6 +383,5 @@ async def test_tree_event_forward(request: Any) -> None:
         # child2 never persists its own peer active, and whether it persists
         # admin events depends on when child1 link goes active
         assert 3 <= persister2.num_persists <= 5
-        assert persister2.num_persists == 5
         assert persister2.num_retrieves == persister2.num_persists
         assert persister2.num_clears == persister2.num_persists
