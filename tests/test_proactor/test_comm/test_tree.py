@@ -95,12 +95,10 @@ async def test_tree_no_parent(request: Any) -> None:
         assert child2.links.num_in_flight == 0
         # child2 never persists its own peer active, and whether it persists
         # admin events depends on when child1 link goes active
-        assert 3 <= child2.event_persister.num_persists <= 5
-        assert child2.event_persister.num_persists == 5
-        assert (
-            child2.event_persister.num_retrieves == child2.event_persister.num_persists
-        )
-        assert child2.event_persister.num_clears == child2.event_persister.num_persists
+        persister2 = child2.event_persister
+        assert 3 <= persister2.num_persists <= 5
+        assert persister2.num_retrieves == persister2.num_persists
+        assert persister2.num_clears == persister2.num_persists
 
 
 @pytest.mark.asyncio
@@ -179,12 +177,10 @@ async def test_tree_message_exchange(request: Any) -> None:
         assert child2.links.num_in_flight == 0
         # child2 never persists its own peer active, and whether it persists
         # admin events depends on when child1 link goes active
-        assert 3 <= child2.event_persister.num_persists <= 5
-        assert child2.event_persister.num_persists == 5
-        assert (
-            child2.event_persister.num_retrieves == child2.event_persister.num_persists
-        )
-        assert child2.event_persister.num_clears == child2.event_persister.num_persists
+        persister2 = child2.event_persister
+        assert 3 <= persister2.num_persists <= 5
+        assert persister2.num_retrieves == persister2.num_persists
+        assert persister2.num_clears == persister2.num_persists
 
 
 @pytest.mark.asyncio
@@ -273,8 +269,8 @@ async def test_tree_parent_comm(request: Any) -> None:
         # child2 never persists its own peer active, and whether it persists
         # admin events depends on when child1 link goes active
         assert 3 <= persister2.num_persists <= 5
-        assert persister2.num_persists == 5
         assert persister2.num_retrieves == persister2.num_persists
+        assert persister2.num_clears == persister2.num_persists
 
 
 @pytest.mark.asyncio
