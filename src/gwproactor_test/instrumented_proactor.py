@@ -478,9 +478,14 @@ class InstrumentedProactor(Proactor):
             assert_count(0, p.num_retrieves, tag + " num_retrieves", err_str)
             assert_count(0, p.num_clears, tag + " num_clears", err_str)
         if all_clear:
-            assert_count(0, self.links.num_pending, tag + " num_pending", err_str)
-            assert_count(num_persists, p.num_persists, tag + " num_persists", err_str)
-            assert_count(num_persists, p.num_retrieves, tag + " num_retrieves", err_str)
-            assert_count(num_persists, p.num_clears, tag + " num_clears", err_str)
+            if num_pending != 0:
+                raise ValueError(
+                    f"ERROR. all_clear is True but num_pending ({num_pending}) != 0"
+                )
+            if num_retrieves is None:
+                num_retrieves = num_persists
+            if num_clears is None:
+                num_clears = num_persists
+        assert_count(num_persists, p.num_persists, tag + " num_persists", err_str)
         assert_count(num_retrieves, p.num_retrieves, tag + " num_retrieves", err_str)
         assert_count(num_clears, p.num_clears, tag + " num_clears", err_str)
