@@ -162,8 +162,10 @@ async def test_tree_message_exchange(request: Any) -> None:
             ]
         )
         await await_for(
-            lambda: child2.links.num_pending == 0
-            and child1.links.num_pending == exp_child1_events,
+            lambda: child1.links.num_pending == exp_child1_events
+            and child1.links.num_in_flight == 0
+            and child2.links.num_pending == 0
+            and child2.links.num_in_flight == 0,
             1,
             f"ERROR waiting for child1 to receive {exp_child1_events} events",
             err_str_f=h.summary_str,
@@ -242,7 +244,9 @@ async def test_tree_parent_comm(request: Any) -> None:
         )
         await await_for(
             lambda: h.child1.links.num_pending == 0
+            and h.child1.links.num_in_flight == 0
             and h.child2.links.num_pending == 0
+            and h.child2.links.num_in_flight == 0
             and h.parent.links.num_pending == exp_parent_events,
             1,
             f"ERROR waiting for parent to persist {exp_parent_events} events",
@@ -346,7 +350,9 @@ async def test_tree_event_forward(request: Any) -> None:
         )
         await await_for(
             lambda: h.child1.links.num_pending == 0
+            and h.child1.links.num_in_flight == 0
             and h.child2.links.num_pending == 0
+            and h.child2.links.num_in_flight == 0
             and h.parent.links.num_pending == exp_parent_events,
             1,
             f"ERROR waiting for parent to persist {exp_parent_events} events",
