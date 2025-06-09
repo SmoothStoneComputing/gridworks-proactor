@@ -130,7 +130,8 @@ async def test_basic_comm_child_first(request: Any) -> None:
 
         # wait for all events to be acked
         await await_for(
-            lambda: child.event_persister.num_pending == 0,
+            lambda: child.event_persister.num_pending == 0
+            and child.links.num_in_flight == 0,
             1,
             "ERROR waiting for events to be acked",
             err_str_f=child.summary_str,
