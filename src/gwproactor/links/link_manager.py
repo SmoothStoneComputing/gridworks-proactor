@@ -312,16 +312,14 @@ class LinkManager:
             path_dbg |= 0x00000008
             if len(self._in_flight_events) >= self._settings.num_inflight_events:
                 path_dbg |= 0x00000010
-                oldest_event_id = next(iter(self._in_flight_events))
-                oldest_event = self._in_flight_events.pop(oldest_event_id)
                 result = self._event_persister.persist(
-                    oldest_event.MessageId,
-                    oldest_event.model_dump_json().encode(PERSISTER_ENCODING),
+                    event.MessageId,
+                    event.model_dump_json().encode(PERSISTER_ENCODING),
                 )
             else:
                 path_dbg |= 0x00000020
+                self._in_flight_events[event.MessageId] = event
                 result = Ok()
-            self._in_flight_events[event.MessageId] = event
             self.publish_upstream(event, AckRequired=True)
         else:
             result = self._event_persister.persist(
