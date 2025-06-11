@@ -47,32 +47,43 @@ def assert_acks_consistent(
     in_flight_set: set[str] = set(h.child.links.in_flight_events.keys())
     pending_set: set[str] = set(h.child.event_persister.pending_ids())
     error_s = ""
+    error_summary_s = ""
     if not in_flight_set.issubset(needs_ack_set):
         in_flight_not_in_needs_ack_set: set[str] = in_flight_set.difference(
             needs_ack_set
         )
-        error_s += f"Child in-flight events not in needs ack: {len(in_flight_not_in_needs_ack_set)}\n"
+        error_summary_line = f"Child in-flight events not in needs ack: {len(in_flight_not_in_needs_ack_set)}\n"
+        error_summary_s += error_summary_line
+        error_s += error_summary_line
         for i, event_id in enumerate(in_flight_not_in_needs_ack_set):
             error_s += f"  {i+1:3d} / {len(in_flight_not_in_needs_ack_set):3d}  {event_id[:8]}\n"
     if not pending_set.issubset(needs_ack_set):
         pending_not_in_needs_ack_set: set[str] = pending_set.difference(needs_ack_set)
-        error_s += f"Child pending events not in needs ack: {len(pending_not_in_needs_ack_set)}\n"
+        error_summary_line = f"Child pending events not in needs ack: {len(pending_not_in_needs_ack_set)}\n"
+        error_summary_s += error_summary_line
+        error_s += error_summary_line
         for i, event_id in enumerate(pending_not_in_needs_ack_set):
             error_s += (
                 f"  {i+1:3d} / {len(pending_not_in_needs_ack_set):3d}  {event_id[:8]}\n"
             )
     needs_ack_not_in_events = needs_ack_set - (in_flight_set | pending_set)
     if needs_ack_not_in_events:
-        error_s += (
+        error_summary_line = (
             f"Parent needs_ack not in child events: {len(needs_ack_not_in_events)}\n"
         )
+        error_summary_s += error_summary_line
+        error_s += error_summary_line
         for i, event_id in enumerate(needs_ack_not_in_events):
             error_s += (
                 f"  {i+1:3d} / {len(needs_ack_not_in_events):3d}  {event_id[:8]}\n"
             )
     if error_s:
-        raise ValueError(f"ERROR. Acks inconsistent\n{full_s}\n{error_s}\n")
+        full_s += error_s + summary_s + error_summary_s
+        raise ValueError(
+            f"ERROR. Acks inconsistent\n{full_s}\n{error_s}\n{h.summary_str()}\n"
+        )
     consistent_s = "Acks CONSISTENT\n"
+    full_s += summary_s
     full_s += consistent_s
     summary_s += consistent_s
 
@@ -563,9 +574,20 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
                 tag=f"generated event {i+1} / {num_to_generate}  ",
                 err_str=h.summary_str(),
             )
+
         # paused acks:
         # [17 in-flight][10 persisted][3 in-flight][1 persisted][30 in-flight][30 persisted]
+        child.assert_event_counts(
+            num_pending=41,
+            num_in_flight=50,
+            num_persists=44,
+            num_retrieves=3,
+            num_clears=3,
+            tag=f"After generating {num_to_generate} events",
+            err_str=h.summary_str(),
+        )
         exp_needs_ack = in_flight_buffer_size + 11 + 30
+        assert (child.links.num_pending + child.links.num_in_flight) == exp_needs_ack
         await await_for(
             lambda: len(parent.links.needs_ack) == exp_needs_ack,
             1,
