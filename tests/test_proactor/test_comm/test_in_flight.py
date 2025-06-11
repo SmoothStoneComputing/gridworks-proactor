@@ -3,10 +3,13 @@ from math import floor
 from typing import Any, Optional
 
 import pytest
-from gwproto.messages import Ack
+from gwproto.messages import Ack, AnyEvent
+from result import Err, Ok
 
+from gwproactor import Problems
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
+from gwproactor.persister import FileEmptyWarning
 from gwproactor_test import LiveTest, await_for
 
 
@@ -55,17 +58,56 @@ def assert_acks_consistent(
         error_summary_line = f"Child in-flight events not in needs ack: {len(in_flight_not_in_needs_ack_set)}\n"
         error_summary_s += error_summary_line
         error_s += error_summary_line
-        for i, event_id in enumerate(in_flight_not_in_needs_ack_set):
-            error_s += f"  {i+1:3d} / {len(in_flight_not_in_needs_ack_set):3d}  {event_id[:8]}\n"
+        for i, event_id in enumerate(
+            sorted(
+                in_flight_not_in_needs_ack_set,
+                key=lambda x: h.child.links.in_flight_events[x].TimeCreatedMs,
+            )
+        ):
+            event = h.child.links.in_flight_events[event_id]
+            error_s += (
+                f"  {i+1:3d} / {len(in_flight_not_in_needs_ack_set):3d}  "
+                f"{event_id[:8]}  "
+                f"{event.TimeCreatedMs:15d}  "
+                f"{event.TypeName}\n"
+            )
     if not pending_set.issubset(needs_ack_set):
         pending_not_in_needs_ack_set: set[str] = pending_set.difference(needs_ack_set)
-        error_summary_line = f"Child pending events not in needs ack: {len(pending_not_in_needs_ack_set)}\n"
+        pending_not_in_needs_ack_events: list[AnyEvent] = []
+        deserialize_problems: list[Problems] = []
+        for event_id in pending_not_in_needs_ack_set:
+            match h.child.event_persister.retrieve(event_id):
+                case Ok(content):
+                    if content is not None:
+                        pending_not_in_needs_ack_events.append(
+                            AnyEvent.model_validate_json(content)
+                        )
+                    else:
+                        deserialize_problems.append(
+                            Problems(warnings=[FileEmptyWarning(uid=event_id)])
+                        )
+                case Err(one_retrieve_problems):
+                    deserialize_problems.append(one_retrieve_problems)
+        pending_not_in_needs_ack_events = sorted(
+            pending_not_in_needs_ack_events, key=lambda x: x.TimeCreatedMs
+        )
+        error_summary_line = f"Child pending events not in needs ack: {len(pending_not_in_needs_ack_events)}\n"
         error_summary_s += error_summary_line
         error_s += error_summary_line
-        for i, event_id in enumerate(pending_not_in_needs_ack_set):
+        for i, event in enumerate(pending_not_in_needs_ack_events):
             error_s += (
-                f"  {i+1:3d} / {len(pending_not_in_needs_ack_set):3d}  {event_id[:8]}\n"
+                f"  {i+1:3d} / {len(pending_not_in_needs_ack_set):3d}  "
+                f"{event.MessageId[:8]}  "
+                f"{event.TimeCreatedMs:15d}  "
+                f"{event.TypeName}\n"
             )
+        if deserialize_problems:
+            error_summary_line = f"Problems deserializing child pending events for display: {len(deserialize_problems)}"
+            error_summary_s += error_summary_line
+            error_s += error_summary_line
+            for i, problem in enumerate(deserialize_problems):
+                error_s += f"  {i+1:3d} / {len(deserialize_problems):3d}  {problem}\n"
+
     needs_ack_not_in_events = needs_ack_set - (in_flight_set | pending_set)
     if needs_ack_not_in_events:
         error_summary_line = (
