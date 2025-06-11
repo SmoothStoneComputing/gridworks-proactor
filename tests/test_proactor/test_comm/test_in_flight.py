@@ -341,6 +341,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
         child = h.child
         parent = h.parent
         parent.pause_acks()
+        child.set_ack_timeout_seconds(100)  # please no timeouts while we are busy
 
         # Walk through generating in-flight events.
 
