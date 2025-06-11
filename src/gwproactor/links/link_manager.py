@@ -286,11 +286,16 @@ class LinkManager:
 
     def generate_event(self, event: EventT) -> Result[bool, Exception]:
         path_dbg = 0
+        error_count = 0
+        warning_count = 0
         self._logger.path(
-            "++generate_event %s  f: %d  (p: %d)",
+            "++generate_event %s  f: %d  (p: %d)  (pr: %d  r: %d  c: %d)",
             event.TypeName,
             len(self._in_flight_events),
             self._event_persister.num_pending,
+            self._event_persister.num_persists,
+            self._event_persister.num_retrieves,
+            self._event_persister.num_clears,
         )
         if not event.Src:
             path_dbg |= 0x00000001
@@ -322,14 +327,25 @@ class LinkManager:
                 result = Ok()
             self.publish_upstream(event, AckRequired=True)
         else:
+            path_dbg |= 0x00000040
             result = self._event_persister.persist(
                 event.MessageId, event.model_dump_json().encode(PERSISTER_ENCODING)
             )
+            match result:
+                case Err(problems):
+                    error_count = len(problems.errors)
+                    warning_count = len(problems.warnings)
+
         self._logger.path(
-            "--generate_event %s  f: %d  (p: %d)  path:0x%08X",
+            "--generate_event %s  f: %d  (p: %d)  (pr: %d  r: %d  c: %d)  problems: (%d %d)  path:0x%08X",
             event.TypeName,
             len(self._in_flight_events),
             self._event_persister.num_pending,
+            self._event_persister.num_persists,
+            self._event_persister.num_retrieves,
+            self._event_persister.num_clears,
+            error_count,
+            warning_count,
             path_dbg,
         )
         return result

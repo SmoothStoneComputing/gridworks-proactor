@@ -1,6 +1,7 @@
 # ruff: noqa: ERA001
 
 import dataclasses
+import logging
 import typing
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -363,12 +364,13 @@ class InstrumentedProactor(Proactor):
     def summarize(self) -> None:
         self._logger.info(self.summary_str())
 
-    def delimit(self, text: str = "") -> None:
-        if self._logger.general_enabled:
-            self._logger.info(
+    def delimit(self, text: str = "", log_level: int = logging.INFO) -> None:
+        if self._logger.isEnabledFor(log_level):
+            self._logger.log(
+                log_level,
                 f"\n\n{self.DELIMIT_STR}\n"
                 f"{self.DELIMIT_CHAR}  {text}\n"
-                f"{self.DELIMIT_STR}\n"
+                f"{self.DELIMIT_STR}\n",
             )
 
     def force_ping(self, client_name: str) -> None:
@@ -455,7 +457,7 @@ class InstrumentedProactor(Proactor):
             persist_check = self.event_persister.num_persists >= num_persists
         return pending_check and self.links.num_in_flight == 0 and persist_check
 
-    def assert_events_at_rest(
+    def assert_event_counts(
         self,
         *,
         num_pending: Optional[int | tuple[int | None, int | None]] = 0,
