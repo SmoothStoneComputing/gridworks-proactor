@@ -321,7 +321,6 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
             h.child.subscription_name,
             "gridworks-ack",
         )
-        acks_received_by_child = child.stats.num_received_by_topic[parent_ack_topic]
 
         # Release acks one by one.
         #
@@ -368,9 +367,10 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
             acks_released += h.parent.release_acks(num_to_release=1)
 
             # Wait for child to receive an ack
+            last_events = last_in_flight + last_pending
             await await_for(
-                lambda: child.stats.num_received_by_topic[parent_ack_topic]
-                == acks_received_by_child + acks_released,  # noqa: B023
+                lambda: child.links.num_pending + child.links.num_in_flight
+                == last_events - 1,  # noqa: B023
                 timeout=1,
                 tag=(
                     "ERROR waiting for child to receive ack "
