@@ -821,7 +821,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
                 await await_for(
                     lambda: child.links.num_in_flight == exp_in_flight,  # noqa: B023
                     1,
-                    f"ERROR waiting for in-flight to be {exp_in_flight} in flight acks",
+                    f"ERROR waiting for {exp_in_flight} in-flight-events, group_size: {group_size}",
                     err_str_f=h.summary_str,
                 )
             else:
@@ -830,7 +830,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
                 await await_for(
                     lambda: child.links.num_pending == exp_pending,  # noqa: B023
                     1,
-                    f"ERROR waiting for child to receive an {acks_released} acks",
+                    f"ERROR waiting for child to receive an {acks_released} acks, group_size: {group_size}",
                 )
             child.assert_event_counts(
                 num_pending=exp_pending,
