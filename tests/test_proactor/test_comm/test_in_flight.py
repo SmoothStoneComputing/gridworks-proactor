@@ -1,138 +1,293 @@
+import datetime
 import logging
+import textwrap
 from math import floor
 from typing import Any, Optional
 
 import pytest
-from gwproto.messages import Ack, AnyEvent
+from gwproto.messages import Ack, AnyEvent, EventBase
 from result import Err, Ok
 
 from gwproactor import Problems
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
-from gwproactor.persister import FileEmptyWarning
+from gwproactor.persister import ByteDecodingError, UIDMissingWarning
 from gwproactor_test import LiveTest, await_for
+from gwproactor_test.instrumented_proactor import caller_str
+
+
+class EventAckConsistencyError(Exception): ...
+
+
+class UnexpectedMessage(EventAckConsistencyError): ...
+
+
+class CountInconsistency(EventAckConsistencyError): ...
+
+
+class _EventAckCountsIntermediate:
+    problems: Problems
+
+    paused_ack_list: list[Ack]
+
+    in_flight_set: set[str]
+    pending_set: set[str]
+    paused_ack_set: set[str]
+    in_flight_not_paused_set: set[str]
+    pending_not_paused_set: set[str]
+    paused_not_events_set: set[str]
+
+    pending_events: dict[str, EventBase]
+    in_flight_not_paused_events: dict[str, EventBase]
+    pending_not_paused_events: dict[str, EventBase]
+    paused_not_events_list: list[str]
+
+    def __init__(self, h: LiveTest, *, verbose: bool = False) -> None:
+        self._find_errors(h)
+        if self.ok() and not verbose:
+            self.pending_events = {}
+            self.in_flight_not_paused_events = {}
+            self.pending_not_paused_events = {}
+            self.paused_not_events_list = []
+        else:
+            self._sort_events(h)
+
+    def _find_errors(self, h: LiveTest) -> None:
+        in_flight_set = set(h.child.links.in_flight_events.keys())
+        pending_set = set(h.child.event_persister.pending_ids())
+        paused_ack_list: list[Ack] = []
+        problems = Problems()
+        for paused in h.parent.needs_ack:
+            if paused.link_name == h.parent.downstream_client:
+                match paused.message.Payload:
+                    case Ack():
+                        paused_ack_list.append(paused.message.Payload)
+                    case _:
+                        problems.add_error(
+                            UnexpectedMessage(paused.message.Header.TypeName)
+                        )
+        paused_ack_set = {paused_ack.AckMessageID for paused_ack in paused_ack_list}
+        in_flight_not_paused_set = in_flight_set - paused_ack_set
+        pending_not_paused_set = pending_set - paused_ack_set
+        paused_not_events_set = paused_ack_set - (in_flight_set | paused_ack_set)
+        self.problems = problems
+        self.in_flight_set = in_flight_set
+        self.pending_set = pending_set
+        self.paused_ack_list = paused_ack_list
+        self.paused_ack_set = paused_ack_set
+        self.in_flight_not_paused_set = in_flight_not_paused_set
+        self.pending_not_paused_set = pending_not_paused_set
+        self.paused_not_events_set = paused_not_events_set
+
+    def _sort_pending_events(self, h: LiveTest) -> None:
+        # Sort pending events by time (persister does not guarantee order)
+        pending_event_list: list[AnyEvent] = []
+        for event_id in self.pending_set:
+            match h.child.event_persister.retrieve(event_id):
+                case Ok(content):
+                    if content is not None:
+                        try:
+                            pending_event_list.append(
+                                AnyEvent.model_validate_json(content)
+                            )
+                        except Exception as e:  # noqa: BLE001
+                            self.problems.add_error(e).add_error(
+                                ByteDecodingError("reupload_events", uid=event_id)
+                            )
+                    else:
+                        self.problems.add_error(
+                            UIDMissingWarning("Ack consistency check", uid=event_id)
+                        )
+                case Err(one_retrieve_problems):
+                    self.problems.add_error(one_retrieve_problems)
+        h.child.event_persister._num_retrieves -= len(pending_event_list)  # type: ignore # noqa
+        pending_event_list.sort(key=lambda event_: event_.TimeCreatedMs)
+        self.pending_events = {
+            pending_event.MessageId: pending_event
+            for pending_event in pending_event_list
+        }
+
+    def _sort_events(self, h: LiveTest) -> None:
+        self._sort_pending_events(h)
+        self.in_flight_not_paused_events = {
+            event.MessageId: event
+            for event in sorted(
+                [
+                    h.child.links.in_flight_events[x]
+                    for x in self.in_flight_not_paused_set
+                ],
+                key=lambda x: x.TimeCreatedMs,
+            )
+        }
+        self.pending_not_paused_events = {
+            event.MessageId: event
+            for event in sorted(
+                [self.pending_events[x] for x in self.pending_not_paused_set],
+                key=lambda x: x.TimeCreatedMs,
+            )
+        }
+        self.paused_not_events_list = [
+            ack.AckMessageID
+            for ack in self.paused_ack_list
+            if ack.AckMessageID in self.paused_not_events_set
+        ]
+
+    def ok(self) -> bool:
+        return (
+            not self.problems
+            and not self.in_flight_not_paused_set
+            and not self.pending_not_paused_set
+            and not self.paused_not_events_set
+        )
+
+    def __bool__(self) -> bool:
+        return self.ok()
+
+
+class _EventAckReportGenerator:
+    h: LiveTest
+    c: _EventAckCountsIntermediate
+    verbose: bool
+    summary: str
+    non_error_report: str
+    error_report: str
+    report: str
+
+    def __init__(
+        self, h: LiveTest, c: _EventAckCountsIntermediate, *, verbose: bool = False
+    ) -> None:
+        self.h = h
+        self.c = c
+        self.verbose = verbose
+        self._summarize()
+        if not verbose and self.c.ok():
+            self.summary += "Acks CONSISTENT\n"
+            self.report = self.summary
+        else:
+            self._make_non_error_report()
+            self._make_error_report()
+            if self.c.ok():
+                self.summary += "Acks CONSISTENT\n"
+            self.report = self.non_error_report + self.error_report + self.summary
+
+    def _summarize(self) -> None:
+        self.summary = (
+            f"Parent paused acks: {len(self.c.paused_ack_set)}\n"
+            f"Child pending events: {len(self.c.pending_set)}\n"
+            f"Child in-flight events: {len(self.c.in_flight_set)}\n"
+        )
+
+    def _make_non_error_report(self) -> None:
+        report = f"Parent paused acks: {len(self.c.paused_ack_list)}\n"
+        event: EventBase | str
+        for i, paused_ack in enumerate(self.c.paused_ack_list):
+            if paused_ack.AckMessageID in self.h.child.links.in_flight_events:
+                event = self.h.child.links.in_flight_events[paused_ack.AckMessageID]
+                loc = "in-flight"
+            elif paused_ack.AckMessageID in self.c.pending_events:
+                event = self.c.pending_events[paused_ack.AckMessageID]
+                loc = "pending"
+            else:
+                event = paused_ack.AckMessageID
+                loc = "*UKNONWN*"
+            report += self._event_line(event, loc, i + 1, len(self.c.paused_ack_list))
+        report += f"Child in-flight events: {self.h.child.links.num_in_flight}\n"
+        for i, event in enumerate(self.h.child.links.in_flight_events.values()):
+            report += self._event_line(
+                event, "in-flight", i + 1, len(self.c.pending_events)
+            )
+        report += f"Child pending events: {len(self.c.pending_events)}\n"
+        for i, event in enumerate(self.c.pending_events.values()):
+            report += self._event_line(
+                event, "pending", i + 1, len(self.c.pending_events)
+            )
+        self.non_error_report = report
+
+    def _make_error_report(self) -> None:
+        report = ""
+        events = self.c.in_flight_not_paused_events.values()
+        line = f"Child in-flight events not in parent paused acks: {len(events)}\n"
+        report += line
+        self.summary += line
+        for i, event in enumerate(events):
+            report += self._event_line(event, "in-flight", i + 1, len(events))
+
+        events = self.c.pending_not_paused_events.values()
+        line = f"Child pending events not in parent paused acks: {len(events)}\n"
+        report += line
+        self.summary += line
+        for i, event in enumerate(events):
+            report += self._event_line(event, "pending", i + 1, len(events))
+
+        event_ids = self.c.paused_not_events_list
+        line = f"Paused acks not in child in-flight or pending: {len(event_ids)}\n"
+        report += line
+        self.summary += line
+        for i, event_id in enumerate(event_ids):
+            report += self._event_line(event_id, "", i + 1, len(event_ids))
+
+        line = f"Problems making ack count calculation: {len(self.c.problems)}"
+        report += line
+        self.summary += line
+        report += textwrap.indent(str(self.c.problems), "  ")
+
+        self.error_report = report
+
+    @classmethod
+    def _event_line(cls, event: EventBase | str, loc: str, i: int, n: int) -> str:
+        if isinstance(event, EventBase):
+            event_id = event.MessageId
+            dt = datetime.datetime.fromtimestamp(
+                event.TimeCreatedMs / 1000, tz=datetime.UTC
+            )
+            info_s = f"{dt}   {event.TypeName}"
+        else:
+            event_id = event
+            info_s = ""
+        return f"  {i:3d} / {n:3d}   {event_id[:8]}   {loc:10s}   {info_s}\n"
+
+    @property
+    def problems(self) -> Problems:
+        return self.c.problems
+
+
+class EventAckCounts:
+    summary: str = ""
+    report: str = ""
+    problems: Problems
+
+    def __init__(self, h: LiveTest, *, verbose: bool = False) -> None:
+        calc = _EventAckCountsIntermediate(h, verbose=verbose)
+        reporter = _EventAckReportGenerator(h, c=calc, verbose=verbose)
+        self.problems = calc.problems
+        self.summary = reporter.summary
+        self.report = reporter.report
+
+    def ok(self) -> bool:
+        return not self.problems
+
+    def __bool__(self) -> bool:
+        return self.ok()
 
 
 def assert_acks_consistent(
     h: LiveTest,
     *,
     print_summary: bool = False,
-    print_all: bool = False,
+    verbose: bool = False,
     log_level: int = logging.ERROR,
+    raise_errors: bool = True,
 ) -> None:
-    full_s = f"\n\nParent paused acks: {len(h.parent.needs_ack)}\n"
-    summary_s = full_s
-    needs_ack_set: set[str] = set()
-    for i, needs_ack in enumerate(h.parent.needs_ack):
-        ack = needs_ack.message.Payload
-        if not isinstance(ack, Ack):
-            raise ValueError(f"WHOOPS: {type(ack)}")  # noqa: TRY004
-        if ack.AckMessageID in h.child.links.in_flight_events:
-            loc_s = "in-flight"
-        elif ack.AckMessageID in h.child.event_persister.pending_ids():
-            loc_s = "pending"
-        else:
-            loc_s = "*UKNONWN*"
-        full_s += f"  {i+1:3d} / {len(h.parent.needs_ack):3d}  {ack.AckMessageID[:8]}  {loc_s}\n"
-        needs_ack_set.add(ack.AckMessageID)
-    s = f"Child in-flight events: {h.child.links.num_in_flight}\n"
-    full_s += s
-    summary_s += s
-    for i, (event_id, event) in enumerate(h.child.links.in_flight_events.items()):
-        if event_id != event.MessageId:
-            raise ValueError(f"WHOOPS 1 {event_id} != {event.MessageId}")
-        full_s += f"  {i+1:3d} / {h.child.links.num_in_flight:3d}  {event_id[:8]}\n"
-    s = f"Child pending events: {h.child.links.num_pending}\n"
-    full_s += s
-    summary_s += s
-    for i, event_id in enumerate(h.child.event_persister.pending_ids()):
-        full_s += f"  {i+1:3d} / {h.child.links.num_pending:3d}  {event_id[:8]}\n"
-    in_flight_set: set[str] = set(h.child.links.in_flight_events.keys())
-    pending_set: set[str] = set(h.child.event_persister.pending_ids())
-    error_s = ""
-    error_summary_s = ""
-    if not in_flight_set.issubset(needs_ack_set):
-        in_flight_not_in_needs_ack_set: set[str] = in_flight_set.difference(
-            needs_ack_set
+    called_from_str = f"\nassert_acks_consistent() called from {caller_str(depth=2)}"
+    counts = EventAckCounts(h, verbose=verbose)
+    if not counts.ok() and raise_errors:
+        raise AssertionError(
+            f"ERROR {called_from_str}\n{counts.report}\n{h.summary_str()}"
         )
-        error_summary_line = f"Child in-flight events not in needs ack: {len(in_flight_not_in_needs_ack_set)}\n"
-        error_summary_s += error_summary_line
-        error_s += error_summary_line
-        for i, event_id in enumerate(
-            sorted(
-                in_flight_not_in_needs_ack_set,
-                key=lambda x: h.child.links.in_flight_events[x].TimeCreatedMs,
-            )
-        ):
-            event = h.child.links.in_flight_events[event_id]
-            error_s += (
-                f"  {i+1:3d} / {len(in_flight_not_in_needs_ack_set):3d}  "
-                f"{event_id[:8]}  "
-                f"{event.TimeCreatedMs:15d}  "
-                f"{event.TypeName}\n"
-            )
-    if not pending_set.issubset(needs_ack_set):
-        pending_not_in_needs_ack_set: set[str] = pending_set.difference(needs_ack_set)
-        pending_not_in_needs_ack_events: list[AnyEvent] = []
-        deserialize_problems: list[Problems] = []
-        for event_id in pending_not_in_needs_ack_set:
-            match h.child.event_persister.retrieve(event_id):
-                case Ok(content):
-                    if content is not None:
-                        pending_not_in_needs_ack_events.append(
-                            AnyEvent.model_validate_json(content)
-                        )
-                    else:
-                        deserialize_problems.append(
-                            Problems(warnings=[FileEmptyWarning(uid=event_id)])
-                        )
-                case Err(one_retrieve_problems):
-                    deserialize_problems.append(one_retrieve_problems)
-        pending_not_in_needs_ack_events = sorted(
-            pending_not_in_needs_ack_events, key=lambda x: x.TimeCreatedMs
-        )
-        error_summary_line = f"Child pending events not in needs ack: {len(pending_not_in_needs_ack_events)}\n"
-        error_summary_s += error_summary_line
-        error_s += error_summary_line
-        for i, event in enumerate(pending_not_in_needs_ack_events):
-            error_s += (
-                f"  {i+1:3d} / {len(pending_not_in_needs_ack_set):3d}  "
-                f"{event.MessageId[:8]}  "
-                f"{event.TimeCreatedMs:15d}  "
-                f"{event.TypeName}\n"
-            )
-        if deserialize_problems:
-            error_summary_line = f"Problems deserializing child pending events for display: {len(deserialize_problems)}"
-            error_summary_s += error_summary_line
-            error_s += error_summary_line
-            for i, problem in enumerate(deserialize_problems):
-                error_s += f"  {i+1:3d} / {len(deserialize_problems):3d}  {problem}\n"
-
-    needs_ack_not_in_events = needs_ack_set - (in_flight_set | pending_set)
-    if needs_ack_not_in_events:
-        error_summary_line = (
-            f"Parent needs_ack not in child events: {len(needs_ack_not_in_events)}\n"
-        )
-        error_summary_s += error_summary_line
-        error_s += error_summary_line
-        for i, event_id in enumerate(needs_ack_not_in_events):
-            error_s += (
-                f"  {i+1:3d} / {len(needs_ack_not_in_events):3d}  {event_id[:8]}\n"
-            )
-    if error_s:
-        full_s += error_s + summary_s + error_summary_s
-        raise ValueError(
-            f"ERROR. Acks inconsistent\n{full_s}\n{error_s}\n{h.summary_str()}\n"
-        )
-    consistent_s = "Acks CONSISTENT\n"
-    full_s += summary_s
-    full_s += consistent_s
-    summary_s += consistent_s
-
-    if print_all:
-        h.child.logger.log(log_level, full_s)
+    if verbose or not counts.ok():
+        h.child.logger.log(log_level, f"{called_from_str}\n{counts.report}")
     elif print_summary:
-        h.child.logger.log(log_level, summary_s)
+        h.child.logger.log(log_level, f"{called_from_str}\n{counts.summary}")
 
 
 async def await_quiescent_connections(
