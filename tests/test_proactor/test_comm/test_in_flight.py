@@ -491,7 +491,18 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
     duplication of the above less controlled tests, but seems worth having.
     """
 
-    async with LiveTest(start_child=True, start_parent=True, request=request) as h:
+    # Please no timeouts while we are busy
+    child_settings = LiveTest.child_app_type().get_settings()
+    parent_settings = LiveTest.parent_app_type().get_settings()
+    child_settings.proactor.ack_timeout_seconds = 100
+    parent_settings.proactor.ack_timeout_seconds = 100
+    async with LiveTest(
+        start_child=True,
+        start_parent=True,
+        request=request,
+        child_app_settings=child_settings,
+        parent_app_settings=parent_settings,
+    ) as h:
         await await_quiescent_connections(h)
         child = h.child
         parent = h.parent
