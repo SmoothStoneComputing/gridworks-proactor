@@ -77,3 +77,6 @@ class Problems(ValueError):
             Summary=summary,
             Details=str(self),
         )
+
+    def __len__(self) -> int:
+        return len(self.errors) + len(self.warnings)

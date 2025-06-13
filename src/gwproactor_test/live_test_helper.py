@@ -308,8 +308,8 @@ class LiveTest:
         return (
             f"CommTestHelper caught error {exc}.\n"
             "Working log dirs:"
-            f"\n\t[{self.child_app.config.settings.paths.log_dir}]"
-            f"\n\t[{self.parent_app.config.settings.paths.log_dir}]"
+            f"\n\t{self.child_app.config.settings.paths.log_dir}"
+            f"\n\t{self.parent_app.config.settings.paths.log_dir}"
         )
 
     async def __aexit__(
@@ -349,3 +349,18 @@ class LiveTest:
         else:
             s += "PARENT: None\n"
         return s
+
+    def assert_child_events_at_rest(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> None:
+        self.child.assert_event_counts(*args, **kwargs)
+
+    def assert_child1_events_at_rest(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> None:
+        self.child.assert_event_counts(*args, **kwargs)
+
+    def assert_parent_events_at_rest(
+        self, *args: typing.Any, **kwargs: typing.Any
+    ) -> None:
+        self.child.assert_event_counts(*args, **kwargs)

@@ -20,6 +20,9 @@ def assert_contents(
     curr_dir: Optional[Union[str, Path]] = None,
     check_index: bool = True,
     max_bytes: Optional[int] = None,
+    num_persists: Optional[int] = None,
+    num_retrieves: Optional[int] = None,
+    num_clears: Optional[int] = None,
 ) -> None:
     assert p.num_pending == len(p.pending_ids())
     if num_pending is not None:
@@ -35,6 +38,12 @@ def assert_contents(
         assert p.num_pending == len(str_uids)
         for str_uid in str_uids:
             assert str_uid in p
+    if num_persists is not None:
+        assert p.num_persists == num_persists
+    if num_retrieves is not None:
+        assert p.num_retrieves == num_retrieves
+    if num_clears is not None:
+        assert p.num_clears == num_clears
     if check_index:
         p2 = SQLitePersister(
             database_dir=p.database_path.parent,  # noqa: SLF001
@@ -60,6 +69,9 @@ def test_sqlite_persister_happy_path(tmp_path: Path) -> None:
         persister,
         num_pending=0,
         max_bytes=SQLitePersister.DEFAULT_MAX_BYTES,
+        num_persists=0,
+        num_retrieves=0,
+        num_clears=0,
     )
 
     # add one
@@ -77,12 +89,16 @@ def test_sqlite_persister_happy_path(tmp_path: Path) -> None:
         uids=[event.MessageId],
         num_pending=1,
         curr_bytes_range=(initial_bytes, initial_bytes + len(event_bytes)),
+        num_persists=1,
+        num_retrieves=0,
+        num_clears=0,
     )
 
     # retrieve
     retrieved = persister.retrieve(event.MessageId)
     assert retrieved.is_ok(), str(retrieved)
     assert retrieved.value == event_bytes
+    assert persister.num_retrieves == 1
 
     # deserialize
     loaded = json.loads(retrieved.value.decode("utf-8"))
@@ -106,6 +122,9 @@ def test_sqlite_persister_happy_path(tmp_path: Path) -> None:
         uids=[event.MessageId, event2.MessageId],
         num_pending=2,
         curr_bytes_range=(initial_bytes, initial_bytes + len(event2_bytes)),
+        num_persists=2,
+        num_retrieves=1,
+        num_clears=0,
     )
 
     # reindex
@@ -126,6 +145,9 @@ def test_sqlite_persister_happy_path(tmp_path: Path) -> None:
         persister,
         uids=[event.MessageId],
         num_pending=1,
+        num_persists=2,
+        num_retrieves=1,
+        num_clears=1,
     )
 
     # clear first one
@@ -135,6 +157,9 @@ def test_sqlite_persister_happy_path(tmp_path: Path) -> None:
     assert_contents(
         persister,
         num_pending=0,
+        num_persists=2,
+        num_retrieves=1,
+        num_clears=2,
     )
 
     # reindex

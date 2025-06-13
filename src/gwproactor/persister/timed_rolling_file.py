@@ -43,6 +43,9 @@ class TimedRollingFilePersister(PersisterInterface):
     _curr_bytes: int
     _pat_watchdog_args: Optional[list[str]] = None
     _reindex_pat_seconds: float = REINDEX_PAT_SECONDS
+    _num_persists: int = 0
+    _num_retrieves: int = 0
+    _num_clears: int = 0
 
     def __init__(
         self,
@@ -76,6 +79,7 @@ class TimedRollingFilePersister(PersisterInterface):
         return self._curr_dir
 
     def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:
+        self._num_persists += 1
         problems = Problems()
         try:
             if len(content) > self._max_bytes:
@@ -164,6 +168,7 @@ class TimedRollingFilePersister(PersisterInterface):
         return Ok()
 
     def clear(self, uid: str) -> Result[bool, Problems]:
+        self._num_clears += 1
         problems = Problems()
         path = self._pending.pop(uid, None)
         if path:
@@ -196,6 +201,18 @@ class TimedRollingFilePersister(PersisterInterface):
     def num_pending(self) -> int:
         return len(self._pending)
 
+    @property
+    def num_persists(self) -> int:
+        return self._num_persists
+
+    @property
+    def num_retrieves(self) -> int:
+        return self._num_retrieves
+
+    @property
+    def num_clears(self) -> int:
+        return self._num_clears
+
     def __contains__(self, uid: str) -> bool:
         return uid in self._pending
 
@@ -203,6 +220,7 @@ class TimedRollingFilePersister(PersisterInterface):
         return self._pending.get(uid, None)
 
     def retrieve(self, uid: str) -> Result[Optional[bytes], Problems]:
+        self._num_retrieves += 1
         problems = Problems()
         content: Optional[bytes] = None
         path = self._pending.get(uid, None)

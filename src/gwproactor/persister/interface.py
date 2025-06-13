@@ -43,3 +43,18 @@ class PersisterInterface(abc.ABC):
     @abstractmethod
     def reindex(self) -> Result[Optional[bool], Problems]:
         """Re-created pending index from persisted storage"""
+
+    @property
+    @abstractmethod
+    def num_persists(self) -> int:
+        """Total number of calls to persist() since construction."""
+
+    @property
+    @abstractmethod
+    def num_retrieves(self) -> int:
+        """Total number of calls to retrieve() since construction."""
+
+    @property
+    @abstractmethod
+    def num_clears(self) -> int:
+        """Total number of calls to clear() since construction."""
