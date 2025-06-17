@@ -3,6 +3,7 @@ from trogon import Trogon
 from typer.main import get_group
 
 from gwproactor.config import Paths
+from gwproactor_test import persister_cli
 from gwproactor_test.certs import generate_dummy_certs
 from gwproactor_test.dummies.tree import admin_cli, atn1_cli, scada1_cli, scada2_cli
 from gwproactor_test.dummies.tree.admin_settings import (
@@ -24,6 +25,7 @@ app.add_typer(scada1_cli.app, name="scada1", help="Use dummy scada1")
 app.add_typer(scada2_cli.app, name="scada2", help="Use dummy scada1")
 app.add_typer(atn1_cli.app, name="atn", help="Use dummy scada1")
 app.add_typer(admin_cli.app, name="admin", help="Use dummy admin")
+app.add_typer(persister_cli.app, name="mp", help="Measure persister timings.")
 
 
 @app.command()
