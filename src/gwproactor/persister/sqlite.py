@@ -26,6 +26,9 @@ class SQLitePersister(PersisterInterface):
     _url: str
     _engine: Optional[Engine] = None
     _echo: bool = False
+    _num_persists: int = 0
+    _num_retrieves: int = 0
+    _num_clears: int = 0
 
     def __init__(
         self,
@@ -55,6 +58,7 @@ class SQLitePersister(PersisterInterface):
         return self._engine
 
     def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:  # noqa: ARG002
+        self._num_persists += 1
         problems = Problems()
         try:
             with Session(self.engine) as session:
@@ -75,6 +79,7 @@ class SQLitePersister(PersisterInterface):
         return Ok()
 
     def clear(self, uid: str) -> Result[bool, Problems]:
+        self._num_clears += 1
         with Session(self.engine) as session:
             if (event := session.get(DatabaseEvent, uid)) is not None:
                 session.delete(event)
@@ -106,11 +111,24 @@ class SQLitePersister(PersisterInterface):
     def max_bytes(self) -> int:
         return self._max_bytes
 
+    @property
+    def num_persists(self) -> int:
+        return self._num_persists
+
+    @property
+    def num_retrieves(self) -> int:
+        return self._num_retrieves
+
+    @property
+    def num_clears(self) -> int:
+        return self._num_clears
+
     def __contains__(self, uid: str) -> bool:
         with Session(self.engine) as session:
             return session.get(DatabaseEvent, uid) is not None
 
     def retrieve(self, uid: str) -> Result[Optional[bytes], Problems]:
+        self._num_retrieves += 1
         with Session(self.engine) as session:
             event = session.get(DatabaseEvent, uid)
             if event is None:

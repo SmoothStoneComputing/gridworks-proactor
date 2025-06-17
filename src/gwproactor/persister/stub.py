@@ -7,10 +7,16 @@ from gwproactor.problems import Problems
 
 
 class StubPersister(PersisterInterface):
+    _num_persists: int = 0
+    _num_retrieves: int = 0
+    _num_clears: int = 0
+
     def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:  # noqa: ARG002
+        self._num_persists += 1
         return Ok()
 
     def clear(self, uid: str) -> Result[bool, Problems]:  # noqa: ARG002
+        self._num_clears += 1
         return Ok()
 
     def pending_ids(self) -> list[str]:
@@ -31,4 +37,17 @@ class StubPersister(PersisterInterface):
         return Ok(None)
 
     def reindex(self) -> Result[Optional[bool], Problems]:
+        self._num_retrieves += 1
         return Ok()
+
+    @property
+    def num_persists(self) -> int:
+        return self._num_persists
+
+    @property
+    def num_retrieves(self) -> int:
+        return self._num_retrieves
+
+    @property
+    def num_clears(self) -> int:
+        return self._num_clears

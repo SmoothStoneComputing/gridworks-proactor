@@ -53,9 +53,8 @@ async def await_for(  # noqa: C901, PLR0912, PLR0913
     now = start = time.time()
     until = now + timeout
     err_format = (
-        "ERROR. [{tag}] await_for() timed out after {seconds} seconds\n"
-        "  [{tag}]\n"
-        "  From {file}:{line}\n"
+        "ERROR from {file}:{line}  [{tag}]\n"
+        "  await_for() timed out after {seconds} seconds\n"
         "  wait function: {f}"
         "{err_str}"
     )
