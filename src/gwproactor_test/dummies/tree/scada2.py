@@ -10,7 +10,7 @@ from gwproactor.config import MQTTClient
 from gwproactor.config.links import CodecSettings, LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import MQTTReceiptPayload
-from gwproactor.persister import SQLitePersister
+from gwproactor.persister import TimedRollingFilePersister
 from gwproactor_test.dummies import DUMMY_SCADA1_NAME, DUMMY_SCADA2_NAME
 from gwproactor_test.dummies.names import DUMMY_ADMIN_NAME, DUMMY_ADMIN_SHORT_NAME
 from gwproactor_test.dummies.tree.admin_messages import (
@@ -194,5 +194,5 @@ class DummyScada2App(App):
         }
 
     @classmethod
-    def _make_persister(cls, settings: AppSettings) -> SQLitePersister:
-        return SQLitePersister(settings.paths.event_dir)
+    def _make_persister(cls, settings: AppSettings) -> TimedRollingFilePersister:
+        return TimedRollingFilePersister(settings.paths.event_dir)
