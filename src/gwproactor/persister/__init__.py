@@ -19,7 +19,6 @@ from gwproactor.persister.exceptions import (
 )
 from gwproactor.persister.interface import PersisterInterface
 from gwproactor.persister.simple_directory_writer import SimpleDirectoryWriter
-from gwproactor.persister.sqlite import SQLitePersister
 from gwproactor.persister.stub import StubPersister
 from gwproactor.persister.timed_rolling_file import TimedRollingFilePersister
 
@@ -39,7 +38,6 @@ __all__ = [
     "ReadFailed",
     "ReindexError",
     "SimpleDirectoryWriter",
-    "SQLitePersister",
     "StubPersister",
     "TimedRollingFilePersister",
     "TrimFailed",

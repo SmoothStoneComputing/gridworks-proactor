@@ -17,7 +17,6 @@ from pydantic import BaseModel
 from gwproactor.config import Paths
 from gwproactor.persister import (
     PersisterInterface,
-    SQLitePersister,
     TimedRollingFilePersister,
 )
 
@@ -33,13 +32,11 @@ app = typer.Typer(
 
 class PersisterType(str, Enum):
     json = "json"
-    sqlite = "sqlite"
     all = "all"
 
 
 persister_classes: dict[PersisterType, type] = {
     PersisterType.json: TimedRollingFilePersister,
-    PersisterType.sqlite: SQLitePersister,
 }
 
 
