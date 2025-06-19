@@ -421,7 +421,9 @@ class Proactor(AppInterface, Runnable):
 
     def _process_ack_timeout(self, wait_info: AckWaitInfo) -> None:
         self._logger.message_enter(
-            "++Proactor._process_ack_timeout %s", wait_info.message_id
+            "++Proactor<%s>._process_ack_timeout %s",
+            self.short_name,
+            wait_info.message_id,
         )
         path_dbg = 0
         match self._links.process_ack_timeout(wait_info):
@@ -434,7 +436,7 @@ class Proactor(AppInterface, Runnable):
                 path_dbg |= 0x00000004
                 self._report_error(exception, msg="Proactor._process_ack_timeout")
         self._logger.message_exit(
-            "--Proactor._process_ack_timeout path:0x%08X", path_dbg
+            "--Proactor<%s>._process_ack_timeout path:0x%08X", self.short_name, path_dbg
         )
 
     def _process_ack(self, link_name: str, message_id: str) -> None:
@@ -562,11 +564,13 @@ class Proactor(AppInterface, Runnable):
         )
 
     async def async_process_message(self, message: Message[Any]) -> None:  # noqa: C901, PLR0912
-        if not isinstance(message.Payload, PatWatchdog):
+        if self._logger.path_enabled and not isinstance(message.Payload, PatWatchdog):
+            if isinstance(message.Payload, MQTTReceiptPayload):
+                msg_type_str = message.Payload.message.topic.split("/")[-1]
+            else:
+                msg_type_str = f"{message.Header.Src}/{message.Header.MessageType}"
             self._logger.message_enter(
-                "++Proactor.process_message %s/%s",
-                message.Header.Src,
-                message.Header.MessageType,
+                "++Proactor<%s>.process_message  [%s]", self.short_name, msg_type_str
             )
         path_dbg = 0
         if not isinstance(message.Payload, (MQTTReceiptPayload, PatWatchdog)):
@@ -612,9 +616,9 @@ class Proactor(AppInterface, Runnable):
                 path_dbg |= 0x00000400
                 self._callbacks.process_internal_message(message)
         await self._notify_message_future(message)
-        if not isinstance(message.Payload, PatWatchdog):
+        if self._logger.path_enabled and not isinstance(message.Payload, PatWatchdog):
             self._logger.message_exit(
-                "--Proactor.process_message  path:0x%08X", path_dbg
+                "--Proactor<%s>.process_message  path:0x%08X", self.short_name, path_dbg
             )
 
     async def _notify_message_future(self, message: Message[Any]) -> None:
@@ -657,7 +661,8 @@ class Proactor(AppInterface, Runnable):
         self, mqtt_receipt_message: Message[MQTTReceiptPayload]
     ) -> Result[Message[Any], Exception]:
         self._logger.path(
-            "++Proactor._process_mqtt_message %s/%s",
+            "++Proactor<%s>._process_mqtt_message %s/%s",
+            self.short_name,
             mqtt_receipt_message.Header.Src,
             mqtt_receipt_message.Header.MessageType,
         )
@@ -719,7 +724,8 @@ class Proactor(AppInterface, Runnable):
                         mqtt_receipt_message.Payload.client_name, decoded_message
                     )
         self._logger.path(
-            "--Proactor._process_mqtt_message:%s  path:0x%08X",
+            "--Proactor<%s>._process_mqtt_message:%s  path:0x%08X",
+            self.short_name,
             int(decode_result.is_ok()),
             path_dbg,
         )
@@ -756,7 +762,9 @@ class Proactor(AppInterface, Runnable):
         self, message: Message[MQTTSubackPayload]
     ) -> Result[bool, Exception]:
         self._logger.path(
-            "++Proactor._process_mqtt_suback client:%s", message.Payload.client_name
+            "++Proactor<%s>._process_mqtt_suback client:%s",
+            self.short_name,
+            message.Payload.client_name,
         )
         path_dbg = 0
         result: Result[bool, Exception] = Ok()
@@ -795,6 +803,7 @@ class Proactor(AppInterface, Runnable):
     def _process_shutdown_message(self, message: Message[Shutdown]) -> None:
         self._stop_requested = True
         self.generate_event(ShutdownEvent(Reason=message.Payload.Reason))
+        self._links.flush_in_flight_events()
         self._logger.lifecycle(
             f"Shutting down due to ShutdownMessage, [{message.Payload.Reason}]"
         )
@@ -850,10 +859,10 @@ class Proactor(AppInterface, Runnable):
                     pass
 
     async def join(self) -> None:
-        self._logger.lifecycle("++Proactor.join()  proactor: <%s>", self.name)
+        self._logger.lifecycle("++Proactor<%s>.join()", self.short_name)
         if self._stopped:
             self._logger.lifecycle(
-                "--Proactor.join()  proactor: <%s>  (already stopped)", self.name
+                "--Proactor<%s>.join()  (already stopped)", self.short_name
             )
             return
         if self._loop is None:
@@ -894,4 +903,4 @@ class Proactor(AppInterface, Runnable):
             self._stopped = True
         except Exception:
             self._logger.exception("ERROR in Proactor.join")
-        self._logger.lifecycle("--Proactor.join()  proactor: <%s>", self.name)
+        self._logger.lifecycle("--Proactor<%s>.join()", self.short_name)

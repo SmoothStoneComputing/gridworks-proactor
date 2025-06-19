@@ -5,9 +5,9 @@ import xdg
 from pydantic import BaseModel, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
-DEFAULT_BASE_NAME = "gridworks"
+DEFAULT_BASE_NAME: str = "gridworks"
 DEFAULT_BASE_DIR = Path(DEFAULT_BASE_NAME)
-DEFAULT_NAME = "scada"
+DEFAULT_NAME: str = "scada"
 DEFAULT_NAME_DIR = Path(DEFAULT_NAME)
 DEFAULT_LAYOUT_FILE = Path("hardware-layout.json")
 
