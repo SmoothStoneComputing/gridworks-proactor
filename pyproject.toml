@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gridworks-proactor"
-version = "4.0.1"
+version = "4.1.0"
 description = "Gridworks Proactor"
 authors = ["Jessica Millar <jmillar@gridworks-consulting.com>"]
 license = "MIT"
@@ -47,8 +47,6 @@ rich = "^14.0.0"
 #   https://github.com/fastapi/typer/pull/1222
 #   https://github.com/fastapi/typer/commits/click-8.2/
 click = "<8.2.0"
-sqlmodel = "^0.0.24"
-sqlalchemy = "^2.0.41"
 
 [tool.poetry.group.dev.dependencies]
 Pygments = ">=2.10.0"
