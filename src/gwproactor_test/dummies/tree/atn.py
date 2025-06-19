@@ -12,7 +12,10 @@ from gwproactor.config import MQTTClient
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import MQTTReceiptPayload
-from gwproactor.persister import PersisterInterface, SimpleDirectoryWriter
+from gwproactor.persister import (
+    PersisterInterface,
+    TimedRollingFilePersister,
+)
 from gwproactor_test.dummies import DUMMY_SCADA1_NAME
 from gwproactor_test.dummies.names import DUMMY_ATN_NAME
 
@@ -30,6 +33,7 @@ class DummyAtn(PrimeActor):
         match decoded.Payload:
             case EventBase():
                 path_dbg |= 0x00000001
+                self.services.generate_event(decoded.Payload)
             case _:
                 path_dbg |= 0x00000002
         self.services.logger.path(
@@ -83,4 +87,4 @@ class DummyAtnApp(App):
 
     @classmethod
     def _make_persister(cls, settings: AppSettings) -> PersisterInterface:
-        return SimpleDirectoryWriter(settings.paths.event_dir)
+        return TimedRollingFilePersister(settings.paths.event_dir)
