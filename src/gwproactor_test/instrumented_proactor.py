@@ -14,7 +14,7 @@ from gwproto.messages import CommEvent, EventBase, EventT, PingMessage
 from paho.mqtt.client import MQTT_ERR_CONN_LOST, MQTT_ERR_SUCCESS, MQTTMessageInfo
 from result import Ok, Result
 
-from gwproactor import Proactor
+from gwproactor import AppInterface, Proactor
 from gwproactor.config import LoggerLevels
 from gwproactor.config.proactor_config import ProactorConfig
 from gwproactor.links import LinkManager, LinkState, MQTTClients, MQTTClientWrapper
@@ -197,8 +197,8 @@ class InstrumentedProactor(Proactor):
     DELIMIT_CHAR = "#"
     DELIMIT_STR = DELIMIT_CHAR * 150
 
-    def __init__(self, config: ProactorConfig) -> None:
-        super().__init__(config)
+    def __init__(self, services: AppInterface, config: ProactorConfig) -> None:
+        super().__init__(services, config)
         self._subacks_paused = defaultdict(bool)
         self._subacks_available = defaultdict(list)
         self._mqtt_messages_dropped = defaultdict(bool)
