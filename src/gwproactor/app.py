@@ -191,7 +191,7 @@ class App(AppInterface):
         )
 
     def _instantiate_proactor(self) -> Proactor:
-        return self.sub_types.proactor_type(self.config)
+        return self.sub_types.proactor_type(self, self.config)
 
     def instantiate(self) -> Self:
         self.raw_proactor = self._instantiate_proactor()
@@ -199,7 +199,7 @@ class App(AppInterface):
         if self.sub_types.prime_actor_type is not None:
             self._prime_actor = self.sub_types.prime_actor_type(
                 self.config.name.short_name,
-                self.proactor,
+                self,
             )
         self._load_actors()
         self.proactor.links.log_subscriptions("construction")

@@ -12,3 +12,4 @@ extensions = [
 ]
 autodoc_typehints = "description"
 html_theme = "furo"
+myst_heading_anchors = 7

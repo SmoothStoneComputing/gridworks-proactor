@@ -6,26 +6,23 @@
 [![License](https://img.shields.io/pypi/l/gridworks-proactor)][license]
 
 [![Read the documentation at https://gridworks-proactor.readthedocs.io/](https://img.shields.io/readthedocs/gridworks-proactor/latest.svg?label=Read%20the%20Docs)][read the docs]
-[![Tests](https://github.com/thegridelectric/gridworks-proactor/workflows/Tests/badge.svg)][tests]
+[![Tests](https://github.com/SmoothStoneComputing/gridworks-proactor/workflows/Tests/badge.svg)][tests]
 [![Codecov](https://app.codecov.io/gh/SmoothStoneComputing/gridworks-proactor/branch/main/graph/badge.svg)][codecov]
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
-[![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
 
 [pypi status]: https://pypi.org/project/gridworks-proactor/
 
 [read the docs]: https://gridworks-proactor.readthedocs.io/
 
-[tests]: https://github.com/thegridelectric/gridworks-proactor/actions?workflow=Tests
+[tests]: https://github.com/SmoothStoneComputing/gridworks-proactor/actions?workflow=Tests
 
 [codecov]: https://app.codecov.io/gh/SmoothStoneComputing/gridworks-proactor
 
 [pre-commit]: https://github.com/pre-commit/pre-commit
 
-[black]: https://github.com/psf/black
-
 This packages provides "live actor" and "application monitored communication" infrastructure for the
-[GridWorks SpaceHeat SCADA](https://github.com/thegridelectric/gw-scada-spaceheat-python) project. This separation
+[GridWorks SpaceHeat SCADA](https://github.com/thegridelectric/gridworks-scada) project. This separation
 allows the scada code to be more focussed on on application specific details and provides the potential to re-use the
 "live actor" and "application monitored" infrastructure.
 
@@ -211,16 +208,16 @@ This project was generated from [@cjolowicz]'s [Hypermodern Python Cookiecutter]
 
 [hypermodern python cookiecutter]: https://github.com/cjolowicz/cookiecutter-hypermodern-python
 
-[file an issue]: https://github.com/thegridelectric/gridworks-proactor/issues
+[file an issue]: https://github.com/SmoothStoneComputing/gridworks-proactor/issues
 
 [pip]: https://pip.pypa.io/
 
-[example-test-mosquitto.conf]: https://github.com/thegridelectric/gridworks-proactor/blob/main/tests/config/example-test-mosquitto.conf
+[example-test-mosquitto.conf]: https://github.com/SmoothStoneComputing/gridworks-proactor/blob/main/tests/config/example-test-mosquitto.conf
 
 <!-- github-only -->
 
-[license]: https://github.com/thegridelectric/gridworks-proactor/blob/main/LICENSE
+[license]: https://github.com/SmoothStoneComputing/gridworks-proactor/blob/main/LICENSE
 
-[contributor guide]: https://github.com/thegridelectric/gridworks-proactor/blob/main/CONTRIBUTING.md
+[contributor guide]: https://github.com/SmoothStoneComputing/gridworks-proactor/blob/main/CONTRIBUTING.md
 
 [communication state]: https://gridworks-proactor.readthedocs.io/en/latest/comm_state.html

@@ -75,7 +75,7 @@ from gwproactor.web_manager import _WebManager
 T = TypeVar("T")
 
 
-class Proactor(AppInterface, Runnable):
+class Proactor(Runnable):
     AWAIT_PROCESSING_FUTURE_ATTRIBUTE: str = "_await_processing_future"
 
     _name: ProactorName
@@ -100,7 +100,7 @@ class Proactor(AppInterface, Runnable):
     _web_manager: _WebManager
     _watchdog: WatchdogManager
 
-    def __init__(self, config: ProactorConfig) -> None:
+    def __init__(self, services: AppInterface, config: ProactorConfig) -> None:
         self._name = config.name
         self._settings = config.settings
         self._callbacks = CallbackManager(callback_functions=config.callback_functions)
@@ -138,11 +138,11 @@ class Proactor(AppInterface, Runnable):
         self._tasks = []
         self._stop_requested = False
         self._stopped = False
-        self._watchdog = WatchdogManager(9, self)
+        self._watchdog = WatchdogManager(9, services)
         self.add_communicator(self._watchdog)
-        self._io_loop_manager = IOLoop(self)
+        self._io_loop_manager = IOLoop(services)
         self.add_communicator(self._io_loop_manager)
-        self._web_manager = _WebManager(self)
+        self._web_manager = _WebManager(services)
         self.add_communicator(self._web_manager)
         for server_config in self._layout.get_components_by_type(WebServerComponent):
             self._web_manager.add_web_server_config(
@@ -408,7 +408,7 @@ class Proactor(AppInterface, Runnable):
     def get_web_server_configs(self) -> dict[str, WebServerGt]:
         return self._web_manager.get_configs()
 
-    def get_external_watchdog_builder_class(
+    def get_external_watchdog_builder_class(  # noqa
         self,
     ) -> type[ExternalWatchdogCommandBuilder]:
         return SystemDWatchdogCommandBuilder
