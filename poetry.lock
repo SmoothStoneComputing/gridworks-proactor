@@ -808,13 +808,13 @@ xdg = ">=6.0.0"
 
 [[package]]
 name = "gridworks-protocol"
-version = "1.2.7"
+version = "1.2.8"
 description = "Gridworks Protocol"
 optional = false
 python-versions = "<4.0,>=3.11"
 files = [
-    {file = "gridworks_protocol-1.2.7-py3-none-any.whl", hash = "sha256:442065fcb893188e5a0d8fa1256d5ad7e9c158e62543800f2fecd044fab1b858"},
-    {file = "gridworks_protocol-1.2.7.tar.gz", hash = "sha256:243a5d73267bc255def9ca7d59b884db3c64d6dad9c63e7d0822c0879643a894"},
+    {file = "gridworks_protocol-1.2.8-py3-none-any.whl", hash = "sha256:2c26fec5cd9b341e7fc063ad4db852a9c0813c01a0f9a7a8ccc6922535f94d24"},
+    {file = "gridworks_protocol-1.2.8.tar.gz", hash = "sha256:661d44eee28a9fc0e5b443e36760fa7b49fa839b4670f492e287a8bb9af0cf18"},
 ]
 
 [package.dependencies]
