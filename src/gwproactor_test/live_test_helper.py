@@ -116,6 +116,10 @@ class LiveTest:
     def parent_app(self) -> App:
         return self._parent_app
 
+    @classmethod
+    def test_layout_path(cls) -> Path:
+        return TEST_HARDWARE_LAYOUT_PATH
+
     def _make_app(
         self,
         app_type: type[App],
@@ -126,7 +130,7 @@ class LiveTest:
         # Copy hardware layout file.
         paths = Paths(name=app_type.paths_name())
         paths.mkdirs(parents=True, exist_ok=True)
-        shutil.copyfile(Path(TEST_HARDWARE_LAYOUT_PATH), paths.hardware_layout)
+        shutil.copyfile(self.test_layout_path(), paths.hardware_layout)
         # Use an instrumented proactor
         sub_types = app_type.make_subtypes()
         sub_types.proactor_type = InstrumentedProactor
