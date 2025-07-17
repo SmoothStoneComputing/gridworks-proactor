@@ -101,7 +101,7 @@ class _EventAckCountsIntermediate:
                         )
                 case Err(one_retrieve_problems):
                     self.problems.add_error(one_retrieve_problems)
-        h.child.event_persister._num_retrieves -= len(pending_event_list)  # type: ignore # noqa
+        child.event_persister._num_retrieves -= len(pending_event_list)  # type: ignore # noqa
         pending_event_list.sort(key=lambda event_: event_.TimeCreatedMs)
         self.pending_events = {
             pending_event.MessageId: pending_event
