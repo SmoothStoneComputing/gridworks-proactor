@@ -20,7 +20,12 @@ from gwproactor_test.dummies.pair.parent import DummyParentApp
 from gwproactor_test.event_consistency_checks import EventAckCounts
 from gwproactor_test.instrumented_proactor import InstrumentedProactor, caller_str
 from gwproactor_test.logger_guard import LoggerGuards
-from gwproactor_test.wait import await_for
+from gwproactor_test.wait import (
+    AwaitablePredicate,
+    ErrorStringFunction,
+    Predicate,
+    await_for,
+)
 
 
 def get_option_value(
@@ -355,6 +360,45 @@ class LiveTest:
             s += "PARENT: None\n"
         return s
 
+    async def await_for(
+        self,
+        f: Predicate | AwaitablePredicate,
+        tag: str = "",
+        *,
+        timeout: float = 3.0,  # noqa: ASYNC109
+        raise_timeout: bool = True,
+        retry_duration: float = 0.01,
+        err_str_f: Optional[ErrorStringFunction] = None,
+        logger: Optional[logging.Logger | logging.LoggerAdapter[logging.Logger]] = None,
+        error_dict: Optional[dict[str, typing.Any]] = None,
+    ) -> bool:
+        if not isinstance(tag, str):
+            raise TypeError(
+                "ERROR. LiveTest.await_for() received a non-string tag "
+                f"(type: {type(tag)}).\n"
+                "  Did you pass the timeout as the second parameter?\n\n"
+                "  The signature of LiveTest differs from wait.await_for(), "
+                "which has timeout as the second, not third parameter."
+            )
+        if err_str_f is None:
+            err_str_f = self.summary_str
+        return await await_for(
+            f=f,
+            timeout=timeout,
+            tag=tag,
+            raise_timeout=raise_timeout,
+            retry_duration=retry_duration,
+            err_str_f=err_str_f,
+            logger=logger,
+            error_dict=error_dict,
+        )
+
+    async def wait_child_to_parent_active(self) -> bool:
+        return await self.await_for(
+            self.child.links.link(self.child.upstream_client).active,
+            "ERROR waiting child to parent link to be active",
+        )
+
     def assert_child_events_at_rest(
         self, *args: typing.Any, **kwargs: typing.Any
     ) -> None:
@@ -434,18 +478,14 @@ class LiveTest:
             if exp_parent_persists is not None
             else exp_parent_pending
         )
-        await await_for(
+        await self.await_for(
             lambda: child_link.active() and child.events_at_rest(),
-            1,
             "ERROR waiting for child events upload",
-            err_str_f=self.summary_str,
         )
-        await await_for(
+        await self.await_for(
             lambda: parent_link.active()
             and parent.events_at_rest(num_pending=exp_parent_pending),
-            1,
             f"ERROR waiting for parent to persist {exp_parent_pending} events",
-            err_str_f=self.summary_str,
         )
         parent.assert_event_counts(
             num_pending=exp_parent_pending,
