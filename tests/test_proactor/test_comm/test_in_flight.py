@@ -6,10 +6,6 @@ import pytest
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
 from gwproactor_test import LiveTest, await_for
-from gwproactor_test.live_test_helper import (
-    assert_acks_consistent,
-    await_quiescent_connections,
-)
 
 
 @pytest.mark.asyncio
@@ -17,7 +13,7 @@ async def test_in_flight_happy_path(request: Any) -> None:
     """Generate a bunch of events. While they are being acked generate a bunch
     more. Verify the child has not persisted any of them."""
     async with LiveTest(start_child=True, start_parent=True, request=request) as h:
-        await await_quiescent_connections(h)
+        await h.await_quiescent_connections()
 
         child = h.child
         parent = h.parent
@@ -85,7 +81,7 @@ async def test_in_flight_overflow(request: Any) -> None:
 
     # Start parent and child and wait for them to be at rest
     async with LiveTest(start_child=True, start_parent=True, request=request) as h:
-        await await_quiescent_connections(h)
+        await h.await_quiescent_connections()
 
         child = h.child
         parent = h.parent
@@ -155,7 +151,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
         child_app_settings=child_settings,
         parent_app_settings=parent_settings,
     ) as h:
-        await await_quiescent_connections(h)
+        await h.await_quiescent_connections()
         child = h.child
         parent = h.parent
         parent.pause_acks()
@@ -196,7 +192,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
             all_pending=True,
             tag="parent after events generated",
         )
-        assert_acks_consistent(h)
+        h.assert_acks_consistent()
 
         # Walk through generating more in-flight while in-flight buffer
         # has room
@@ -241,7 +237,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
             all_pending=True,
             tag="parent after events generated",
         )
-        assert_acks_consistent(h)
+        h.assert_acks_consistent()
 
         # Walk through overflowing the buffer
 
@@ -275,7 +271,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
             all_pending=True,
             tag="parent after overflow events generated",
         )
-        assert_acks_consistent(h)
+        h.assert_acks_consistent()
         # Walk through mixing overflow and in flight.
 
         # first with a small mix, release an 3 acks so we have some room in the
@@ -309,7 +305,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
             all_pending=True,
             tag="parent after small mix",
         )
-        assert_acks_consistent(h)
+        h.assert_acks_consistent()
 
         # re-fill the in-flight buffer.
         for i in range(acks_released):
@@ -340,7 +336,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
             all_pending=True,
             tag="parent after in-flight refilled",
         )
-        assert_acks_consistent(h)
+        h.assert_acks_consistent()
 
         # next event should be persisted
         child.generate_event(
@@ -370,7 +366,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
             all_pending=True,
             tag="parent after overflow",
         )
-        assert_acks_consistent(h)
+        h.assert_acks_consistent()
         # now generate a bigger mix
         # release 30
         acks_released = 30
@@ -404,7 +400,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
             all_pending=True,
             tag="parent after overflow",
         )
-        assert_acks_consistent(h)
+        h.assert_acks_consistent()
 
         # generate 60 events. 30 Should end up in-flight, and 30 persisted
         exp_pending = 11
@@ -461,7 +457,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
             all_pending=True,
             tag="parent after add 60 more",
         )
-        assert_acks_consistent(h)
+        h.assert_acks_consistent()
 
         # release all the acks, group by group
         exp_in_flight = in_flight_buffer_size
@@ -515,7 +511,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
                 all_pending=True,
                 tag=f"parent after add group {group_idx}  group_size: {group_size}  ",
             )
-            assert_acks_consistent(h)
+            h.assert_acks_consistent()
 
         # all events should have been passed along.
         child.assert_event_counts(
@@ -543,7 +539,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
             1,
             f"ERROR waiting for parent to persist {exp_parent_persists} events",
         )
-        assert_acks_consistent(h)
+        h.assert_acks_consistent()
 
 
 @pytest.mark.asyncio
@@ -552,7 +548,7 @@ async def test_in_flight_comm_loss(request: Any) -> None:
     in-flight"""
 
     async with LiveTest(start_child=True, start_parent=True, request=request) as h:
-        await await_quiescent_connections(h)
+        await h.await_quiescent_connections()
         child = h.child
         upstream_link = child.links.link(child.upstream_client)
         parent = h.parent
@@ -626,8 +622,7 @@ async def test_in_flight_comm_loss(request: Any) -> None:
         # The parent will receive the generated events twice since they
         # all time out and are then re-sent.
         exp_parent_persists = exp_parent_pending + num_to_generate
-        await await_quiescent_connections(
-            h,
+        await h.await_quiescent_connections(
             exp_child_persists=exp_persists,
             exp_parent_pending=exp_parent_pending,
             exp_parent_persists=exp_parent_persists,
@@ -646,7 +641,7 @@ async def test_in_flight_comm_loss(request: Any) -> None:
 @pytest.mark.asyncio
 async def test_in_flight_overflow_comm_loss(request: Any) -> None:
     async with LiveTest(start_child=True, start_parent=True, request=request) as h:
-        await await_quiescent_connections(h)
+        await h.await_quiescent_connections()
         child = h.child
         upstream_link = child.links.link(child.upstream_client)
         parent = h.parent
@@ -697,8 +692,7 @@ async def test_in_flight_overflow_comm_loss(request: Any) -> None:
         # The parent will receive the generated events twice since they
         # all time out and are then re-sent.
         exp_parent_persists = exp_parent_pending + num_to_generate
-        await await_quiescent_connections(
-            h,
+        await h.await_quiescent_connections(
             exp_child_persists=exp_child_persists,
             exp_parent_pending=exp_parent_pending,
             exp_parent_persists=exp_parent_persists,

@@ -370,92 +370,95 @@ class LiveTest:
     ) -> None:
         self.child.assert_event_counts(*args, **kwargs)
 
-
-def assert_acks_consistent(
-    h: LiveTest,
-    *,
-    print_summary: bool = False,
-    verbose: bool = False,
-    log_level: int = logging.ERROR,
-    raise_errors: bool = True,
-) -> None:
-    called_from_str = f"\nassert_acks_consistent() called from {caller_str(depth=2)}"
-    counts = EventAckCounts(parent=h.parent, child=h.child, verbose=verbose)
-    if not counts.ok() and raise_errors:
-        raise AssertionError(
-            f"ERROR {called_from_str}\n{counts.report}\n{h.summary_str()}"
+    def assert_acks_consistent(
+        self,
+        *,
+        print_summary: bool = False,
+        verbose: bool = False,
+        log_level: int = logging.ERROR,
+        raise_errors: bool = True,
+    ) -> None:
+        called_from_str = (
+            f"\nassert_acks_consistent() called from {caller_str(depth=2)}"
         )
-    if verbose or not counts.ok():
-        h.child.logger.log(log_level, f"{called_from_str}\n{counts.report}")
-    elif print_summary:
-        h.child.logger.log(log_level, f"{called_from_str}\n{counts.summary}")
+        counts = EventAckCounts(parent=self.parent, child=self.child, verbose=verbose)
+        if not counts.ok() and raise_errors:
+            raise AssertionError(
+                f"ERROR {called_from_str}\n{counts.report}\n{self.summary_str()}"
+            )
+        if verbose or not counts.ok():
+            self.child.logger.log(log_level, f"{called_from_str}\n{counts.report}")
+        elif print_summary:
+            self.child.logger.log(log_level, f"{called_from_str}\n{counts.summary}")
 
+    async def await_quiescent_connections(
+        self,
+        *,
+        exp_child_persists: Optional[int] = None,
+        exp_parent_pending: Optional[int] = None,
+        exp_parent_persists: Optional[int] = None,
+    ) -> None:
+        child = self.child
+        child_link = child.links.link(child.upstream_client)
+        parent = self.parent
+        parent_link = parent.links.link(parent.downstream_client)
 
-async def await_quiescent_connections(
-    h: LiveTest,
-    exp_child_persists: Optional[int] = None,
-    exp_parent_pending: Optional[int] = None,
-    exp_parent_persists: Optional[int] = None,
-) -> None:
-    child = h.child
-    child_link = child.links.link(child.upstream_client)
-    parent = h.parent
-    parent_link = parent.links.link(parent.downstream_client)
-
-    # wait for all events to be at rest
-    exp_child_persists = (
-        exp_child_persists
-        if exp_child_persists is not None
-        else sum(
-            [
-                1,  # child startup
-                2,  # child connect, substribe
-            ]
-        )
-    )
-
-    exp_parent_pending = (
-        exp_parent_pending
-        if exp_parent_pending is not None
-        else (
-            sum(
+        # wait for all events to be at rest
+        exp_child_persists = (
+            exp_child_persists
+            if exp_child_persists is not None
+            else sum(
                 [
-                    exp_child_persists,
-                    1,  # child peer active
-                    1,  # parent startup
-                    3,  # parent connect, subscribe, peer active
+                    1,  # child startup
+                    2,  # child connect, substribe
                 ]
             )
         )
-    )
-    exp_parent_persists = (
-        exp_parent_persists if exp_parent_persists is not None else exp_parent_pending
-    )
-    await await_for(
-        lambda: child_link.active() and child.events_at_rest(),
-        1,
-        "ERROR waiting for child events upload",
-        err_str_f=h.summary_str,
-    )
-    await await_for(
-        lambda: parent_link.active()
-        and parent.events_at_rest(num_pending=exp_parent_pending),
-        1,
-        f"ERROR waiting for parent to persist {exp_parent_pending} events",
-        err_str_f=h.summary_str,
-    )
-    parent.assert_event_counts(
-        num_pending=exp_parent_pending,
-        num_persists=exp_parent_persists,
-        num_clears=0,
-        num_retrieves=0,
-        tag="parent",
-        err_str=h.summary_str(),
-    )
-    child.assert_event_counts(
-        # child will not persist peer active event
-        num_persists=exp_child_persists,
-        all_clear=True,
-        tag="child",
-        err_str=h.summary_str(),
-    )
+
+        exp_parent_pending = (
+            exp_parent_pending
+            if exp_parent_pending is not None
+            else (
+                sum(
+                    [
+                        exp_child_persists,
+                        1,  # child peer active
+                        1,  # parent startup
+                        3,  # parent connect, subscribe, peer active
+                    ]
+                )
+            )
+        )
+        exp_parent_persists = (
+            exp_parent_persists
+            if exp_parent_persists is not None
+            else exp_parent_pending
+        )
+        await await_for(
+            lambda: child_link.active() and child.events_at_rest(),
+            1,
+            "ERROR waiting for child events upload",
+            err_str_f=self.summary_str,
+        )
+        await await_for(
+            lambda: parent_link.active()
+            and parent.events_at_rest(num_pending=exp_parent_pending),
+            1,
+            f"ERROR waiting for parent to persist {exp_parent_pending} events",
+            err_str_f=self.summary_str,
+        )
+        parent.assert_event_counts(
+            num_pending=exp_parent_pending,
+            num_persists=exp_parent_persists,
+            num_clears=0,
+            num_retrieves=0,
+            tag="parent",
+            err_str=self.summary_str(),
+        )
+        child.assert_event_counts(
+            # child will not persist peer active event
+            num_persists=exp_child_persists,
+            all_clear=True,
+            tag="child",
+            err_str=self.summary_str(),
+        )
