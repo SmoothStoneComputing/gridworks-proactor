@@ -13,7 +13,7 @@ from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
 from gwproactor.persister import ByteDecodingError, UIDMissingWarning
 from gwproactor_test import LiveTest, await_for
-from gwproactor_test.instrumented_proactor import caller_str
+from gwproactor_test.instrumented_proactor import InstrumentedProactor, caller_str
 
 
 class EventAckConsistencyError(Exception): ...
@@ -42,23 +42,31 @@ class _EventAckCountsIntermediate:
     pending_not_paused_events: dict[str, EventBase]
     paused_not_events_list: list[str]
 
-    def __init__(self, h: LiveTest, *, verbose: bool = False) -> None:
-        self._find_errors(h)
+    def __init__(
+        self,
+        *,
+        parent: InstrumentedProactor,
+        child: InstrumentedProactor,
+        verbose: bool = False,
+    ) -> None:
+        self._find_errors(parent=parent, child=child)
         if self.ok() and not verbose:
             self.pending_events = {}
             self.in_flight_not_paused_events = {}
             self.pending_not_paused_events = {}
             self.paused_not_events_list = []
         else:
-            self._sort_events(h)
+            self._sort_events(child=child)
 
-    def _find_errors(self, h: LiveTest) -> None:
-        in_flight_set = set(h.child.links.in_flight_events.keys())
-        pending_set = set(h.child.event_persister.pending_ids())
+    def _find_errors(
+        self, *, parent: InstrumentedProactor, child: InstrumentedProactor
+    ) -> None:
+        in_flight_set = set(child.links.in_flight_events.keys())
+        pending_set = set(child.event_persister.pending_ids())
         paused_ack_list: list[Ack] = []
         problems = Problems()
-        for paused in h.parent.needs_ack:
-            if paused.link_name == h.parent.downstream_client:
+        for paused in parent.needs_ack:
+            if paused.link_name == parent.downstream_client:
                 match paused.message.Payload:
                     case Ack():
                         paused_ack_list.append(paused.message.Payload)
@@ -79,11 +87,11 @@ class _EventAckCountsIntermediate:
         self.pending_not_paused_set = pending_not_paused_set
         self.paused_not_events_set = paused_not_events_set
 
-    def _sort_pending_events(self, h: LiveTest) -> None:
+    def _sort_pending_events(self, *, child: InstrumentedProactor) -> None:
         # Sort pending events by time (persister does not guarantee order)
         pending_event_list: list[AnyEvent] = []
         for event_id in self.pending_set:
-            match h.child.event_persister.retrieve(event_id):
+            match child.event_persister.retrieve(event_id):
                 case Ok(content):
                     if content is not None:
                         try:
@@ -107,13 +115,13 @@ class _EventAckCountsIntermediate:
             for pending_event in pending_event_list
         }
 
-    def _sort_events(self, h: LiveTest) -> None:
-        self._sort_pending_events(h)
+    def _sort_events(self, *, child: InstrumentedProactor) -> None:
+        self._sort_pending_events(child=child)
         self.in_flight_not_paused_events = {
             event.MessageId: event
             for event in sorted(
                 [
-                    h.child.links.in_flight_events[x]
+                    child.links.in_flight_events[x]
                     for x in self.in_flight_not_paused_set
                 ],
                 key=lambda x: x.TimeCreatedMs,
@@ -145,7 +153,7 @@ class _EventAckCountsIntermediate:
 
 
 class _EventAckReportGenerator:
-    h: LiveTest
+    child: InstrumentedProactor
     c: _EventAckCountsIntermediate
     verbose: bool
     summary: str
@@ -154,9 +162,13 @@ class _EventAckReportGenerator:
     report: str
 
     def __init__(
-        self, h: LiveTest, c: _EventAckCountsIntermediate, *, verbose: bool = False
+        self,
+        child: InstrumentedProactor,
+        c: _EventAckCountsIntermediate,
+        *,
+        verbose: bool = False,
     ) -> None:
-        self.h = h
+        self.child = child
         self.c = c
         self.verbose = verbose
         self._summarize()
@@ -181,8 +193,8 @@ class _EventAckReportGenerator:
         report = f"Parent paused acks: {len(self.c.paused_ack_list)}\n"
         event: EventBase | str
         for i, paused_ack in enumerate(self.c.paused_ack_list):
-            if paused_ack.AckMessageID in self.h.child.links.in_flight_events:
-                event = self.h.child.links.in_flight_events[paused_ack.AckMessageID]
+            if paused_ack.AckMessageID in self.child.links.in_flight_events:
+                event = self.child.links.in_flight_events[paused_ack.AckMessageID]
                 loc = "in-flight"
             elif paused_ack.AckMessageID in self.c.pending_events:
                 event = self.c.pending_events[paused_ack.AckMessageID]
@@ -191,8 +203,8 @@ class _EventAckReportGenerator:
                 event = paused_ack.AckMessageID
                 loc = "*UKNONWN*"
             report += self._event_line(event, loc, i + 1, len(self.c.paused_ack_list))
-        report += f"Child in-flight events: {self.h.child.links.num_in_flight}\n"
-        for i, event in enumerate(self.h.child.links.in_flight_events.values()):
+        report += f"Child in-flight events: {self.child.links.num_in_flight}\n"
+        for i, event in enumerate(self.child.links.in_flight_events.values()):
             report += self._event_line(
                 event, "in-flight", i + 1, len(self.c.pending_events)
             )
@@ -256,9 +268,15 @@ class EventAckCounts:
     report: str = ""
     problems: Problems
 
-    def __init__(self, h: LiveTest, *, verbose: bool = False) -> None:
-        calc = _EventAckCountsIntermediate(h, verbose=verbose)
-        reporter = _EventAckReportGenerator(h, c=calc, verbose=verbose)
+    def __init__(
+        self,
+        *,
+        parent: InstrumentedProactor,
+        child: InstrumentedProactor,
+        verbose: bool = False,
+    ) -> None:
+        calc = _EventAckCountsIntermediate(parent=parent, child=child, verbose=verbose)
+        reporter = _EventAckReportGenerator(child=child, c=calc, verbose=verbose)
         self.problems = calc.problems
         self.summary = reporter.summary
         self.report = reporter.report
@@ -279,7 +297,7 @@ def assert_acks_consistent(
     raise_errors: bool = True,
 ) -> None:
     called_from_str = f"\nassert_acks_consistent() called from {caller_str(depth=2)}"
-    counts = EventAckCounts(h, verbose=verbose)
+    counts = EventAckCounts(parent=h.parent, child=h.child, verbose=verbose)
     if not counts.ok() and raise_errors:
         raise AssertionError(
             f"ERROR {called_from_str}\n{counts.report}\n{h.summary_str()}"
