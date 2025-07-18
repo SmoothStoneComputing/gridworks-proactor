@@ -393,9 +393,15 @@ class LiveTest:
             error_dict=error_dict,
         )
 
-    async def wait_child_to_parent_active(self) -> bool:
+    async def child_to_parent_active(self) -> bool:
         return await self.await_for(
             self.child.links.link(self.child.upstream_client).active,
+            "ERROR waiting child to parent link to be active",
+        )
+
+    async def parent_to_child_active(self) -> bool:
+        return await self.await_for(
+            self.parent.links.link(self.parent.downstream_client).active,
             "ERROR waiting child to parent link to be active",
         )
 
