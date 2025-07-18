@@ -195,24 +195,8 @@ async def test_tree_parent_comm(request: Any) -> None:
         )
         h.add_child2()
         h.start_child2()
-        link1to2 = h.child1.links.link(h.child1.downstream_client)
-        link2to1 = h.child2.links.link(h.child2.upstream_client)
-        await await_for(
-            lambda: link1to2.active() and link2to1.active(),
-            3,
-            "link1to2.active() and link2to1.active()",
-            err_str_f=h.summary_str,
-        )
         h.add_parent()
         h.start_parent()
-        link1toAtn = h.child1.links.link(h.child1.upstream_client)
-        linkAtnto1 = h.parent.links.link(h.parent.downstream_client)
-        await await_for(
-            lambda: link1toAtn.active() and linkAtnto1.active(),
-            3,
-            "link1toAtn.active() and linkAtnto1.active()",
-            err_str_f=h.summary_str,
-        )
 
         # wait for all events to be at rest
         exp_child2_events = sum(
@@ -238,39 +222,7 @@ async def test_tree_parent_comm(request: Any) -> None:
                 exp_child1_events,
             ]
         )
-        await await_for(
-            lambda: h.child1.links.num_pending == 0
-            and h.child1.links.num_in_flight == 0
-            and h.child2.links.num_pending == 0
-            and h.child2.links.num_in_flight == 0
-            and h.parent.links.num_pending == exp_parent_events,
-            1,
-            f"ERROR waiting for parent to persist {exp_parent_events} events",
-            err_str_f=h.summary_str,
-        )
-        persister0 = h.parent.event_persister
-        persister1 = h.child1.event_persister
-        persister2 = h.child2.event_persister
-        assert h.parent.links.num_pending == exp_parent_events
-        assert h.parent.links.num_in_flight == 0
-        assert persister0.num_persists == exp_parent_events
-        assert persister0.num_retrieves == 0
-        assert persister0.num_clears == 0
-        assert h.child1.links.num_pending == 0
-        assert h.child1.links.num_in_flight == 0
-        # child 1 will persist between 3 and (exp_child1_events - 1) events, depending
-        # on when parent link went active
-        assert 3 <= persister1.num_persists <= (exp_child1_events - 1), h.summary_str()
-        assert persister1.num_retrieves == persister1.num_persists
-        assert persister1.num_clears == persister1.num_persists
-
-        assert h.child2.links.num_pending == 0
-        assert h.child2.links.num_in_flight == 0
-        # child2 never persists its own peer active, and whether it persists
-        # admin events depends on when child1 link goes active
-        assert 3 <= persister2.num_persists <= 5
-        assert persister2.num_retrieves == persister2.num_persists
-        assert persister2.num_clears == persister2.num_persists
+        await h.await_quiescent_connections(exp_parent_pending=exp_parent_events)
 
 
 @pytest.mark.asyncio

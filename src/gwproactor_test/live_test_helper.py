@@ -13,13 +13,19 @@ from gwproactor import AppSettings, Proactor, setup_logging
 from gwproactor.app import App
 from gwproactor.config import DEFAULT_BASE_NAME as DEFAULT_LOG_BASE_NAME
 from gwproactor.config import MQTTClient, Paths
-from gwproactor_test import copy_keys
-from gwproactor_test.certs import uses_tls
+from gwproactor_test.certs import copy_keys, uses_tls
 from gwproactor_test.clean import TEST_HARDWARE_LAYOUT_PATH
 from gwproactor_test.dummies.pair.child import DummyChildApp
 from gwproactor_test.dummies.pair.parent import DummyParentApp
-from gwproactor_test.instrumented_proactor import InstrumentedProactor
+from gwproactor_test.event_consistency_checks import EventAckCounts
+from gwproactor_test.instrumented_proactor import InstrumentedProactor, caller_str
 from gwproactor_test.logger_guard import LoggerGuards
+from gwproactor_test.wait import (
+    AwaitablePredicate,
+    ErrorStringFunction,
+    Predicate,
+    await_for,
+)
 
 
 def get_option_value(
@@ -354,6 +360,51 @@ class LiveTest:
             s += "PARENT: None\n"
         return s
 
+    async def await_for(
+        self,
+        f: Predicate | AwaitablePredicate,
+        tag: str = "",
+        *,
+        timeout: float = 3.0,  # noqa: ASYNC109
+        raise_timeout: bool = True,
+        retry_duration: float = 0.01,
+        err_str_f: Optional[ErrorStringFunction] = None,
+        logger: Optional[logging.Logger | logging.LoggerAdapter[logging.Logger]] = None,
+        error_dict: Optional[dict[str, typing.Any]] = None,
+    ) -> bool:
+        if not isinstance(tag, str):
+            raise TypeError(
+                "ERROR. LiveTest.await_for() received a non-string tag "
+                f"(type: {type(tag)}).\n"
+                "  Did you pass the timeout as the second parameter?\n\n"
+                "  The signature of LiveTest differs from wait.await_for(), "
+                "which has timeout as the second, not third parameter."
+            )
+        if err_str_f is None:
+            err_str_f = self.summary_str
+        return await await_for(
+            f=f,
+            timeout=timeout,
+            tag=tag,
+            raise_timeout=raise_timeout,
+            retry_duration=retry_duration,
+            err_str_f=err_str_f,
+            logger=logger,
+            error_dict=error_dict,
+        )
+
+    async def child_to_parent_active(self) -> bool:
+        return await self.await_for(
+            self.child.links.link(self.child.upstream_client).active,
+            "ERROR waiting child to parent link to be active",
+        )
+
+    async def parent_to_child_active(self) -> bool:
+        return await self.await_for(
+            self.parent.links.link(self.parent.downstream_client).active,
+            "ERROR waiting child to parent link to be active",
+        )
+
     def assert_child_events_at_rest(
         self, *args: typing.Any, **kwargs: typing.Any
     ) -> None:
@@ -368,3 +419,92 @@ class LiveTest:
         self, *args: typing.Any, **kwargs: typing.Any
     ) -> None:
         self.child.assert_event_counts(*args, **kwargs)
+
+    def assert_acks_consistent(
+        self,
+        *,
+        print_summary: bool = False,
+        verbose: bool = False,
+        log_level: int = logging.ERROR,
+        raise_errors: bool = True,
+    ) -> None:
+        called_from_str = (
+            f"\nassert_acks_consistent() called from {caller_str(depth=2)}"
+        )
+        counts = EventAckCounts(parent=self.parent, child=self.child, verbose=verbose)
+        if not counts.ok() and raise_errors:
+            raise AssertionError(
+                f"ERROR {called_from_str}\n{counts.report}\n{self.summary_str()}"
+            )
+        if verbose or not counts.ok():
+            self.child.logger.log(log_level, f"{called_from_str}\n{counts.report}")
+        elif print_summary:
+            self.child.logger.log(log_level, f"{called_from_str}\n{counts.summary}")
+
+    async def await_quiescent_connections(
+        self,
+        *,
+        exp_child_persists: Optional[int] = None,
+        exp_parent_pending: Optional[int] = None,
+        exp_parent_persists: Optional[int] = None,
+    ) -> None:
+        child = self.child
+        child_link = child.links.link(child.upstream_client)
+        parent = self.parent
+        parent_link = parent.links.link(parent.downstream_client)
+
+        # wait for all events to be at rest
+        exp_child_persists = (
+            exp_child_persists
+            if exp_child_persists is not None
+            else sum(
+                [
+                    1,  # child startup
+                    2,  # child connect, substribe
+                ]
+            )
+        )
+
+        exp_parent_pending = (
+            exp_parent_pending
+            if exp_parent_pending is not None
+            else (
+                sum(
+                    [
+                        exp_child_persists,
+                        1,  # child peer active
+                        1,  # parent startup
+                        3,  # parent connect, subscribe, peer active
+                    ]
+                )
+            )
+        )
+        exp_parent_persists = (
+            exp_parent_persists
+            if exp_parent_persists is not None
+            else exp_parent_pending
+        )
+        await self.await_for(
+            lambda: child_link.active() and child.events_at_rest(),
+            "ERROR waiting for child events upload",
+        )
+        await self.await_for(
+            lambda: parent_link.active()
+            and parent.events_at_rest(num_pending=exp_parent_pending),
+            f"ERROR waiting for parent to persist {exp_parent_pending} events",
+        )
+        parent.assert_event_counts(
+            num_pending=exp_parent_pending,
+            num_persists=exp_parent_persists,
+            num_clears=0,
+            num_retrieves=0,
+            tag="parent",
+            err_str=self.summary_str(),
+        )
+        child.assert_event_counts(
+            # child will not persist peer active event
+            num_persists=exp_child_persists,
+            all_clear=True,
+            tag="child",
+            err_str=self.summary_str(),
+        )
