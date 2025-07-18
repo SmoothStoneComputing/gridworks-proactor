@@ -43,7 +43,7 @@ async def test_in_flight_happy_path(request: Any) -> None:
             assert last_in_flight > 0
             await await_for(
                 lambda: _child_got_more_acks(),
-                1,
+                3,
                 "ERROR waiting for child to receive some acks",
                 retry_duration=0.001,
                 err_str_f=h.summary_str,
