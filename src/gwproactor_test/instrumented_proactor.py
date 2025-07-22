@@ -12,6 +12,7 @@ from typing import Any, Optional, Tuple, cast
 from gwproto import Message
 from gwproto.messages import CommEvent, EventBase, EventT, PingMessage
 from paho.mqtt.client import MQTT_ERR_CONN_LOST, MQTT_ERR_SUCCESS, MQTTMessageInfo
+from pydantic import BaseModel
 from result import Ok, Result
 
 from gwproactor import AppInterface, Proactor
@@ -103,15 +104,55 @@ class _PausedAck:
     context: Optional[Any]
 
 
+class _Ackable(BaseModel):
+    message_type: str = ""
+    send_count: int = 0
+    ack_count: int = 0
+    ack_paths: list[int] = []
+
+
+class _AckTracker:
+    ackables: dict[str, _Ackable]
+
+    def __init__(self) -> None:
+        self.ackables = defaultdict(_Ackable)
+
+    def __len__(self) -> int:
+        return len(self.ackables)
+
+    def track_publish(self, message: Message[Any]) -> None:
+        if message.Header.AckRequired:
+            tracked = self.ackables[message.Header.MessageId]
+            if (
+                tracked.message_type
+                and tracked.message_type != message.Header.MessageType
+            ):
+                raise ValueError(
+                    f"ERROR. _AckTracker recored {message.Header.MessageId} "
+                    f"with message type {tracked.message_type} but message "
+                    f"resent with type {message.Header.MessageType}"
+                )
+            tracked.message_type = message.Header.MessageType
+            tracked.send_count += 1
+            self.ackables[message.Header.MessageId].send_count += 1
+
+    def track_ack(self, message_id: str, path_dbg: int) -> None:
+        tracked = self.ackables[message_id]
+        tracked.ack_count += 1
+        tracked.ack_paths.append(path_dbg)
+
+
 class RecorderLinks(LinkManager):
     acks_paused: bool
     needs_ack: list[_PausedAck]
+    ack_tracker: _AckTracker
 
     # noinspection PyMissingConstructor
     def __init__(self, other: LinkManager) -> None:
         self.__dict__ = other.__dict__
         self.acks_paused = False
         self.needs_ack = []
+        self.ack_tracker = _AckTracker()
 
     def link(self, name: str) -> LinkState:
         link = self._states.link(name)
@@ -140,6 +181,7 @@ class RecorderLinks(LinkManager):
         if self.acks_paused:
             self.needs_ack.append(_PausedAck(link_name, message, qos, context))
             return MQTTMessageInfo(-1)
+        self.ack_tracker.track_publish(message)
         return super().publish_message(
             link_name,
             message,
@@ -148,6 +190,11 @@ class RecorderLinks(LinkManager):
             topic=topic,
             use_link_topic=use_link_topic,
         )
+
+    def process_ack(self, link_name: str, message_id: str) -> int:
+        path_dbg = super().process_ack(link_name, message_id)
+        self.ack_tracker.track_ack(message_id, path_dbg)
+        return path_dbg
 
     def release_acks(self, clear: bool = False, num_to_release: int = -1) -> int:
         # self._logger.info(
@@ -359,6 +406,16 @@ class InstrumentedProactor(Proactor):
                 f"subacks paused: {self._subacks_paused[link_name]}  "
                 f"subacks available: {len(self._subacks_available[link_name])}\n"
             )
+        s += f"Tracked acks: {len(self.links.ack_tracker.ackables)}\n"
+        for message_id, tracked in self.links.ack_tracker.ackables.items():
+            s += (
+                f"  {message_id[:8]}  sent: {tracked.send_count:2d}  "
+                f"acked: {tracked.ack_count}  "
+                f"{tracked.message_type:30s}  "
+            )
+            for ack_path in tracked.ack_paths:
+                s += f"  0x{ack_path:08X}"
+            s += "\n"
         return s
 
     def summarize(self) -> None:

@@ -598,7 +598,7 @@ class LinkManager:
         self._logger.path("--LinkManager.process_ack_timeout path:0x%08X", path_dbg)
         return result
 
-    def process_ack(self, link_name: str, message_id: str) -> None:
+    def process_ack(self, link_name: str, message_id: str) -> int:
         self._logger.path("++LinkManager.process_ack  <%s>  %s", link_name, message_id)
         path_dbg = 0
         wait_info = self._acks.cancel_ack_timer(link_name, message_id)
@@ -619,6 +619,7 @@ class LinkManager:
                         path_dbg |= 0x00000010
                         self._logger.info("reupload complete.")
         self._logger.path("--LinkManager.process_ack path:0x%08X", path_dbg)
+        return path_dbg
 
     def send_ack(self, link_name: str, message: Message[Any]) -> None:
         if message.Header.MessageId:
