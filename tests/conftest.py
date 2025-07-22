@@ -1,9 +1,14 @@
 """Local pytest configuration"""
 
+import json
 from pathlib import Path
 from typing import Any
 
 import pytest
+import rich
+from _pytest.nodes import Item
+from _pytest.reports import TestReport
+from _pytest.runner import CallInfo
 
 from gwproactor_test import (
     clean_test_env,  # noqa: F401
@@ -22,3 +27,32 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 @pytest.fixture(autouse=True)
 def always_restore_loggers(restore_loggers: Any) -> None: ...  # noqa: F811
+
+
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> TestReport | None:  # type: ignore[misc]
+    rep = yield  # noqa
+    try:
+        if rep.when == "call" and rep.failed:
+            fail_file = Path("tests/failed_tests.json")
+            if not fail_file.exists():
+                fail_dict = {}
+            else:
+                with fail_file.open() as f:
+                    try:
+                        fail_dict = json.loads(f.read())
+                    except Exception as e:  # noqa: BLE001
+                        rich.print(
+                            f"ERROR treating {fail_file} as json. Truncating. "
+                            f"Excetpion: {type(e)}, {e}"
+                        )
+                        fail_dict = {}
+            if rep.nodeid not in fail_dict:
+                fail_dict[rep.nodeid] = 1
+            else:
+                fail_dict[rep.nodeid] += 1
+            with fail_file.open("w") as f:
+                f.write(json.dumps(fail_dict, sort_keys=True, indent=2))
+    except Exception as e:  # noqa: BLE001
+        rich.print(f"ERROR in pytest_runtest_makereport. " f"Excetpion: {type(e)}, {e}")
+    return rep

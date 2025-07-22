@@ -14,4 +14,5 @@ __pycache__/
 tests/.env-gwproactor-test
 tests/.certificate_cache
 tests/.ci-ca
+tests/failed_tests.json
 hacking
