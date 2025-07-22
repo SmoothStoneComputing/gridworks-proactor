@@ -408,10 +408,16 @@ class InstrumentedProactor(Proactor):
             )
         s += f"Tracked acks: {len(self.links.ack_tracker.ackables)}\n"
         for message_id, tracked in self.links.ack_tracker.ackables.items():
+            rp = int(message_id in self.links._reuploads._reupload_pending)  # noqa
+            ru = int(message_id in self.links._reuploads._reuploaded_unacked)  # noqa
             s += (
-                f"  {message_id[:8]}  sent: {tracked.send_count:2d}  "
+                f"  {message_id[:8]}  "
+                f"p:{int(message_id in self.event_persister)}  "
+                f"f:{int(message_id in self.links.in_flight_events)}  "
+                f"rp:{rp}  ru:{ru}  "
+                f"sent: {tracked.send_count:2d}  "
                 f"acked: {tracked.ack_count}  "
-                f"{tracked.message_type:30s}  "
+                f"{tracked.message_type:45s}  "
             )
             for ack_path in tracked.ack_paths:
                 s += f"  0x{ack_path:08X}"

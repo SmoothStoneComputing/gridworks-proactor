@@ -371,6 +371,7 @@ class LiveTest:
         err_str_f: Optional[ErrorStringFunction] = None,
         logger: Optional[logging.Logger | logging.LoggerAdapter[logging.Logger]] = None,
         error_dict: Optional[dict[str, typing.Any]] = None,
+        caller_depth: int = 2,
     ) -> bool:
         if not isinstance(tag, str):
             raise TypeError(
@@ -391,18 +392,21 @@ class LiveTest:
             err_str_f=err_str_f,
             logger=logger,
             error_dict=error_dict,
+            caller_depth=caller_depth,
         )
 
     async def child_to_parent_active(self) -> bool:
         return await self.await_for(
             self.child.links.link(self.child.upstream_client).active,
             "ERROR waiting child to parent link to be active",
+            caller_depth=3,
         )
 
     async def parent_to_child_active(self) -> bool:
         return await self.await_for(
             self.parent.links.link(self.parent.downstream_client).active,
             "ERROR waiting child to parent link to be active",
+            caller_depth=3,
         )
 
     def assert_child_events_at_rest(
@@ -487,11 +491,13 @@ class LiveTest:
         await self.await_for(
             lambda: child_link.active() and child.events_at_rest(),
             "ERROR waiting for child events upload",
+            caller_depth=3,
         )
         await self.await_for(
             lambda: parent_link.active()
             and parent.events_at_rest(num_pending=exp_parent_pending),
             f"ERROR waiting for parent to persist {exp_parent_pending} events",
+            caller_depth=3,
         )
         parent.assert_event_counts(
             num_pending=exp_parent_pending,
