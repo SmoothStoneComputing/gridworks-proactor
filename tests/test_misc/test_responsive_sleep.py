@@ -10,7 +10,7 @@ class StopMe:
     def __init__(self, running: bool = True, step_duration: float = 0.1) -> None:
         self.running = running
         self.step_duration = step_duration
-        self.thread = threading.Thread(target=self.loop)
+        self.thread = threading.Thread(target=self.loop, daemon=True)
 
     def loop(self) -> None:
         while self.running:
