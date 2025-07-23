@@ -28,7 +28,7 @@ def str_tasks(
         for i, task in enumerate(tasks):
             s += (
                 f"\t{i + 1}/{len(tasks)}  "
-                f"{task.get_name():20s}  "
+                f"{task.get_name():30s}  "
                 f"done:{task.done()}   "
                 f"exception:{_get_task_exception(task)}  "
                 f"{task.get_coro()}\n"
