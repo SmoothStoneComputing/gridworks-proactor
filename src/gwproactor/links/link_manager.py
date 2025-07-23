@@ -592,6 +592,11 @@ class LinkManager:
                     transition.canceled_acks.extend(
                         self._acks.cancel_ack_timers(wait_info.link_name)
                     )
+                    if self._states[wait_info.link_name].active_for_send():
+                        path_dbg |= 0x00000004
+                        self.publish_message(
+                            wait_info.link_name, PingMessage(Src=self.publication_name)
+                        )
                 result = Ok(transition)
             case _:
                 result = Err(state_result.err())
