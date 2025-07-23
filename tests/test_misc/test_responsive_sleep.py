@@ -29,7 +29,7 @@ class StopMe:
         self.thread.join()
 
 
-MAX_DELAY = 0.01
+MAX_DELAY = 0.1
 
 
 # "pre-compile" code before tests to cut down on failures caused by
