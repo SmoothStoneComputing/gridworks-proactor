@@ -295,17 +295,6 @@ async def test_ping(request: Any) -> None:
         assert messages_from_child >= reps * 0.5, err_str
 
         # wait for all in-flight events to be acked
-        await await_for(
-            lambda: child.links.num_in_flight == 0,
-            3,
-            "ERROR waiting for child active",
-            err_str_f=h.summary_str,
-        )
-        assert child.links.num_pending == 0
-        assert child.event_persister.num_persists == 3
-        assert child.event_persister.num_retrieves == 3
-        assert child.event_persister.num_clears == 3
-
         # parent should have persisted:
         exp_events = sum(
             [
@@ -316,6 +305,11 @@ async def test_ping(request: Any) -> None:
                 reps,  # dbg events
             ]
         )
+        await h.await_quiescent_connections(
+            exp_child_persists=3,
+            exp_parent_pending=exp_events,
+        )
+
         # wait for parent to finish persisting
         await await_for(
             lambda: h.parent.event_persister.num_persists == exp_events,
