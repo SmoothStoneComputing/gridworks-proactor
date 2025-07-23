@@ -21,6 +21,7 @@ from gwproactor_test.logger_guard import LoggerGuards
 class TreeLiveTest(LiveTest):
     _child2_app: App
     child2_verbose: bool = False
+    child2_message_summary: bool = False
     child2_on_screen: bool = False
     child2_logger_guards: LoggerGuards
 
@@ -30,8 +31,10 @@ class TreeLiveTest(LiveTest):
         add_child1: bool = False,
         start_child1: bool = False,
         child1_verbose: Optional[bool] = None,
+        child1_message_summary: Optional[bool] = None,
         child2_app_settings: Optional[AppSettings] = None,
         child2_verbose: Optional[bool] = None,
+        child2_message_summary: Optional[bool] = None,
         add_child2: bool = False,
         start_child2: bool = False,
         child2_on_screen: Optional[bool] = None,
@@ -45,11 +48,22 @@ class TreeLiveTest(LiveTest):
                 option_name="--child1-verbose",
                 request=kwargs.get("request"),
             )
+        if child1_message_summary is None:
+            kwargs["child_message_summary"] = get_option_value(
+                parameter_value=child1_verbose,
+                option_name="--child1-message-summary",
+                request=kwargs.get("request"),
+            )
         kwargs["request"] = kwargs.get("request")
         super().__init__(**kwargs)
         self.child2_verbose = get_option_value(
             parameter_value=child2_verbose,
             option_name="--child2-verbose",
+            request=kwargs.get("request"),
+        )
+        self.child2_message_summary = get_option_value(
+            parameter_value=child2_message_summary,
+            option_name="--child2-message-summary",
             request=kwargs.get("request"),
         )
         self.child2_on_screen = get_option_value(
@@ -58,7 +72,10 @@ class TreeLiveTest(LiveTest):
             request=kwargs.get("request"),
         )
         self._child2_app = self._make_app(
-            self.child2_app_type(), child2_app_settings, app_verbose=self.child2_verbose
+            self.child2_app_type(),
+            child2_app_settings,
+            app_verbose=self.child2_verbose,
+            app_message_summary=self.child2_message_summary,
         )
         self.setup_child2_logging()
         if add_child2 or start_child2:

@@ -43,8 +43,11 @@ class LiveTest:
     _parent_app: App
     _child_app: App
     verbose: bool
+    message_summary: bool
     child_verbose: bool
+    child_message_summary: bool
     parent_verbose: bool
+    parent_message_summary: bool
     parent_on_screen: bool
     lifecycle_logging: bool
     logger_guards: LoggerGuards
@@ -55,8 +58,11 @@ class LiveTest:
         child_app_settings: Optional[AppSettings] = None,
         parent_app_settings: Optional[AppSettings] = None,
         verbose: Optional[bool] = None,
+        message_summary: Optional[bool] = None,
         child_verbose: Optional[bool] = None,
+        child_message_summary: Optional[bool] = None,
         parent_verbose: Optional[bool] = None,
+        parent_message_summary: Optional[bool] = None,
         lifecycle_logging: bool = False,
         add_child: bool = False,
         add_parent: bool = False,
@@ -70,14 +76,29 @@ class LiveTest:
             option_name="--live-test-verbose",
             request=request,
         )
+        self.message_summary = get_option_value(
+            parameter_value=message_summary,
+            option_name="--live-test-message-summary",
+            request=request,
+        )
         self.child_verbose = get_option_value(
             parameter_value=child_verbose,
             option_name="--child-verbose",
             request=request,
         )
+        self.child_message_summary = get_option_value(
+            parameter_value=child_message_summary,
+            option_name="--child-message-summary",
+            request=request,
+        )
         self.parent_verbose = get_option_value(
             parameter_value=parent_verbose,
             option_name="--parent-verbose",
+            request=request,
+        )
+        self.parent_message_summary = get_option_value(
+            parameter_value=parent_message_summary,
+            option_name="--parent-message-summary",
             request=request,
         )
         self.parent_on_screen = get_option_value(
@@ -90,11 +111,13 @@ class LiveTest:
             self.child_app_type(),
             child_app_settings,
             app_verbose=self.child_verbose,
+            app_message_summary=self.child_message_summary,
         )
         self._parent_app = self._make_app(
             self.parent_app_type(),
             parent_app_settings,
             app_verbose=self.parent_verbose,
+            app_message_summary=self.parent_message_summary,
         )
         self.setup_logging()
         if add_child or start_child:
@@ -132,6 +155,7 @@ class LiveTest:
         app_settings: Optional[AppSettings],
         *,
         app_verbose: bool = False,
+        app_message_summary: bool = False,
     ) -> App:
         # Copy hardware layout file.
         paths = Paths(name=app_type.paths_name())
@@ -143,6 +167,7 @@ class LiveTest:
         app_settings = app_type.update_settings_from_command_line(
             app_type.get_settings(settings=app_settings, paths=paths),
             verbose=self.verbose or app_verbose,
+            message_summary=self.message_summary or app_message_summary,
         )
         if not self.lifecycle_logging and not self.verbose and not app_verbose:
             app_settings.logging.levels.lifecycle = logging.WARNING
