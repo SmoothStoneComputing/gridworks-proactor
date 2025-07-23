@@ -26,6 +26,7 @@ from gwproactor.message import (
     MQTTSubackPayload,
 )
 from gwproactor.stats import LinkStats, ProactorStats
+from gwproactor.str_tasks import str_tasks
 
 
 def split_subscriptions(client_wrapper: MQTTClientWrapper) -> Tuple[int, Optional[int]]:
@@ -380,7 +381,11 @@ class InstrumentedProactor(Proactor):
         self._mqtt_messages_dropped[client_name] = drop
 
     def summary_str(self) -> str:
-        s = str(self.stats)
+        s = ""
+        if self._loop is not None:
+            s += str_tasks(self._loop, self.paths_name, self._tasks)
+            s += "\n"
+        s += str(self.stats)
         s += "\nEvents:\n"
         s += f"  pending: {self.links.num_pending}\n"
         s += f"  in-flight: {self.links.num_in_flight}\n"
