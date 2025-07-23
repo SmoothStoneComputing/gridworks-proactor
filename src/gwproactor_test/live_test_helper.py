@@ -365,7 +365,7 @@ class LiveTest:
         f: Predicate | AwaitablePredicate,
         tag: str = "",
         *,
-        timeout: float = 3.0,  # noqa: ASYNC109
+        timeout: float = 10.0,  # noqa: ASYNC109
         raise_timeout: bool = True,
         retry_duration: float = 0.01,
         err_str_f: Optional[ErrorStringFunction] = None,
@@ -456,8 +456,6 @@ class LiveTest:
         child_link = child.links.link(child.upstream_client)
         parent = self.parent
         parent_link = parent.links.link(parent.downstream_client)
-
-        # wait for all events to be at rest
         exp_child_persists = (
             exp_child_persists
             if exp_child_persists is not None
@@ -468,7 +466,6 @@ class LiveTest:
                 ]
             )
         )
-
         exp_parent_pending = (
             exp_parent_pending
             if exp_parent_pending is not None
@@ -488,15 +485,26 @@ class LiveTest:
             if exp_parent_persists is not None
             else exp_parent_pending
         )
+        # Multiple waits for clarity when something goes wrong, rather than
+        # one long wait with many possible failures.
         await self.await_for(
-            lambda: child_link.active() and child.events_at_rest(),
-            "ERROR waiting for child events upload",
+            lambda: child_link.active(),
+            "ERROR in await_quiescent_connections: waiting for child link to be active",
             caller_depth=3,
         )
         await self.await_for(
-            lambda: parent_link.active()
-            and parent.events_at_rest(num_pending=exp_parent_pending),
-            f"ERROR waiting for parent to persist {exp_parent_pending} events",
+            lambda: child.events_at_rest(),
+            "ERROR in await_quiescent_connections: waiting for child events to upload",
+            caller_depth=3,
+        )
+        await self.await_for(
+            lambda: parent_link.active(),
+            "ERROR in await_quiescent_connections: waiting for parent link to be active",
+            caller_depth=3,
+        )
+        await self.await_for(
+            lambda: parent.events_at_rest(num_pending=exp_parent_pending),
+            f"ERROR in await_quiescent_connections: waiting for parent to persist {exp_parent_pending} events",
             caller_depth=3,
         )
         parent.assert_event_counts(

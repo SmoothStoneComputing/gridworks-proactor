@@ -282,15 +282,42 @@ class TreeLiveTest(LiveTest):
         parent = self.parent
         parent_to_child1 = parent.links.link(parent.downstream_client)
 
+        # Multiple waits for clarity when something goes wrong, rather than
+        # one long wait with many possible failures.
         await self.await_for(
-            lambda: child2_to_child1.active()
-            and child2.events_at_rest()
-            and child1_to_child2.active()
-            and child1_to_parent.active()
-            and child1.events_at_rest()
-            and parent_to_child1.active()
-            and parent.events_at_rest(num_pending=exp_parent_pending),
-            "ERROR waiting for events to be uploaded",
+            lambda: child2_to_child1.active(),
+            "ERROR in await_quiescent_connections: waiting for child2 to child1 link to be active",
+            caller_depth=3,
+        )
+        await self.await_for(
+            lambda: child2.events_at_rest(),
+            "ERROR in await_quiescent_connections: waiting for child2 events to upload to child1",
+            caller_depth=3,
+        )
+        await self.await_for(
+            lambda: child1_to_child2.active(),
+            "ERROR in await_quiescent_connections: waiting for child1 to child2 link to be active",
+            caller_depth=3,
+        )
+        await self.await_for(
+            lambda: child1_to_parent.active(),
+            "ERROR in await_quiescent_connections: waiting for child1 to parent link to be active",
+            caller_depth=3,
+        )
+        await self.await_for(
+            lambda: child1.events_at_rest(),
+            "ERROR in await_quiescent_connections: waiting for child1 events to upload to parent",
+            caller_depth=3,
+        )
+        await self.await_for(
+            lambda: parent_to_child1.active(),
+            "ERROR in await_quiescent_connections: waiting for parent to child1 link to be active",
+            caller_depth=3,
+        )
+        await self.await_for(
+            lambda: parent.events_at_rest(num_pending=exp_parent_pending),
+            f"ERROR in await_quiescent_connections: waiting for parent to persist {exp_parent_pending} events",
+            caller_depth=3,
         )
         summary_str = self.summary_str()
         parent.assert_event_counts(
