@@ -125,29 +125,35 @@ async def test_basic_comm_child_first(request: Any) -> None:
         # wait for all events to be acked
         await h.await_quiescent_connections(exp_child_persists=3)
 
+        activation_count = child_stats.comm_event_counts[
+            "gridworks.event.comm.peer.active"
+        ]
         # Tell client we lost comm
         child.force_mqtt_disconnect("parent")
 
         # Wait for reconnect
-        await await_for(
+        await h.await_for(
             lambda: child_stats.comm_event_counts["gridworks.event.comm.peer.active"]
-            > 1,
-            3,
+            > activation_count,
             "ERROR waiting link to resubscribe after comm loss",
-            err_str_f=child.summary_str,
         )
-        assert child_link.active_for_send()
-        assert child_link.active_for_recv()
-        assert child_link.active()
-        assert StateName(child_link.state) == StateName.active
-        assert child_comm_event_counts["gridworks.event.comm.mqtt.connect"] == 2
+        err_str = h.summary_str()
+        assert child_link.active_for_send(), err_str
+        assert child_link.active_for_recv(), err_str
+        assert child_link.active(), err_str
+        assert StateName(child_link.state) == StateName.active, err_str
+        assert (
+            child_comm_event_counts["gridworks.event.comm.mqtt.connect"] == 2
+        ), err_str
         assert (
             child_comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 2
-        )
-        assert child_comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 1
-        assert child_comm_event_counts["gridworks.event.comm.peer.active"] == 2
-        assert len(child_stats.comm_events) == 7
-        assert 0 <= child.links.num_in_flight <= 4
+        ), err_str
+        assert (
+            child_comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 1
+        ), err_str
+        assert child_comm_event_counts["gridworks.event.comm.peer.active"] == 2, err_str
+        assert len(child_stats.comm_events) == 7, err_str
+        assert 0 <= child.links.num_in_flight <= 4, err_str
 
         # wait for all events to be acked
         await h.await_quiescent_connections(
