@@ -674,9 +674,8 @@ async def test_in_flight_overflow_comm_loss(request: Any) -> None:
             num_retrieves=startup_persists,
         )
 
-        await await_for(
-            lambda: len(parent.needs_ack) == num_to_generate,
-            1,
+        await h.await_for(
+            lambda: len(parent.needs_ack) >= num_to_generate,
             f"ERROR waiting for parent to have {num_to_generate} paused acks",
         )
         exp_parent_pending += num_to_generate

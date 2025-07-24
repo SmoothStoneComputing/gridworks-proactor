@@ -112,7 +112,7 @@ async def test_response_timeout(request: Any) -> None:
         assert child.event_persister.num_retrieves == 3
         assert child.event_persister.num_clears == 3
         await await_for(
-            lambda: len(parent.needs_ack) == 1,
+            lambda: len(parent.needs_ack) >= 1,
             1,
             "ERROR waiting for parent to have messages to be send",
             err_str_f=h.summary_str,

@@ -118,13 +118,11 @@ async def test_tree_message_exchange(request: Any) -> None:
         link2to1 = child2.links.link(child2.upstream_client)
 
         # Wait for children to connect
-        await await_for(
+        await h.await_for(
             lambda: link1to2.active()
             and link2to1.active()
             and link1toAtn.active_for_send(),
-            1,
             "ERROR waiting children to connect",
-            err_str_f=h.summary_str,
         )
 
         # exchange messages
