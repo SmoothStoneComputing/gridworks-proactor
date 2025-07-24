@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 import rich
-from _pytest._code.code import ExceptionChainRepr, ReprFileLocation
+from _pytest._code.code import ExceptionChainRepr, ReprEntry
 from _pytest.nodes import Item
 from _pytest.reports import TestReport
 from _pytest.runner import CallInfo
@@ -50,20 +50,39 @@ def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> TestReport | 
                             f"Excetpion: {type(e)}, {e}"
                         )
                         fail_dict = {}
-            if isinstance(rep.longrepr, ExceptionChainRepr) and isinstance(
-                rep.longrepr.reprcrash, ReprFileLocation
+            rich.print(fail_dict)
+            test_name = (
+                f"{rep.nodeid}:{rep.location[1] if rep.location[1] is not None else 0}"
+            )
+            lineno = f"{rep.location[1] if rep.location[1] is not None else 0}"
+            test_file_path = Path(rep.location[0])
+            if (
+                isinstance(rep.longrepr, ExceptionChainRepr)
+                and rep.longrepr.reprtraceback is not None
             ):
-                lineno = str(rep.longrepr.reprcrash.lineno)
-            else:
-                lineno = str(rep.location[1] if rep.location[1] is not None else 0)
-            if rep.nodeid not in fail_dict:
-                fail_dict[rep.nodeid] = {"total": 0, "line_counts": {}}
-            if lineno not in fail_dict[rep.nodeid]["line_counts"]:
-                fail_dict[rep.nodeid]["line_counts"][lineno] = 0
-            fail_dict[rep.nodeid]["total"] += 1
-            fail_dict[rep.nodeid]["line_counts"][lineno] += 1
+                reprtraceback = rep.longrepr.reprtraceback
+                if reprtraceback.reprentries is not None:
+                    repentries = reprtraceback.reprentries
+                    if (
+                        len(repentries)
+                        and isinstance(repentries[0], ReprEntry)
+                        and repentries[0].reprfileloc is not None
+                    ):
+                        loc = repentries[0].reprfileloc
+                        error_path = Path(loc.path)
+                        if error_path.name == test_file_path.name:
+                            lineno = f"{loc.lineno}"
+                        else:
+                            lineno = f"{error_path.name}:{loc.lineno}"
+            if test_name not in fail_dict:
+                fail_dict[test_name] = {"total": 0, "line_counts": {}}
+            if lineno not in fail_dict[test_name]["line_counts"]:
+                fail_dict[test_name]["line_counts"][lineno] = 0
+            fail_dict[test_name]["total"] += 1
+            fail_dict[test_name]["line_counts"][lineno] += 1
             with fail_file.open("w") as f:
                 f.write(json.dumps(fail_dict, sort_keys=True, indent=2))
+            rich.print(fail_dict)
     except Exception as e:  # noqa: BLE001
         rich.print(f"ERROR in pytest_runtest_makereport. " f"Exception: {type(e)}, {e}")
         raise
