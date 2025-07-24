@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 import rich
+from _pytest._code.code import ExceptionChainRepr, ReprFileLocation
 from _pytest.nodes import Item
 from _pytest.reports import TestReport
 from _pytest.runner import CallInfo
@@ -34,7 +35,9 @@ def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> TestReport | 
     rep = yield  # noqa
     try:
         if rep.when == "call" and rep.failed:
-            fail_file = Path("tests/failed_tests.json")
+            fail_file = Path("output/failed_tests.json")
+            if not fail_file.parent.exists():
+                fail_file.parent.mkdir(parents=True)
             if not fail_file.exists():
                 fail_dict = {}
             else:
@@ -47,12 +50,21 @@ def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> TestReport | 
                             f"Excetpion: {type(e)}, {e}"
                         )
                         fail_dict = {}
-            if rep.nodeid not in fail_dict:
-                fail_dict[rep.nodeid] = 1
+            if isinstance(rep.longrepr, ExceptionChainRepr) and isinstance(
+                rep.longrepr.reprcrash, ReprFileLocation
+            ):
+                lineno = str(rep.longrepr.reprcrash.lineno)
             else:
-                fail_dict[rep.nodeid] += 1
+                lineno = str(rep.location[1] if rep.location[1] is not None else 0)
+            if rep.nodeid not in fail_dict:
+                fail_dict[rep.nodeid] = {"total": 0, "line_counts": {}}
+            if lineno not in fail_dict[rep.nodeid]["line_counts"]:
+                fail_dict[rep.nodeid]["line_counts"][lineno] = 0
+            fail_dict[rep.nodeid]["total"] += 1
+            fail_dict[rep.nodeid]["line_counts"][lineno] += 1
             with fail_file.open("w") as f:
                 f.write(json.dumps(fail_dict, sort_keys=True, indent=2))
     except Exception as e:  # noqa: BLE001
-        rich.print(f"ERROR in pytest_runtest_makereport. " f"Excetpion: {type(e)}, {e}")
+        rich.print(f"ERROR in pytest_runtest_makereport. " f"Exception: {type(e)}, {e}")
+        raise
     return rep
