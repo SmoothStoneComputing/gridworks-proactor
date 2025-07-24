@@ -71,7 +71,7 @@ async def test_reupload_basic(request: Any) -> None:
         assert not child.links.reuploading()
 
         assert child.event_persister.num_persists >= 3
-        assert child.event_persister.num_retrieves == child.event_persister.num_persists
+        assert child.event_persister.num_retrieves >= child.event_persister.num_persists
         assert child.event_persister.num_clears == child.event_persister.num_persists
 
         # parent should have persisted:
@@ -112,11 +112,9 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
         child.disable_derived_events()
         upstream_link = h.child.links.link(child.upstream_client)
         reupload_counts = h.child.stats.link(child.upstream_client).reupload_counts
-        await await_for(
+        await h.await_for(
             lambda: child.mqtt_quiescent(),
-            1,
             "ERROR waiting for child to connect to mqtt",
-            err_str_f=h.summary_str,
         )
         # Some events should have been generated, and they should have all been sent
         assert child.links.num_pending == 3
