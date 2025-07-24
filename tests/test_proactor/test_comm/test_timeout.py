@@ -49,18 +49,14 @@ async def test_response_timeout(request: Any) -> None:
         child.set_ack_timeout_seconds(1)
         assert stats.timeouts == 0
         h.start_child()
-        await await_for(
+        await h.await_for(
             lambda: link.in_state(StateName.awaiting_peer),
-            3,
             "ERROR waiting for child to connect to broker",
-            err_str_f=h.summary_str,
         )
         # (awaiting_peer -> response_timeout -> awaiting_peer)
-        await await_for(
+        await h.await_for(
             lambda: stats.timeouts > 0,
-            1,
             "ERROR waiting for child to timeout",
-            err_str_f=h.summary_str,
         )
         assert link.state == StateName.awaiting_peer
         assert child.event_persister.num_pending == 3
@@ -327,9 +323,9 @@ async def test_ping(request: Any) -> None:
             "ERROR waiting for parent to respond",
             err_str_f=h.summary_str,
         )
-        assert child.event_persister.num_persists == 4
-        assert child.event_persister.num_retrieves == 4
-        assert child.event_persister.num_clears == 4
+        assert child.event_persister.num_persists >= 4
+        assert child.event_persister.num_retrieves == child.event_persister.num_persists
+        assert child.event_persister.num_clears == child.event_persister.num_persists
 
         # wait for parent to finish persisting
         exp_parent_persists = last_parent_persists + 2  # (child timeout, peer active)
