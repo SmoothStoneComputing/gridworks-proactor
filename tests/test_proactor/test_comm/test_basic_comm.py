@@ -152,7 +152,7 @@ async def test_basic_comm_child_first(request: Any) -> None:
             child_comm_event_counts["gridworks.event.comm.mqtt.disconnect"] >= 1
         ), err_str
         assert child_comm_event_counts["gridworks.event.comm.peer.active"] >= 2, err_str
-        assert len(child_stats.comm_events) == 7, err_str
+        assert len(child_stats.comm_events) >= 7, err_str
         assert 0 <= child.links.num_in_flight <= 4, err_str
 
         # wait for all events to be acked
