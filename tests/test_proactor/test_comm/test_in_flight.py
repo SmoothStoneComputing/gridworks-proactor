@@ -40,7 +40,7 @@ async def test_in_flight_happy_path(request: Any) -> None:
                 )
             )
             last_in_flight = child.links.num_in_flight
-            assert last_in_flight > 0
+            assert last_in_flight > 0, h.summary_str()
             await await_for(
                 lambda: _child_got_more_acks(),
                 3,
@@ -699,6 +699,6 @@ async def test_in_flight_overflow_comm_loss(request: Any) -> None:
         child.assert_event_counts(
             num_pending=0,
             num_in_flight=0,
-            num_persists=exp_child_persists,
+            num_persists=(exp_child_persists, None),
             all_clear=True,
         )

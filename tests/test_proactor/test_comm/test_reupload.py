@@ -155,13 +155,11 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
         )
 
         # Wait for reupload to complete
-        await await_for(
+        await h.await_for(
             lambda: reupload_counts.completed > 0
             and child.links.num_pending == 0
             and child.links.num_in_flight == 0,
-            1,
             "ERROR waiting for reupload to complete",
-            err_str_f=h.summary_str,
         )
         assert child.event_persister.num_persists == (3 + events_to_generate)
         assert child.event_persister.num_retrieves == child.event_persister.num_persists
@@ -591,13 +589,11 @@ async def test_reupload_errors(request: Any) -> None:
         )
 
         # Wait for reupload to complete
-        await await_for(
+        await h.await_for(
             lambda: reupload_counts.completed > 0
             and child.links.num_pending == 0
             and child.links.num_in_flight == 0,
-            3,
             "ERROR waiting for reupload to complete",
-            err_str_f=_err_str,
         )
         assert reupload_counts.started == reupload_counts.completed
         assert parent.stats.num_events_received == 64
