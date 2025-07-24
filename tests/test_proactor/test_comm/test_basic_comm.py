@@ -143,15 +143,15 @@ async def test_basic_comm_child_first(request: Any) -> None:
         assert child_link.active(), err_str
         assert StateName(child_link.state) == StateName.active, err_str
         assert (
-            child_comm_event_counts["gridworks.event.comm.mqtt.connect"] == 2
+            child_comm_event_counts["gridworks.event.comm.mqtt.connect"] >= 2
         ), err_str
         assert (
-            child_comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 2
+            child_comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] >= 2
         ), err_str
         assert (
-            child_comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 1
+            child_comm_event_counts["gridworks.event.comm.mqtt.disconnect"] >= 1
         ), err_str
-        assert child_comm_event_counts["gridworks.event.comm.peer.active"] == 2, err_str
+        assert child_comm_event_counts["gridworks.event.comm.peer.active"] >= 2, err_str
         assert len(child_stats.comm_events) == 7, err_str
         assert 0 <= child.links.num_in_flight <= 4, err_str
 

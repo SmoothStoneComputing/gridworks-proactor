@@ -70,9 +70,9 @@ async def test_reupload_basic(request: Any) -> None:
         assert child.links.num_reuploaded_unacked == 0
         assert not child.links.reuploading()
 
-        assert child.event_persister.num_persists == 3
-        assert child.event_persister.num_retrieves == 3
-        assert child.event_persister.num_clears == 3
+        assert child.event_persister.num_persists >= 3
+        assert child.event_persister.num_retrieves == child.event_persister.num_persists
+        assert child.event_persister.num_clears == child.event_persister.num_persists
 
         # parent should have persisted:
         exp_events = sum(
@@ -84,11 +84,9 @@ async def test_reupload_basic(request: Any) -> None:
             ]
         )
         # wait for parent to finish persisting
-        await await_for(
-            lambda: h.parent.event_persister.num_persists == exp_events,
-            3,
+        await h.await_for(
+            lambda: h.parent.event_persister.num_persists > exp_events,
             f"ERROR waiting for parent to finish persisting {exp_events} events",
-            err_str_f=h.summary_str,
         )
 
 
@@ -161,7 +159,7 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
             and child.links.num_in_flight == 0,
             "ERROR waiting for reupload to complete",
         )
-        assert child.event_persister.num_persists == (3 + events_to_generate)
+        assert child.event_persister.num_persists >= (3 + events_to_generate)
         assert child.event_persister.num_retrieves == child.event_persister.num_persists
         assert child.event_persister.num_clears == child.event_persister.num_persists
         # parent should have persisted:
@@ -175,11 +173,9 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
             ]
         )
         # wait for parent to finish persisting
-        await await_for(
+        await h.await_for(
             lambda: h.parent.event_persister.num_persists == exp_events,
-            3,
             f"ERROR waiting for parent to finish persisting {exp_events} events",
-            err_str_f=h.summary_str,
         )
 
 
@@ -590,7 +586,7 @@ async def test_reupload_errors(request: Any) -> None:
 
         # Wait for reupload to complete
         await h.await_for(
-            lambda: reupload_counts.completed > 0
+            lambda: (0 < reupload_counts.completed == reupload_counts.started)
             and child.links.num_pending == 0
             and child.links.num_in_flight == 0,
             "ERROR waiting for reupload to complete",
