@@ -58,13 +58,11 @@ async def test_reupload_basic(request: Any) -> None:
         )
 
         # Wait for reuploading to complete
-        await await_for(
+        await h.await_for(
             lambda: reupload_counts.completed > 0
             and child.links.num_pending == 0
             and child.links.num_in_flight == 0,
-            1,
             "ERROR waiting for re-upload to complete",
-            err_str_f=h.summary_str,
         )
 
         # All events should have been reuploaded.
