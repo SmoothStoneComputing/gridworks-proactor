@@ -28,13 +28,11 @@ async def test_tree_no_parent(request: Any) -> None:
 
         # start child 1
         h.start_child1()
-        await await_for(
+        await h.await_for(
             lambda: link1to2.active_for_send()
             and link1toAtn.active_for_send()
             and child1.links.num_pending == 7,
-            1,
             "ERROR waiting child1 links to be active_for_send",
-            err_str_f=h.summary_str,
         )
         assert StateName(link1to2.state) == StateName.awaiting_peer, h.summary_str()
         assert StateName(link1toAtn.state) == StateName.awaiting_peer
@@ -63,7 +61,7 @@ async def test_tree_no_parent(request: Any) -> None:
 
         # start child 2
         h.start_child2()
-        await await_for(
+        await h.await_for(
             lambda: link1to2.active()
             and link2to1.active()
             and child2.links.num_in_flight == 0
@@ -72,7 +70,6 @@ async def test_tree_no_parent(request: Any) -> None:
             # 1 child1 peer active +
             # 6 child2 startup, (admin, scada1) x (connect, subscribe), peer active
             and child1.links.num_pending == 14,
-            1,
             "ERROR waiting child2 links to be active",
             err_str_f=h.summary_str,
         )

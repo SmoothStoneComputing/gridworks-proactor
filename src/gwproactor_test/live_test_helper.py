@@ -530,6 +530,7 @@ class LiveTest:
             lambda: parent.events_at_rest(
                 num_pending=exp_parent_pending,
                 exact_pending=exact,
+                num_persists=exp_parent_persists,
                 exact_persists=exact,
             ),
             f"ERROR in await_quiescent_connections: waiting for parent to persist {exp_parent_pending} events",

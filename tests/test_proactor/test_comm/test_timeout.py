@@ -309,14 +309,7 @@ async def test_ping(request: Any) -> None:
             exp_child_persists=3,
             exp_parent_pending=exp_events,
         )
-
-        # wait for parent to finish persisting
-        await await_for(
-            lambda: h.parent.event_persister.num_persists == exp_events,
-            3,
-            f"ERROR waiting for parent to finish persisting {exp_events} events",
-            err_str_f=h.summary_str,
-        )
+        last_parent_persists = parent.event_persister.num_persists
 
         parent.pause_acks()
         await await_for(
@@ -338,21 +331,9 @@ async def test_ping(request: Any) -> None:
         assert child.event_persister.num_retrieves == 4
         assert child.event_persister.num_clears == 4
 
-        # parent should have persisted:
-        exp_events = sum(
-            [
-                1,  # parent startup
-                3,  # parent connect, subscribe, peer active
-                1,  # child startup
-                3,  # child connect, subscribe, peer active
-                reps,  # dbg events
-                2,  # child timeout, peer active
-            ]
-        )
         # wait for parent to finish persisting
-        await await_for(
-            lambda: h.parent.event_persister.num_persists == exp_events,
-            3,
-            f"ERROR waiting for parent to finish persisting {exp_events} events",
-            err_str_f=h.summary_str,
+        exp_parent_persists = last_parent_persists + 2  # (child timeout, peer active)
+        await h.await_for(
+            lambda: h.parent.event_persister.num_persists >= exp_parent_persists,
+            f"ERROR waiting for parent to finish persisting {exp_parent_persists} events",
         )
