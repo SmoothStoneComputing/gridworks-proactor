@@ -258,6 +258,7 @@ class TreeLiveTest(LiveTest):
         exp_child2_persists: Optional[int | tuple[int | None, int | None]] = None,
         exp_parent_pending: Optional[int] = None,
         exp_parent_persists: Optional[int | tuple[int | None, int | None]] = None,
+        exact: bool = False,
     ) -> None:
         if exp_child_persists is not None and exp_child1_persists is not None:
             raise RuntimeError(
@@ -332,44 +333,78 @@ class TreeLiveTest(LiveTest):
             caller_depth=3,
         )
         await self.await_for(
-            lambda: parent.events_at_rest(num_pending=exp_parent_pending),
+            lambda: parent.events_at_rest(
+                num_pending=exp_parent_pending,
+                exact_pending=exact,
+                exact_persists=exact,
+            ),
             f"ERROR in await_quiescent_connections: waiting for parent to persist {exp_parent_pending} events",
             caller_depth=3,
         )
         summary_str = self.summary_str()
-        parent.assert_event_counts(
-            num_pending=exp_parent_pending,
-            num_persists=(
-                exp_parent_persists
-                if exp_parent_persists is not None
-                else exp_parent_pending
-            ),
-            num_clears=0,
-            num_retrieves=0,
-            tag="parent",
+
+        exp_child2_persists_range: tuple[int | None, int | None]
+        if exp_child2_persists is None:
+            exp_child2_persists = 3
+        if isinstance(exp_child2_persists, int):
+            if exact:
+                exp_child2_persists_range = (exp_child2_persists, exp_child2_persists)
+            else:
+                exp_child2_persists_range = (exp_child2_persists, None)
+        else:
+            exp_child2_persists_range = exp_child2_persists
+        child2.assert_event_counts(
+            num_persists=exp_child2_persists_range,
+            all_clear=True,
+            tag="child2",
             err_str=summary_str,
         )
 
         # child1 will persist between 3 and (exp_child1_events - 1) events,
         # depending on when parent link went active w.r.t the admin and child2
         # links. The '-1' is because the child1-to-parent peer active event
-        # isn't persisted by child1
+        # isn't persisted by child1. This is not, however, predictable, since,
+        # especially in test runs with many tests mqtt thrash is common.
+        exp_child1_persists_range: tuple[int | None, int | None]
         if exp_child1_persists is None:
-            exp_child1_persists = (3, exp_child1_events - 1)
-        child1.assert_event_counts(
-            num_persists=exp_child_persists,
-            all_clear=True,
-            tag="child1",
-            err_str=summary_str,
-        )
+            exp_child1_persists = 3
+        if isinstance(exp_child1_persists, int):
+            if exact:
+                exp_child1_persists_range = (
+                    exp_child1_persists,
+                    exp_child1_persists,
+                )
+            else:
+                exp_child1_persists_range = (exp_child1_persists, None)
+        else:
+            exp_child1_persists_range = exp_child1_persists
+            child1.assert_event_counts(
+                num_persists=exp_child1_persists_range,
+                all_clear=True,
+                tag="child1",
+                err_str=summary_str,
+            )
 
-        # child2 never persists its own peer active, and whether it persists
-        # admin events depends on when child1 link goes active
-        if exp_child2_persists is None:
-            exp_child2_persists = (3, exp_child2_events - 1)
-        child2.assert_event_counts(
-            num_persists=exp_child2_persists,
-            all_clear=True,
-            tag="child2",
+        exp_parent_pending_range: tuple[int, int | None]
+        if exact:
+            exp_parent_pending_range = exp_parent_pending, exp_parent_pending
+        else:
+            exp_parent_pending_range = exp_parent_pending, None
+        exp_parent_persists_range: tuple[int | None, int | None]
+        if exp_parent_persists is None:
+            exp_parent_persists_range = exp_parent_pending_range
+        elif isinstance(exp_parent_persists, int):
+            if exact:
+                exp_parent_persists_range = exp_parent_persists, exp_parent_persists
+            else:
+                exp_parent_persists_range = exp_parent_persists, None
+        else:
+            exp_parent_persists_range = exp_parent_persists
+        parent.assert_event_counts(
+            num_pending=exp_parent_pending_range,
+            num_persists=exp_parent_persists_range,
+            num_clears=0,
+            num_retrieves=0,
+            tag="parent",
             err_str=summary_str,
         )

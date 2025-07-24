@@ -476,6 +476,7 @@ class LiveTest:
         exp_child_persists: Optional[int] = None,
         exp_parent_pending: Optional[int] = None,
         exp_parent_persists: Optional[int] = None,
+        exact: bool = False,
     ) -> None:
         child = self.child
         child_link = child.links.link(child.upstream_client)
@@ -494,15 +495,13 @@ class LiveTest:
         exp_parent_pending = (
             exp_parent_pending
             if exp_parent_pending is not None
-            else (
-                sum(
-                    [
-                        exp_child_persists,
-                        1,  # child peer active
-                        1,  # parent startup
-                        3,  # parent connect, subscribe, peer active
-                    ]
-                )
+            else sum(
+                [
+                    exp_child_persists,
+                    1,  # child peer active
+                    1,  # parent startup
+                    3,  # parent connect, subscribe, peer active
+                ]
             )
         )
         exp_parent_persists = (
@@ -528,21 +527,35 @@ class LiveTest:
             caller_depth=3,
         )
         await self.await_for(
-            lambda: parent.events_at_rest(num_pending=exp_parent_pending),
+            lambda: parent.events_at_rest(
+                num_pending=exp_parent_pending,
+                exact_pending=exact,
+                exact_persists=exact,
+            ),
             f"ERROR in await_quiescent_connections: waiting for parent to persist {exp_parent_pending} events",
             caller_depth=3,
         )
+        exp_child_persists_range: tuple[int, int | None]
+        exp_parent_pending_range: tuple[int, int | None]
+        exp_parent_perists_range: tuple[int, int | None]
+        if exact:
+            exp_child_persists_range = exp_child_persists, exp_child_persists
+            exp_parent_pending_range = exp_parent_pending, exp_parent_persists
+            exp_parent_perists_range = exp_parent_persists, exp_parent_persists
+        else:
+            exp_child_persists_range = exp_child_persists, None
+            exp_parent_pending_range = exp_parent_pending, None
+            exp_parent_perists_range = exp_parent_persists, None
         parent.assert_event_counts(
-            num_pending=exp_parent_pending,
-            num_persists=exp_parent_persists,
+            num_pending=exp_parent_pending_range,
+            num_persists=exp_parent_perists_range,
             num_clears=0,
             num_retrieves=0,
             tag="parent",
             err_str=self.summary_str(),
         )
         child.assert_event_counts(
-            # child will not persist peer active event
-            num_persists=exp_child_persists,
+            num_persists=exp_child_persists_range,
             all_clear=True,
             tag="child",
             err_str=self.summary_str(),
