@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import datetime
 import logging
 import shutil
 import typing
@@ -341,7 +342,9 @@ class LiveTest:
 
     def get_log_path_str(self, exc: BaseException) -> str:
         return (
-            f"CommTestHelper caught error {exc}.\n"
+            f"\nCommTestHelper caught error:\n"
+            f"\t{exc}.\n"
+            f"\tTime: {datetime.datetime.now()}\n"  # noqa: DTZ005
             "Working log dirs:"
             f"\n\t{self.child_app.config.settings.paths.log_dir}"
             f"\n\t{self.parent_app.config.settings.paths.log_dir}"

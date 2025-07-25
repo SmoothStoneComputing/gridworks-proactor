@@ -114,10 +114,10 @@ class _Ackable(BaseModel):
 
 
 class _AckTracker:
-    ackables: dict[str, _Ackable]
+    ackables: dict[str, dict[str, _Ackable]]
 
     def __init__(self) -> None:
-        self.ackables = defaultdict(_Ackable)
+        self.ackables = defaultdict(lambda: defaultdict(_Ackable))
 
     def __len__(self) -> int:
         return len(self.ackables)
@@ -125,11 +125,12 @@ class _AckTracker:
     def track_publish(self, link_name: str, message: Message[Any]) -> None:
         is_ack = isinstance(message.Payload, Ack)
         if is_ack:
-            tracked_id = f"{link_name}.{message.Payload.AckMessageID}"
+            tracked_id = message.Payload.AckMessageID
         else:
-            tracked_id = f"{link_name}.{message.Header.MessageId}"
+            tracked_id = message.Header.MessageId
         if is_ack or message.Header.AckRequired:
-            tracked = self.ackables[tracked_id]
+            link_tracks = self.ackables[link_name]
+            tracked = link_tracks[tracked_id]
             if (
                 tracked.message_type
                 and tracked.message_type != message.Header.MessageType
@@ -140,10 +141,11 @@ class _AckTracker:
                     f"resent with type {message.Header.MessageType}"
                 )
             tracked.message_type = message.Header.MessageType
+            tracked.is_ack = is_ack
             tracked.send_count += 1
 
     def track_ack(self, link_name: str, message_id: str, path_dbg: int) -> None:
-        tracked = self.ackables[f"{link_name}.{message_id}"]
+        tracked = self.ackables[link_name][message_id]
         tracked.ack_count += 1
         tracked.ack_paths.append(path_dbg)
 
@@ -416,22 +418,26 @@ class InstrumentedProactor(Proactor):
                 f"subacks paused: {self._subacks_paused[link_name]}  "
                 f"subacks available: {len(self._subacks_available[link_name])}\n"
             )
-        s += f"Tracked acks/ackables: {len(self.links.ack_tracker.ackables)}\n"
-        for message_id, tracked in self.links.ack_tracker.ackables.items():
-            rp = int(message_id in self.links._reuploads._reupload_pending)  # noqa
-            ru = int(message_id in self.links._reuploads._reuploaded_unacked)  # noqa
-            s += (
-                f"  {message_id[:8]}  "
-                f"p:{int(message_id in self.event_persister)}  "
-                f"f:{int(message_id in self.links.in_flight_events)}  "
-                f"rp:{rp}  ru:{ru}  "
-                f"sent: {tracked.send_count:2d}  "
-                f"acked: {tracked.ack_count}  "
-                f"{tracked.message_type:45s}  "
-            )
-            for ack_path in tracked.ack_paths:
-                s += f"  0x{ack_path:08X}"
-            s += "\n"
+        s += "Tracked acks/ackables\n"
+        for link_name, tracked_items in self.links.ack_tracker.ackables.items():
+            s += f"  {link_name}:{len(tracked_items):3d}\n"
+            for message_id, tracked in tracked_items.items():
+                rp = int(message_id in self.links._reuploads._reupload_pending)  # noqa
+                ru = int(message_id in self.links._reuploads._reuploaded_unacked)  # noqa
+                is_ack_str = "*" if tracked.is_ack else " "
+                s += (
+                    f"    {message_id[:8]}  "
+                    f"p:{int(message_id in self.event_persister)}  "
+                    f"f:{int(message_id in self.links.in_flight_events)}  "
+                    f"rp:{rp}  ru:{ru}  "
+                    f"sent: {tracked.send_count:2d}  "
+                    f"acked: {tracked.ack_count}  "
+                    f"{is_ack_str}  "
+                    f"{tracked.message_type:45s}  "
+                )
+                for ack_path in tracked.ack_paths:
+                    s += f"  0x{ack_path:08X}"
+                s += "\n"
         return s
 
     def summarize(self) -> None:

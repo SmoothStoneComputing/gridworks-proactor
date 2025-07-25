@@ -164,14 +164,12 @@ async def test_tree_message_exchange(request: pytest.FixtureRequest) -> None:
                 1,  # child2 peer active
             ]
         )
-        await await_for(
+        await h.await_for(
             lambda: child1.links.num_pending == exp_child1_events
             and child1.links.num_in_flight == 0
             and child2.links.num_pending == 0
             and child2.links.num_in_flight == 0,
-            1,
             f"ERROR waiting for child1 to receive {exp_child1_events} events",
-            err_str_f=h.summary_str,
         )
         assert child1.links.num_pending == exp_child1_events
         assert child1.links.num_in_flight == 0
