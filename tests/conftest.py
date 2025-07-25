@@ -83,7 +83,6 @@ def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> TestReport | 
             fail_dict[rep.nodeid][line_key][lineno] += 1
             with fail_file.open("w") as f:
                 f.write(json.dumps(fail_dict, sort_keys=True, indent=2))
-            rich.print(fail_dict)
     except Exception as e:  # noqa: BLE001
         rich.print(f"ERROR in pytest_runtest_makereport. " f"Exception: {type(e)}, {e}")
         raise

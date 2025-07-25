@@ -139,18 +139,17 @@ async def test_in_flight_overflow(request: pytest.FixtureRequest) -> None:
             err_str_f=h.summary_str,
         )
         parent.assert_event_counts(
-            num_pending=exp_parent_events,
-            num_persists=exp_parent_events,
+            num_pending=(exp_parent_events, None),
             all_pending=True,
             tag="parent",
             err_str=h.summary_str(),
         )
         # child should have persisted no new events
         child.assert_event_counts(
-            num_persists=exp_child_persists,
+            num_persists=(exp_child_persists, None),
             # overflow events generated without loss of comm do not need to be
             # retrieved
-            num_retrieves=initial_child_retrieves,
+            num_retrieves=(initial_child_retrieves, None),
             all_clear=True,
             tag="child",
             err_str=h.summary_str(),

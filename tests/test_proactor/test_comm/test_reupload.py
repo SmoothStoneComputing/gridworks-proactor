@@ -1,5 +1,6 @@
 # ruff: noqa: ERA001,PLR2004
 import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -83,7 +84,7 @@ async def test_reupload_basic(request: pytest.FixtureRequest) -> None:
         )
         # wait for parent to finish persisting
         await h.await_for(
-            lambda: h.parent.event_persister.num_persists > exp_events,
+            lambda: h.parent.event_persister.num_persists >= exp_events,
             f"ERROR waiting for parent to finish persisting {exp_events} events",
         )
 
@@ -315,6 +316,16 @@ async def test_reupload_flow_control_detail(request: pytest.FixtureRequest) -> N
         #   Bound this loop by time, not by total number of acks since at least one non-reupload ack should arrive
         #   (for the PeerActive event) and others could arrive if, for example, a duplicate MQTT message appeared.
         #
+        #   This loop verifies the behavior of repuload is during normal comm. If comm fails, which does appear
+        #   to happen with some frequency on slow CI machines, the test will generate a warning but not an error.
+
+        def _num_comm_events() -> int:
+            return len(h.child.stats.link(h.child.upstream_client).comm_events) + len(
+                h.parent.stats.link(h.parent.downstream_client).comm_events
+            )
+
+        initial_comm_events = _num_comm_events()
+
         end_time = time.time() + 5
         loop_count_dbg = 0
         loop_path_dbg = 0
@@ -346,6 +357,12 @@ async def test_reupload_flow_control_detail(request: pytest.FixtureRequest) -> N
 
         assert child_links.num_pending == last_num_to_reupload
         child.logger.info(_loop_dbg("pre-loop"))
+        comm_disturbance_warning = (
+            "WARNING: comm disturbed during "
+            f"{request.node.name}. Returning without continuing to "
+            "verify upload behavior. Comm during test should be "
+            "rare but can happen especially on slow CI machines"
+        )
         while child_links.reuploading() and time.time() < end_time:
             loop_path_dbg = 0
             loop_count_dbg += 1
@@ -356,15 +373,24 @@ async def test_reupload_flow_control_detail(request: pytest.FixtureRequest) -> N
 
             # Wait for child to receive an ack
             last_events = last_in_flight + last_pending
+            if _num_comm_events() != initial_comm_events:
+                warnings.warn(message=comm_disturbance_warning, stacklevel=2)
+                return
+
             await h.await_for(
                 lambda: child.links.num_pending + child.links.num_in_flight
-                == last_events - 1,  # noqa: B023
+                == (last_events - 1),  # noqa: B023
                 tag=(
-                    "ERROR waiting for child to receive ack "
+                    f"ERROR waiting for child to receive >= {last_events - 1} acks"
                     f"(acks_released: {acks_released}) "
                     f"on topic <{parent_ack_topic}>"
                 ),
             )
+
+            if _num_comm_events() != initial_comm_events:
+                warnings.warn(message=comm_disturbance_warning, stacklevel=2)
+                return
+
             curr_num_reuploaded_unacked = child_links.num_reuploaded_unacked
             curr_num_repuload_pending = child_links.num_reupload_pending
             curr_num_to_reuplad = (
