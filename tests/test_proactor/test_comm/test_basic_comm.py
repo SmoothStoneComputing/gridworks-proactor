@@ -1,6 +1,5 @@
 # ruff: noqa: PLR2004, ERA001
 import logging
-from typing import Any
 
 import pytest
 from gwproto import MQTTTopic
@@ -12,7 +11,7 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_no_parent(request: Any) -> None:
+async def test_no_parent(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, request=request) as h:
         child = h.child
         link_stats = child.stats.link(child.upstream_client)
@@ -70,7 +69,7 @@ async def test_no_parent(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_basic_comm_child_first(request: Any) -> None:
+async def test_basic_comm_child_first(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
         child_stats = child.stats.link(child.upstream_client)
@@ -169,7 +168,9 @@ async def test_basic_comm_child_first(request: Any) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("suppress_tls", [False, True])
-async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None:
+async def test_basic_comm_parent_first(
+    request: pytest.FixtureRequest, suppress_tls: bool
+) -> None:
     async with LiveTest(request=request) as h:
         child_settings = h.child_app.config.settings
         parent_settings = h.parent_app.config.settings
@@ -231,7 +232,7 @@ async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None
 
 
 @pytest.mark.asyncio
-async def test_basic_parent_comm_loss(request: Any) -> None:
+async def test_basic_parent_comm_loss(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
         child_stats = child.stats.link(child.upstream_client)

@@ -1,7 +1,6 @@
 # ruff: noqa: PLR2004, ERA001
 
 import asyncio
-from typing import Any
 
 import pytest
 from gwproto import MQTTTopic
@@ -14,7 +13,7 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_response_timeout(request: Any) -> None:
+async def test_response_timeout(request: pytest.FixtureRequest) -> None:
     """
     Test:
         (awaiting_peer -> response_timeout -> awaiting_peer)
@@ -148,7 +147,7 @@ async def test_response_timeout(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ping(request: Any) -> None:
+async def test_ping(request: pytest.FixtureRequest) -> None:
     """
     Test:
         ping sent peridoically if no messages sent

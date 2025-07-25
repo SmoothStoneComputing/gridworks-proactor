@@ -2,7 +2,6 @@
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import pytest
 from gwproto import MQTTTopic
@@ -19,7 +18,7 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_reupload_basic(request: Any) -> None:
+async def test_reupload_basic(request: pytest.FixtureRequest) -> None:
     """
     Test:
         reupload not requiring flow control
@@ -90,7 +89,7 @@ async def test_reupload_basic(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_reupload_flow_control_simple(request: Any) -> None:
+async def test_reupload_flow_control_simple(request: pytest.FixtureRequest) -> None:
     """
     Test:
         reupload requiring flow control
@@ -177,7 +176,7 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_reupload_flow_control_detail(request: Any) -> None:
+async def test_reupload_flow_control_detail(request: pytest.FixtureRequest) -> None:
     """
     Test:
         reupload requiring flow control
@@ -512,7 +511,7 @@ class _EventGen:
 
 
 @pytest.mark.asyncio
-async def test_reupload_errors(request: Any) -> None:
+async def test_reupload_errors(request: pytest.FixtureRequest) -> None:
     """Verify that errors occurring *during* re-upload, relating to retrieving
     persisted events, are detected and uploaded as expected.
     """

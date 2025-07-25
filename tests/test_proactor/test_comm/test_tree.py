@@ -1,5 +1,4 @@
 # ruff: noqa: PLR2004, ERA001
-from typing import Any
 
 import pytest
 
@@ -10,7 +9,7 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_tree_no_parent(request: Any) -> None:
+async def test_tree_no_parent(request: pytest.FixtureRequest) -> None:
     async with TreeLiveTest(request=request) as h:
         # add child 1
         h.add_child()
@@ -99,7 +98,7 @@ async def test_tree_no_parent(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_tree_message_exchange(request: Any) -> None:
+async def test_tree_message_exchange(request: pytest.FixtureRequest) -> None:
     async with TreeLiveTest(
         start_child1=True,
         start_child2=True,
@@ -179,7 +178,7 @@ async def test_tree_message_exchange(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_tree_parent_comm(request: Any) -> None:
+async def test_tree_parent_comm(request: pytest.FixtureRequest) -> None:
     async with TreeLiveTest(add_child=True, request=request) as h:
         h.start_child1()
         await await_for(
@@ -221,7 +220,7 @@ async def test_tree_parent_comm(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_tree_event_forward(request: Any) -> None:
+async def test_tree_event_forward(request: pytest.FixtureRequest) -> None:
     async with TreeLiveTest(
         start_child=True,
         start_child2=True,

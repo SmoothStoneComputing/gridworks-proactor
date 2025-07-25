@@ -4,7 +4,7 @@ import contextlib
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Generator, Optional
 
 import dotenv
 import pytest
@@ -119,7 +119,7 @@ class DefaultTestEnv:
 
 @pytest.fixture(autouse=True)
 def default_test_env(
-    request: Any, tmp_path: Path
+    request: pytest.FixtureRequest, tmp_path: Path
 ) -> Generator[MonkeyPatch, None, None]:
     """Automatically used fixture producing monkeypatched environment with:
         - all vars starting with any entry in DefaultTestEnv.DEFAULT_PREFIXES removed
@@ -151,7 +151,9 @@ def default_test_env(
 
 
 @pytest.fixture
-def clean_test_env(request: Any, tmp_path: Path) -> Generator[MonkeyPatch, None, None]:
+def clean_test_env(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> Generator[MonkeyPatch, None, None]:
     """Get a monkeypatched environment with all vars starting with any entry in DEFAULT_PREFIXES *removed* (and none
     loaded from any dotenv file)."""
     test_env = getattr(request, "param", DefaultTestEnv(use_test_dotenv=False))

@@ -1,6 +1,5 @@
 import warnings
 from math import floor
-from typing import Any
 
 import pytest
 
@@ -10,7 +9,7 @@ from gwproactor_test import LiveTest, await_for
 
 
 @pytest.mark.asyncio
-async def test_in_flight_happy_path(request: Any) -> None:
+async def test_in_flight_happy_path(request: pytest.FixtureRequest) -> None:
     """Generate a bunch of events. While they are being acked generate a bunch
     more. Verify the child has not persisted any of them.
 
@@ -99,7 +98,7 @@ async def test_in_flight_happy_path(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_in_flight_overflow(request: Any) -> None:
+async def test_in_flight_overflow(request: pytest.FixtureRequest) -> None:
     """Generate more events than fit "in-fight". Verify persisted as expected
     and reach their destination without timeouts.
     """
@@ -159,7 +158,7 @@ async def test_in_flight_overflow(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_in_flight_flowcontrol(request: Any) -> None:
+async def test_in_flight_flowcontrol(request: pytest.FixtureRequest) -> None:
     """Test in-flight with carefully controlled acks. This is probably
     duplication of the above less controlled tests, but seems worth having.
     """
@@ -568,7 +567,7 @@ async def test_in_flight_flowcontrol(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_in_flight_comm_loss(request: Any) -> None:
+async def test_in_flight_comm_loss(request: pytest.FixtureRequest) -> None:
     """Verify that events are persisted if we lose comm while events are
     in-flight"""
 
@@ -664,7 +663,7 @@ async def test_in_flight_comm_loss(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_in_flight_overflow_comm_loss(request: Any) -> None:
+async def test_in_flight_overflow_comm_loss(request: pytest.FixtureRequest) -> None:
     async with LiveTest(start_child=True, start_parent=True, request=request) as h:
         await h.await_quiescent_connections()
         child = h.child
