@@ -9,6 +9,17 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
+async def test_basic_tree_comm(request: pytest.FixtureRequest) -> None:
+    async with TreeLiveTest(
+        start_child1=True,
+        start_child2=True,
+        start_parent=True,
+        request=request,
+    ) as h:
+        await h.await_quiescent_connections()
+
+
+@pytest.mark.asyncio
 async def test_tree_no_parent(request: pytest.FixtureRequest) -> None:
     async with TreeLiveTest(request=request) as h:
         # add child 1

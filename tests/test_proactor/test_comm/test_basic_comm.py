@@ -11,6 +11,12 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
+async def test_basic_connection(request: pytest.FixtureRequest) -> None:
+    async with LiveTest(start_child=True, start_parent=True, request=request) as h:
+        await h.await_quiescent_connections()
+
+
+@pytest.mark.asyncio
 async def test_no_parent(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, request=request) as h:
         child = h.child

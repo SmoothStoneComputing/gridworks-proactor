@@ -16,21 +16,25 @@ def str_tasks(
         tasks = list(tasks)
         s += f"Tasks: {len(tasks)}  [{tag}]\n"
 
-        def _get_task_exception(task_: asyncio.Task[Any]) -> BaseException | None:
+        def _get_task_exception_str(task_: asyncio.Task[Any]) -> str:
             try:
                 exception_ = task_.exception()
             except asyncio.CancelledError as _e:
                 exception_ = _e
             except asyncio.InvalidStateError:
                 exception_ = None
-            return exception_
+            if exception_ is None:
+                return "exception: None"
+            if isinstance(exception_, asyncio.CancelledError):
+                return "(cancelled)"
+            return f"exception: {type(exception_)}  {exception_}"
 
         for i, task in enumerate(tasks):
             s += (
                 f"\t{i + 1}/{len(tasks)}  "
                 f"{task.get_name():30s}  "
                 f"done:{task.done()}   "
-                f"exception:{_get_task_exception(task)}  "
+                f"{_get_task_exception_str(task)}  "
                 f"{task.get_coro()}\n"
             )
     except Exception as e:  # noqa: BLE001
