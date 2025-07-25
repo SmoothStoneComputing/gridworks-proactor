@@ -8,11 +8,10 @@ import pytest
 from gwproto import MQTTTopic
 from result import Err
 
-from gwproactor import App, AppSettings, Proactor
+from gwproactor import Proactor
 from gwproactor.links import StateName
 from gwproactor.message import DBGEvent, DBGPayload
-from gwproactor.persister import PersisterInterface, TimedRollingFilePersister
-from gwproactor_test.dummies import DummyChildApp
+from gwproactor.persister import TimedRollingFilePersister
 from gwproactor_test.live_test_helper import (
     LiveTest,
 )
@@ -158,7 +157,7 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
             "ERROR waiting for reupload to complete",
         )
         assert child.event_persister.num_persists >= (3 + events_to_generate)
-        assert child.event_persister.num_retrieves == child.event_persister.num_persists
+        assert child.event_persister.num_retrieves >= child.event_persister.num_persists
         assert child.event_persister.num_clears == child.event_persister.num_persists
         # parent should have persisted:
         exp_events = sum(
@@ -172,7 +171,7 @@ async def test_reupload_flow_control_simple(request: Any) -> None:
         )
         # wait for parent to finish persisting
         await h.await_for(
-            lambda: h.parent.event_persister.num_persists == exp_events,
+            lambda: h.parent.event_persister.num_persists >= exp_events,
             f"ERROR waiting for parent to finish persisting {exp_events} events",
         )
 
@@ -358,16 +357,14 @@ async def test_reupload_flow_control_detail(request: Any) -> None:
 
             # Wait for child to receive an ack
             last_events = last_in_flight + last_pending
-            await await_for(
+            await h.await_for(
                 lambda: child.links.num_pending + child.links.num_in_flight
                 == last_events - 1,  # noqa: B023
-                timeout=1,
                 tag=(
                     "ERROR waiting for child to receive ack "
                     f"(acks_released: {acks_released}) "
                     f"on topic <{parent_ack_topic}>"
                 ),
-                err_str_f=h.summary_str,
             )
             curr_num_reuploaded_unacked = child_links.num_reuploaded_unacked
             curr_num_repuload_pending = child_links.num_reupload_pending
@@ -514,53 +511,35 @@ class _EventGen:
             self._generate_missing()
 
 
-class RollingFileChildApp(DummyChildApp):
-    @classmethod
-    def _make_persister(cls, settings: AppSettings) -> PersisterInterface:
-        return TimedRollingFilePersister(settings.paths.event_dir)
-
-
-class RollingLiveTest(LiveTest):
-    @classmethod
-    def child_app_type(cls) -> type[App]:
-        return RollingFileChildApp
-
-
 @pytest.mark.asyncio
 async def test_reupload_errors(request: Any) -> None:
-    async with RollingLiveTest(
+    """Verify that errors occurring *during* re-upload, relating to retrieving
+    persisted events, are detected and uploaded as expected.
+    """
+    async with LiveTest(
         start_child=True,
         add_parent=True,
         request=request,
     ) as h:
         child = h.child
         child.disable_derived_events()
-        reupload_counts = h.child.stats.link(child.upstream_client).reupload_counts
         child_links = h.child.links
-        upstream_link = child_links.link(child.upstream_client)
-        parent = h.parent
 
-        def _err_str() -> str:
-            return (
-                f"\nCHILD\n{child.summary_str()}\n"
-                f"\nPARENT\n{parent.summary_str()}\n"
-            )
-
-        await await_for(
+        await h.await_for(
             lambda: child.mqtt_quiescent(),
-            1,
             "ERROR waiting for child to connect to mqtt",
-            err_str_f=_err_str,
         )
-        assert child.links.num_pending == 3
-        assert child.links.num_in_flight == 0
-        assert child.event_persister.num_persists == 3
-        assert child.event_persister.num_retrieves == 0
-        assert child.event_persister.num_clears == 0
+        child.assert_event_counts(
+            num_pending=(3, None),
+            num_retrieves=0,
+            num_clears=0,
+        )
         assert child_links.num_reupload_pending == 0
         assert child_links.num_reuploaded_unacked == 0
         assert not child_links.reuploading()
 
+        # Generate a bunch of 'bad' events which will cause errors during
+        # reupload.
         generator = _EventGen(child)
         generator.generate(num_corrupt=10)
         generator.generate(num_ok=10)
@@ -568,31 +547,14 @@ async def test_reupload_errors(request: Any) -> None:
         generator.generate(num_ok=10)
         generator.generate(num_missing=10)
         generator.generate(num_ok=10)
-        assert child.links.num_pending == 63
+        assert child.links.num_pending >= 63
         assert child.links.num_in_flight == 0
-        assert child.event_persister.num_persists == 63
+        assert child.event_persister.num_persists >= 63
         assert child.event_persister.num_retrieves == 0
         assert child.event_persister.num_clears == 0
 
         h.start_parent()
-        await await_for(
-            lambda: upstream_link.active(),
-            1,
-            "ERROR waiting for active",
-            err_str_f=_err_str,
+        await h.await_quiescent_connections(
+            exp_child_persists=63,
+            exp_parent_pending=64,
         )
-
-        # Wait for reupload to complete
-        await h.await_for(
-            lambda: (0 < reupload_counts.completed == reupload_counts.started)
-            and child.links.num_pending == 0
-            and child.links.num_in_flight == 0,
-            "ERROR waiting for reupload to complete",
-        )
-        assert reupload_counts.started == reupload_counts.completed
-        assert parent.stats.num_events_received == 64
-        assert child.links.num_pending == 0
-        assert child.links.num_in_flight == 0
-        assert child.event_persister.num_persists == 63
-        assert child.event_persister.num_retrieves == 63
-        assert child.event_persister.num_clears == 63

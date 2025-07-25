@@ -232,23 +232,21 @@ async def test_tree_event_forward(request: Any) -> None:
         link2to1 = h.child2.links.link(h.child2.upstream_client)
         link1toAtn = h.child1.links.link(h.child1.upstream_client)
         linkAtnto1 = h.parent.links.link(h.parent.downstream_client)
-        await await_for(
+        await h.await_for(
             lambda: (
                 link1toAtn.active()
                 and linkAtnto1.active()
                 and link1to2.active()
                 and link2to1.active()
             ),
-            3,
             "link1toAtn.active() and linkAtnto1.active()",
-            err_str_f=h.summary_str,
         )
         relay_name = "scada2.relay1"
         h.child_app.prime_actor.set_relay(relay_name, True)
 
         statsAtnTo1 = h.parent.stats.link(h.parent.downstream_client)
 
-        def _atn_heard_reports() -> bool:
+        def _atn_heard_relay_reports() -> bool:
             es1 = statsAtnTo1.event_counts.get(str(h.child1.publication_name))
             es2 = statsAtnTo1.event_counts.get(str(h.child2.publication_name))
             return bool(
@@ -259,7 +257,7 @@ async def test_tree_event_forward(request: Any) -> None:
             )
 
         await await_for(
-            _atn_heard_reports,
+            _atn_heard_relay_reports,
             1,
             "ERROR waiting for atn to hear reports",
             err_str_f=h.summary_str,
@@ -290,40 +288,6 @@ async def test_tree_event_forward(request: Any) -> None:
                 exp_child1_events,
             ]
         )
-        await await_for(
-            lambda: h.child1.links.num_pending == 0
-            and h.child1.links.num_in_flight == 0
-            and h.child2.links.num_pending == 0
-            and h.child2.links.num_in_flight == 0
-            and h.parent.links.num_pending == exp_parent_events,
-            1,
-            f"ERROR waiting for parent to persist {exp_parent_events} events",
-            err_str_f=h.summary_str,
+        await h.await_quiescent_connections(
+            exp_parent_pending=exp_parent_events,
         )
-        persister0 = h.parent.event_persister
-        persister1 = h.child1.event_persister
-        persister2 = h.child2.event_persister
-        assert h.parent.links.num_pending == exp_parent_events
-        assert h.parent.links.num_in_flight == 0
-        assert persister0.num_persists == exp_parent_events
-        assert persister0.num_retrieves == 0
-        assert persister0.num_clears == 0
-        assert h.child1.links.num_pending == 0
-        if h.child1.links.num_in_flight != 0:
-            import rich
-
-            rich.print(h.child1.links.in_flight_events)
-        assert h.child1.links.num_in_flight == 0
-        # child 1 will persist between 3 and (exp_child1_events - 1) events, depending
-        # on when parent link went active
-        assert 3 <= persister1.num_persists <= (exp_child1_events - 1), h.summary_str()
-        assert persister1.num_retrieves == persister1.num_persists
-        assert persister1.num_clears == persister1.num_persists
-
-        assert h.child2.links.num_pending == 0
-        assert h.child2.links.num_in_flight == 0
-        # child2 never persists its own peer active, and whether it persists
-        # admin events depends on when child1 link goes active
-        assert 3 <= persister2.num_persists <= 5
-        assert persister2.num_retrieves == persister2.num_persists
-        assert persister2.num_clears == persister2.num_persists

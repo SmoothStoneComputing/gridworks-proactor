@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 import rich
-from _pytest._code.code import ExceptionChainRepr, ReprEntry
+from _pytest._code.code import ExceptionChainRepr, ReprEntry  # noqa
 from _pytest.nodes import Item
 from _pytest.reports import TestReport
 from _pytest.runner import CallInfo
@@ -34,12 +34,13 @@ def always_restore_loggers(restore_loggers: Any) -> None: ...  # noqa: F811
 def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> TestReport | None:  # type: ignore[misc]
     rep = yield  # noqa
     try:
+        fail_dict: dict[str, Any]
         if rep.when == "call" and rep.failed:
             fail_file = Path("output/failed_tests.json")
             if not fail_file.parent.exists():
                 fail_file.parent.mkdir(parents=True)
             if not fail_file.exists():
-                fail_dict = {}
+                fail_dict = {"total": 0}
             else:
                 with fail_file.open() as f:
                     try:
@@ -49,11 +50,10 @@ def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> TestReport | 
                             f"ERROR treating {fail_file} as json. Truncating. "
                             f"Excetpion: {type(e)}, {e}"
                         )
-                        fail_dict = {}
-            rich.print(fail_dict)
-            test_name = (
-                f"{rep.nodeid}:{rep.location[1] if rep.location[1] is not None else 0}"
-            )
+                        fail_dict = {"total": 0}
+            if "total" not in fail_dict:
+                fail_dict["total"] = 0
+            fail_dict["total"] += 1
             lineno = f"{rep.location[1] if rep.location[1] is not None else 0}"
             test_file_path = Path(rep.location[0])
             if (
@@ -74,12 +74,13 @@ def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> TestReport | 
                             lineno = f"{loc.lineno}"
                         else:
                             lineno = f"{error_path.name}:{loc.lineno}"
-            if test_name not in fail_dict:
-                fail_dict[test_name] = {"total": 0, "line_counts": {}}
-            if lineno not in fail_dict[test_name]["line_counts"]:
-                fail_dict[test_name]["line_counts"][lineno] = 0
-            fail_dict[test_name]["total"] += 1
-            fail_dict[test_name]["line_counts"][lineno] += 1
+            line_key = "failed_lines"
+            if rep.nodeid not in fail_dict:
+                fail_dict[rep.nodeid] = {"total": 0, line_key: {}}
+            if lineno not in fail_dict[rep.nodeid][line_key]:
+                fail_dict[rep.nodeid][line_key][lineno] = 0
+            fail_dict[rep.nodeid]["total"] += 1
+            fail_dict[rep.nodeid][line_key][lineno] += 1
             with fail_file.open("w") as f:
                 f.write(json.dumps(fail_dict, sort_keys=True, indent=2))
             rich.print(fail_dict)
