@@ -80,9 +80,7 @@ async def test_http_event_upload(request: pytest.FixtureRequest) -> None:
                 ).model_dump(),
             )
         assert response.ok, response.text
-        await await_for(
+        await t.await_for(
             lambda: statsI2U.num_received_by_type["gridworks.event.some.data"] == 1,
-            1,
             "ERROR waiting for ingester to receive event from uploader",
-            err_str_f=t.summary_str,
         )
