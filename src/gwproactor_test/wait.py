@@ -46,6 +46,7 @@ async def await_for(  # noqa: C901, PLR0912, PLR0913
     err_str_f: Optional[ErrorStringFunction] = None,
     logger: Optional[logging.Logger | logging.LoggerAdapter[logging.Logger]] = None,
     error_dict: Optional[dict[str, Any]] = None,
+    caller_depth: int = 1,
 ) -> bool:
     """Similar to wait_for(), but awaitable. Instead of sleeping after a False resoinse from function f, await_for
     will asyncio.sleep(), allowing the event loop to continue. Additionally, f may be either a function or a coroutine.
@@ -93,7 +94,7 @@ async def await_for(  # noqa: C901, PLR0912, PLR0913
                         result = f()  # type:ignore[assignment]
     if result:
         return True
-    caller = getframeinfo(stack()[1][0])
+    caller = getframeinfo(stack()[caller_depth][0])
     format_dict = {
         "tag": tag,
         "file": Path(caller.filename).name,

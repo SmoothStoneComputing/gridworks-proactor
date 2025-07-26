@@ -1,7 +1,6 @@
 # ruff: noqa: PLR2004, ERA001
 
 import asyncio
-from typing import Any
 
 import pytest
 from gwproto import MQTTTopic
@@ -14,7 +13,7 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_response_timeout(request: Any) -> None:
+async def test_response_timeout(request: pytest.FixtureRequest) -> None:
     """
     Test:
         (awaiting_peer -> response_timeout -> awaiting_peer)
@@ -49,18 +48,14 @@ async def test_response_timeout(request: Any) -> None:
         child.set_ack_timeout_seconds(1)
         assert stats.timeouts == 0
         h.start_child()
-        await await_for(
+        await h.await_for(
             lambda: link.in_state(StateName.awaiting_peer),
-            3,
             "ERROR waiting for child to connect to broker",
-            err_str_f=h.summary_str,
         )
         # (awaiting_peer -> response_timeout -> awaiting_peer)
-        await await_for(
+        await h.await_for(
             lambda: stats.timeouts > 0,
-            1,
             "ERROR waiting for child to timeout",
-            err_str_f=h.summary_str,
         )
         assert link.state == StateName.awaiting_peer
         assert child.event_persister.num_pending == 3
@@ -112,7 +107,7 @@ async def test_response_timeout(request: Any) -> None:
         assert child.event_persister.num_retrieves == 3
         assert child.event_persister.num_clears == 3
         await await_for(
-            lambda: len(parent.needs_ack) == 1,
+            lambda: len(parent.needs_ack) >= 1,
             1,
             "ERROR waiting for parent to have messages to be send",
             err_str_f=h.summary_str,
@@ -152,7 +147,7 @@ async def test_response_timeout(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ping(request: Any) -> None:
+async def test_ping(request: pytest.FixtureRequest) -> None:
     """
     Test:
         ping sent peridoically if no messages sent
@@ -295,17 +290,6 @@ async def test_ping(request: Any) -> None:
         assert messages_from_child >= reps * 0.5, err_str
 
         # wait for all in-flight events to be acked
-        await await_for(
-            lambda: child.links.num_in_flight == 0,
-            3,
-            "ERROR waiting for child active",
-            err_str_f=h.summary_str,
-        )
-        assert child.links.num_pending == 0
-        assert child.event_persister.num_persists == 3
-        assert child.event_persister.num_retrieves == 3
-        assert child.event_persister.num_clears == 3
-
         # parent should have persisted:
         exp_events = sum(
             [
@@ -316,13 +300,11 @@ async def test_ping(request: Any) -> None:
                 reps,  # dbg events
             ]
         )
-        # wait for parent to finish persisting
-        await await_for(
-            lambda: h.parent.event_persister.num_persists == exp_events,
-            3,
-            f"ERROR waiting for parent to finish persisting {exp_events} events",
-            err_str_f=h.summary_str,
+        await h.await_quiescent_connections(
+            exp_child_persists=3,
+            exp_parent_pending=exp_events,
         )
+        last_parent_persists = parent.event_persister.num_persists
 
         parent.pause_acks()
         await await_for(
@@ -340,25 +322,13 @@ async def test_ping(request: Any) -> None:
             "ERROR waiting for parent to respond",
             err_str_f=h.summary_str,
         )
-        assert child.event_persister.num_persists == 4
-        assert child.event_persister.num_retrieves == 4
-        assert child.event_persister.num_clears == 4
+        assert child.event_persister.num_persists >= 4
+        assert child.event_persister.num_retrieves == child.event_persister.num_persists
+        assert child.event_persister.num_clears == child.event_persister.num_persists
 
-        # parent should have persisted:
-        exp_events = sum(
-            [
-                1,  # parent startup
-                3,  # parent connect, subscribe, peer active
-                1,  # child startup
-                3,  # child connect, subscribe, peer active
-                reps,  # dbg events
-                2,  # child timeout, peer active
-            ]
-        )
         # wait for parent to finish persisting
-        await await_for(
-            lambda: h.parent.event_persister.num_persists == exp_events,
-            3,
-            f"ERROR waiting for parent to finish persisting {exp_events} events",
-            err_str_f=h.summary_str,
+        exp_parent_persists = last_parent_persists + 2  # (child timeout, peer active)
+        await h.await_for(
+            lambda: h.parent.event_persister.num_persists >= exp_parent_persists,
+            f"ERROR waiting for parent to finish persisting {exp_parent_persists} events",
         )

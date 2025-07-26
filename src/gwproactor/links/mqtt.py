@@ -154,7 +154,9 @@ class MQTTClientWrapper:
         self._stop_requested = True
         try:
             self._client.disconnect()
-            self._thread.join()
+            # In some test executions this call hangs. Stack dumping indicating
+            # that the paho thread is waiting for a select to return.
+            self._thread.join(timeout=3)
         except:  # noqa: E722, S110
             pass
 

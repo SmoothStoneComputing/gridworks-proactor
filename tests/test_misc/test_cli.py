@@ -1,8 +1,8 @@
 import shutil
 import textwrap
 from pathlib import Path
-from typing import Any
 
+import pytest
 from typer.testing import CliRunner
 
 from gwproactor.config import Paths
@@ -15,7 +15,7 @@ from gwproactor_test.dummies.tree.scada2 import DummyScada2App
 runner = CliRunner()
 
 
-def test_cli_completes(request: Any) -> None:
+def test_cli_completes(request: pytest.FixtureRequest) -> None:
     """This test just verifies that clis can execute dry-runs and help without
     exception. It does not attempt to test content of execution."""
     for app_type in [DummyAtnApp, DummyScada1App, DummyScada2App]:
