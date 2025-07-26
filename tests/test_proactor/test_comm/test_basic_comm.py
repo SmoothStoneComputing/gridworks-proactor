@@ -375,12 +375,12 @@ async def test_basic_parent_comm_loss(request: pytest.FixtureRequest) -> None:
         # Wait for reconnect
         await h.await_for(
             lambda: child_stats.comm_event_counts["gridworks.event.comm.peer.active"]
-            > 2,
+            > 2
+            and child_link.active(),
             "ERROR waiting link to resubscribe after comm loss",
         )
         assert child_link.active_for_send()
         assert child_link.active_for_recv()
-        assert child_link.active()
         assert StateName(child_link.state) == StateName.active
         assert child_comm_event_counts["gridworks.event.comm.mqtt.connect"] == 3
         assert (
