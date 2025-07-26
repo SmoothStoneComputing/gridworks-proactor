@@ -8,6 +8,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import Optional, Self, Type
 
+from gwproto import MQTTTopic
+from gwproto.messages import CommEvent
 from pydantic_settings import BaseSettings
 
 from gwproactor import AppSettings, Proactor, setup_logging
@@ -564,3 +566,35 @@ class LiveTest:
             tag="child",
             err_str=self.summary_str(),
         )
+
+    def pings_from_parent_topic(self) -> str:
+        return MQTTTopic.encode(
+            envelope_type="gw",
+            src=self.parent.publication_name,
+            dst=self.parent.links.topic_dst(self.parent.downstream_client),
+            message_type="gridworks-ping",
+        )
+
+    def pings_from_child_topic(self) -> str:
+        return MQTTTopic.encode(
+            envelope_type="gw",
+            src=self.child.publication_name,
+            dst=self.child.links.topic_dst(self.child.downstream_client),
+            message_type="gridworks-ping",
+        )
+
+    def pings_from_parent(self) -> int:
+        return self.child.stats.link(self.child.upstream_client).num_received_by_topic[
+            self.pings_from_parent_topic()
+        ]
+
+    def pings_from_child(self) -> int:
+        return self.parent.stats.link(
+            self.parent.downstream_client
+        ).num_received_by_topic[self.pings_from_child_topic()]
+
+    def child_comm_events(self) -> list[CommEvent]:
+        return self.child.stats.link(self.child.upstream_client).comm_events
+
+    def parent_comm_events(self) -> list[CommEvent]:
+        return self.parent.stats.link(self.parent.downstream_client).comm_events
