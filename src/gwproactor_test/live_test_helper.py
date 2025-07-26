@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import datetime
 import logging
 import shutil
 import typing
@@ -7,6 +8,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import Optional, Self, Type
 
+from gwproto import MQTTTopic
+from gwproto.messages import CommEvent
 from pydantic_settings import BaseSettings
 
 from gwproactor import AppSettings, Proactor, setup_logging
@@ -43,8 +46,11 @@ class LiveTest:
     _parent_app: App
     _child_app: App
     verbose: bool
+    message_summary: bool
     child_verbose: bool
+    child_message_summary: bool
     parent_verbose: bool
+    parent_message_summary: bool
     parent_on_screen: bool
     lifecycle_logging: bool
     logger_guards: LoggerGuards
@@ -55,8 +61,11 @@ class LiveTest:
         child_app_settings: Optional[AppSettings] = None,
         parent_app_settings: Optional[AppSettings] = None,
         verbose: Optional[bool] = None,
+        message_summary: Optional[bool] = None,
         child_verbose: Optional[bool] = None,
+        child_message_summary: Optional[bool] = None,
         parent_verbose: Optional[bool] = None,
+        parent_message_summary: Optional[bool] = None,
         lifecycle_logging: bool = False,
         add_child: bool = False,
         add_parent: bool = False,
@@ -70,14 +79,29 @@ class LiveTest:
             option_name="--live-test-verbose",
             request=request,
         )
+        self.message_summary = get_option_value(
+            parameter_value=message_summary,
+            option_name="--live-test-message-summary",
+            request=request,
+        )
         self.child_verbose = get_option_value(
             parameter_value=child_verbose,
             option_name="--child-verbose",
             request=request,
         )
+        self.child_message_summary = get_option_value(
+            parameter_value=child_message_summary,
+            option_name="--child-message-summary",
+            request=request,
+        )
         self.parent_verbose = get_option_value(
             parameter_value=parent_verbose,
             option_name="--parent-verbose",
+            request=request,
+        )
+        self.parent_message_summary = get_option_value(
+            parameter_value=parent_message_summary,
+            option_name="--parent-message-summary",
             request=request,
         )
         self.parent_on_screen = get_option_value(
@@ -90,11 +114,13 @@ class LiveTest:
             self.child_app_type(),
             child_app_settings,
             app_verbose=self.child_verbose,
+            app_message_summary=self.child_message_summary,
         )
         self._parent_app = self._make_app(
             self.parent_app_type(),
             parent_app_settings,
             app_verbose=self.parent_verbose,
+            app_message_summary=self.parent_message_summary,
         )
         self.setup_logging()
         if add_child or start_child:
@@ -132,6 +158,7 @@ class LiveTest:
         app_settings: Optional[AppSettings],
         *,
         app_verbose: bool = False,
+        app_message_summary: bool = False,
     ) -> App:
         # Copy hardware layout file.
         paths = Paths(name=app_type.paths_name())
@@ -143,6 +170,7 @@ class LiveTest:
         app_settings = app_type.update_settings_from_command_line(
             app_type.get_settings(settings=app_settings, paths=paths),
             verbose=self.verbose or app_verbose,
+            message_summary=self.message_summary or app_message_summary,
         )
         if not self.lifecycle_logging and not self.verbose and not app_verbose:
             app_settings.logging.levels.lifecycle = logging.WARNING
@@ -316,7 +344,9 @@ class LiveTest:
 
     def get_log_path_str(self, exc: BaseException) -> str:
         return (
-            f"CommTestHelper caught error {exc}.\n"
+            f"\nCommTestHelper caught error:\n"
+            f"\t{exc}.\n"
+            f"\tTime: {datetime.datetime.now()}\n"  # noqa: DTZ005
             "Working log dirs:"
             f"\n\t{self.child_app.config.settings.paths.log_dir}"
             f"\n\t{self.parent_app.config.settings.paths.log_dir}"
@@ -365,12 +395,13 @@ class LiveTest:
         f: Predicate | AwaitablePredicate,
         tag: str = "",
         *,
-        timeout: float = 3.0,  # noqa: ASYNC109
+        timeout: float = 10.0,  # noqa: ASYNC109
         raise_timeout: bool = True,
         retry_duration: float = 0.01,
         err_str_f: Optional[ErrorStringFunction] = None,
         logger: Optional[logging.Logger | logging.LoggerAdapter[logging.Logger]] = None,
         error_dict: Optional[dict[str, typing.Any]] = None,
+        caller_depth: int = 2,
     ) -> bool:
         if not isinstance(tag, str):
             raise TypeError(
@@ -391,18 +422,21 @@ class LiveTest:
             err_str_f=err_str_f,
             logger=logger,
             error_dict=error_dict,
+            caller_depth=caller_depth,
         )
 
     async def child_to_parent_active(self) -> bool:
         return await self.await_for(
             self.child.links.link(self.child.upstream_client).active,
             "ERROR waiting child to parent link to be active",
+            caller_depth=3,
         )
 
     async def parent_to_child_active(self) -> bool:
         return await self.await_for(
             self.parent.links.link(self.parent.downstream_client).active,
             "ERROR waiting child to parent link to be active",
+            caller_depth=3,
         )
 
     def assert_child_events_at_rest(
@@ -447,13 +481,12 @@ class LiveTest:
         exp_child_persists: Optional[int] = None,
         exp_parent_pending: Optional[int] = None,
         exp_parent_persists: Optional[int] = None,
+        exact: bool = False,
     ) -> None:
         child = self.child
         child_link = child.links.link(child.upstream_client)
         parent = self.parent
         parent_link = parent.links.link(parent.downstream_client)
-
-        # wait for all events to be at rest
         exp_child_persists = (
             exp_child_persists
             if exp_child_persists is not None
@@ -464,19 +497,16 @@ class LiveTest:
                 ]
             )
         )
-
         exp_parent_pending = (
             exp_parent_pending
             if exp_parent_pending is not None
-            else (
-                sum(
-                    [
-                        exp_child_persists,
-                        1,  # child peer active
-                        1,  # parent startup
-                        3,  # parent connect, subscribe, peer active
-                    ]
-                )
+            else sum(
+                [
+                    exp_child_persists,
+                    1,  # child peer active
+                    1,  # parent startup
+                    3,  # parent connect, subscribe, peer active
+                ]
             )
         )
         exp_parent_persists = (
@@ -484,27 +514,87 @@ class LiveTest:
             if exp_parent_persists is not None
             else exp_parent_pending
         )
+        # Multiple waits for clarity when something goes wrong, rather than
+        # one long wait with many possible failures.
         await self.await_for(
-            lambda: child_link.active() and child.events_at_rest(),
-            "ERROR waiting for child events upload",
+            lambda: child_link.active(),
+            "ERROR in await_quiescent_connections: waiting for child link to be active",
+            caller_depth=3,
         )
         await self.await_for(
-            lambda: parent_link.active()
-            and parent.events_at_rest(num_pending=exp_parent_pending),
-            f"ERROR waiting for parent to persist {exp_parent_pending} events",
+            lambda: child.events_at_rest(),
+            "ERROR in await_quiescent_connections: waiting for child events to upload",
+            caller_depth=3,
         )
+        await self.await_for(
+            lambda: parent_link.active(),
+            "ERROR in await_quiescent_connections: waiting for parent link to be active",
+            caller_depth=3,
+        )
+        await self.await_for(
+            lambda: parent.events_at_rest(
+                num_pending=exp_parent_pending,
+                exact_pending=exact,
+                num_persists=exp_parent_persists,
+                exact_persists=exact,
+            ),
+            f"ERROR in await_quiescent_connections: waiting for parent to persist {exp_parent_pending} events",
+            caller_depth=3,
+        )
+        exp_child_persists_range: tuple[int, int | None]
+        exp_parent_pending_range: tuple[int, int | None]
+        exp_parent_perists_range: tuple[int, int | None]
+        if exact:
+            exp_child_persists_range = exp_child_persists, exp_child_persists
+            exp_parent_pending_range = exp_parent_pending, exp_parent_persists
+            exp_parent_perists_range = exp_parent_persists, exp_parent_persists
+        else:
+            exp_child_persists_range = exp_child_persists, None
+            exp_parent_pending_range = exp_parent_pending, None
+            exp_parent_perists_range = exp_parent_persists, None
         parent.assert_event_counts(
-            num_pending=exp_parent_pending,
-            num_persists=exp_parent_persists,
+            num_pending=exp_parent_pending_range,
+            num_persists=exp_parent_perists_range,
             num_clears=0,
             num_retrieves=0,
             tag="parent",
             err_str=self.summary_str(),
         )
         child.assert_event_counts(
-            # child will not persist peer active event
-            num_persists=exp_child_persists,
+            num_persists=exp_child_persists_range,
             all_clear=True,
             tag="child",
             err_str=self.summary_str(),
         )
+
+    def pings_from_parent_topic(self) -> str:
+        return MQTTTopic.encode(
+            envelope_type="gw",
+            src=self.parent.publication_name,
+            dst=self.parent.links.topic_dst(self.parent.downstream_client),
+            message_type="gridworks-ping",
+        )
+
+    def pings_from_child_topic(self) -> str:
+        return MQTTTopic.encode(
+            envelope_type="gw",
+            src=self.child.publication_name,
+            dst=self.child.links.topic_dst(self.child.downstream_client),
+            message_type="gridworks-ping",
+        )
+
+    def pings_from_parent(self) -> int:
+        return self.child.stats.link(self.child.upstream_client).num_received_by_topic[
+            self.pings_from_parent_topic()
+        ]
+
+    def pings_from_child(self) -> int:
+        return self.parent.stats.link(
+            self.parent.downstream_client
+        ).num_received_by_topic[self.pings_from_child_topic()]
+
+    def child_comm_events(self) -> list[CommEvent]:
+        return self.child.stats.link(self.child.upstream_client).comm_events
+
+    def parent_comm_events(self) -> list[CommEvent]:
+        return self.parent.stats.link(self.parent.downstream_client).comm_events

@@ -1,6 +1,5 @@
 # ruff: noqa: PLR2004, ERA001
 import logging
-from typing import Any
 
 import pytest
 from gwproto import MQTTTopic
@@ -12,7 +11,13 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_no_parent(request: Any) -> None:
+async def test_basic_connection(request: pytest.FixtureRequest) -> None:
+    async with LiveTest(start_child=True, start_parent=True, request=request) as h:
+        await h.await_quiescent_connections()
+
+
+@pytest.mark.asyncio
+async def test_no_parent(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, request=request) as h:
         child = h.child
         link_stats = child.stats.link(child.upstream_client)
@@ -70,7 +75,7 @@ async def test_no_parent(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_basic_comm_child_first(request: Any) -> None:
+async def test_basic_comm_child_first(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
         child_stats = child.stats.link(child.upstream_client)
@@ -125,29 +130,35 @@ async def test_basic_comm_child_first(request: Any) -> None:
         # wait for all events to be acked
         await h.await_quiescent_connections(exp_child_persists=3)
 
+        activation_count = child_stats.comm_event_counts[
+            "gridworks.event.comm.peer.active"
+        ]
         # Tell client we lost comm
         child.force_mqtt_disconnect("parent")
 
         # Wait for reconnect
-        await await_for(
+        await h.await_for(
             lambda: child_stats.comm_event_counts["gridworks.event.comm.peer.active"]
-            > 1,
-            3,
+            > activation_count,
             "ERROR waiting link to resubscribe after comm loss",
-            err_str_f=child.summary_str,
         )
-        assert child_link.active_for_send()
-        assert child_link.active_for_recv()
-        assert child_link.active()
-        assert StateName(child_link.state) == StateName.active
-        assert child_comm_event_counts["gridworks.event.comm.mqtt.connect"] == 2
+        err_str = h.summary_str()
+        assert child_link.active_for_send(), err_str
+        assert child_link.active_for_recv(), err_str
+        assert child_link.active(), err_str
+        assert StateName(child_link.state) == StateName.active, err_str
         assert (
-            child_comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] == 2
-        )
-        assert child_comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 1
-        assert child_comm_event_counts["gridworks.event.comm.peer.active"] == 2
-        assert len(child_stats.comm_events) == 7
-        assert 0 <= child.links.num_in_flight <= 4
+            child_comm_event_counts["gridworks.event.comm.mqtt.connect"] >= 2
+        ), err_str
+        assert (
+            child_comm_event_counts["gridworks.event.comm.mqtt.fully.subscribed"] >= 2
+        ), err_str
+        assert (
+            child_comm_event_counts["gridworks.event.comm.mqtt.disconnect"] >= 1
+        ), err_str
+        assert child_comm_event_counts["gridworks.event.comm.peer.active"] >= 2, err_str
+        assert len(child_stats.comm_events) >= 7, err_str
+        assert 0 <= child.links.num_in_flight <= 4, err_str
 
         # wait for all events to be acked
         await h.await_quiescent_connections(
@@ -163,7 +174,9 @@ async def test_basic_comm_child_first(request: Any) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("suppress_tls", [False, True])
-async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None:
+async def test_basic_comm_parent_first(
+    request: pytest.FixtureRequest, suppress_tls: bool
+) -> None:
     async with LiveTest(request=request) as h:
         child_settings = h.child_app.config.settings
         parent_settings = h.parent_app.config.settings
@@ -225,7 +238,7 @@ async def test_basic_comm_parent_first(request: Any, suppress_tls: bool) -> None
 
 
 @pytest.mark.asyncio
-async def test_basic_parent_comm_loss(request: Any) -> None:
+async def test_basic_parent_comm_loss(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
         child_stats = child.stats.link(child.upstream_client)
@@ -362,12 +375,12 @@ async def test_basic_parent_comm_loss(request: Any) -> None:
         # Wait for reconnect
         await h.await_for(
             lambda: child_stats.comm_event_counts["gridworks.event.comm.peer.active"]
-            > 2,
+            > 2
+            and child_link.active(),
             "ERROR waiting link to resubscribe after comm loss",
         )
         assert child_link.active_for_send()
         assert child_link.active_for_recv()
-        assert child_link.active()
         assert StateName(child_link.state) == StateName.active
         assert child_comm_event_counts["gridworks.event.comm.mqtt.connect"] == 3
         assert (

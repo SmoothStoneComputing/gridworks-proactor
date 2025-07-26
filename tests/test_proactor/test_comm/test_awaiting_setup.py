@@ -1,6 +1,5 @@
 # ruff: noqa: PLR2004, ERA001
 # mypy: disable-error-code="union-attr"
-from typing import Any
 
 import pytest
 from gwproto import MQTTTopic
@@ -14,7 +13,9 @@ from gwproactor_test.wait import await_for
 
 
 @pytest.mark.asyncio
-async def test_awaiting_setup_and_peer_happy_path(request: Any) -> None:
+async def test_awaiting_setup_and_peer_happy_path(
+    request: pytest.FixtureRequest,
+) -> None:
     """
     Test:
      (connecting -> connected -> awaiting_setup_and_peer)
@@ -142,7 +143,9 @@ async def test_awaiting_setup_and_peer_happy_path(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
+async def test_awaiting_setup_and_peer_corner_cases(
+    request: pytest.FixtureRequest,
+) -> None:
     """
     Test corner cases:
      (connecting -> connected -> awaiting_setup_and_peer)
@@ -315,7 +318,7 @@ async def test_awaiting_setup_and_peer_corner_cases(request: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_awaiting_setup_state(request: Any) -> None:
+async def test_awaiting_setup_state(request: pytest.FixtureRequest) -> None:
     """
     Test awaiting_setup (corner state):
      (awaiting_setup_and_peer -> message_from_peer -> awaiting_setup)

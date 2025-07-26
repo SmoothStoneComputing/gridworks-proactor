@@ -1,5 +1,5 @@
 import time
-from typing import Any, Literal, Sequence
+from typing import Literal, Sequence
 
 import aiohttp
 import pytest
@@ -54,7 +54,7 @@ class _UploaderLiveTest(LiveTest):
 
 
 @pytest.mark.asyncio
-async def test_http_event_upload(request: Any) -> None:
+async def test_http_event_upload(request: pytest.FixtureRequest) -> None:
     async with _UploaderLiveTest(request=request, add_child=True, add_parent=True) as t:
         enable_aiohttp_logging()
         linkU2I = t.child.links.link(t.child.upstream_client)
@@ -80,9 +80,7 @@ async def test_http_event_upload(request: Any) -> None:
                 ).model_dump(),
             )
         assert response.ok, response.text
-        await await_for(
+        await t.await_for(
             lambda: statsI2U.num_received_by_type["gridworks.event.some.data"] == 1,
-            1,
             "ERROR waiting for ingester to receive event from uploader",
-            err_str_f=t.summary_str,
         )
