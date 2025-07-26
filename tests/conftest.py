@@ -86,5 +86,4 @@ def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> TestReport | 
                 f.write("\n")
     except Exception as e:  # noqa: BLE001
         rich.print(f"ERROR in pytest_runtest_makereport. " f"Exception: {type(e)}, {e}")
-        raise
     return rep
