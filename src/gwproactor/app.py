@@ -98,6 +98,7 @@ class App(AppInterface):
         app_settings: Optional[AppSettings] = None,
         codec_factory: Optional[CodecFactory] = None,
         sub_types: Optional[SubTypes] = None,
+        layout: Optional[HardwareLayout] = None,
         env_file: Optional[str | Path] = None,
     ) -> None:
         self.sub_types = self.make_subtypes() if sub_types is None else sub_types
@@ -114,7 +115,7 @@ class App(AppInterface):
             else:
                 codec_factory = CodecFactory()
         self.codec_factory = CodecFactory() if codec_factory is None else codec_factory
-        self.config = self._make_proactor_config()
+        self.config = self._make_proactor_config(layout=layout)
         self.links = self._get_link_settings(
             name=self.config.name,
             layout=self.config.layout,
@@ -180,8 +181,10 @@ class App(AppInterface):
 
     def _make_proactor_config(
         self,
+        layout: Optional[HardwareLayout] = None,
     ) -> ProactorConfig:
-        layout = self._load_hardware_layout(self.settings.paths.hardware_layout)
+        if layout is None:
+            layout = self._load_hardware_layout(self.settings.paths.hardware_layout)
         name = self._get_name(layout)
         return ProactorConfig(
             name=name,
@@ -340,6 +343,7 @@ class App(AppInterface):
         app_settings: AppSettings,
         codec_factory: Optional[CodecFactory] = None,
         sub_types: Optional[SubTypes] = None,
+        layout: Optional[HardwareLayout] = None,
         env_file: Optional[str | Path] = None,
         dry_run: bool = False,
         add_screen_handler: bool = True,
@@ -349,6 +353,7 @@ class App(AppInterface):
             app_settings=app_settings,
             codec_factory=codec_factory,
             sub_types=sub_types,
+            layout=layout,
             env_file=env_file,
         )
         env_file_debug_str = (
@@ -428,6 +433,7 @@ class App(AppInterface):
         app_settings: Optional[AppSettings] = None,
         codec_factory: Optional[CodecFactory] = None,
         sub_types: Optional[SubTypes] = None,
+        layout: Optional[HardwareLayout] = None,
         env_file: Optional[str | Path] = "",
         dry_run: bool = False,
         verbose: bool = False,
@@ -465,6 +471,7 @@ class App(AppInterface):
                 app_settings=app_settings,
                 codec_factory=codec_factory,
                 sub_types=sub_types,
+                layout=layout,
                 env_file=env_file,
                 dry_run=dry_run,
                 add_screen_handler=add_screen_handler,

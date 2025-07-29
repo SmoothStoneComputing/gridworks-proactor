@@ -9,7 +9,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Optional, Self, Type
 
-from gwproto import MQTTTopic
+from gwproto import HardwareLayout, MQTTTopic
 from gwproto.messages import CommEvent
 from pydantic_settings import BaseSettings
 
@@ -69,6 +69,9 @@ class LiveTest:
         *,
         child_app_settings: Optional[AppSettings] = None,
         parent_app_settings: Optional[AppSettings] = None,
+        child_layout: Optional[HardwareLayout] = None,
+        parent_layout: Optional[HardwareLayout] = None,
+        layout: Optional[HardwareLayout] = None,
         verbose: Optional[bool] = None,
         message_summary: Optional[bool] = None,
         child_verbose: Optional[bool] = None,
@@ -76,11 +79,13 @@ class LiveTest:
         parent_verbose: Optional[bool] = None,
         parent_message_summary: Optional[bool] = None,
         lifecycle_logging: bool = False,
+        parent_on_screen: Optional[bool] = None,
         add_child: bool = False,
         add_parent: bool = False,
+        add_all: bool = False,
         start_child: bool = False,
         start_parent: bool = False,
-        parent_on_screen: Optional[bool] = None,
+        start_all: bool = False,
         request: typing.Any = None,
     ) -> None:
         self.verbose = get_option_value(
@@ -124,18 +129,24 @@ class LiveTest:
             child_app_settings,
             app_verbose=self.child_verbose,
             app_message_summary=self.child_message_summary,
+            layout=child_layout if child_layout is not None else layout,
         )
         self._parent_app = self._make_app(
             self.parent_app_type(),
             parent_app_settings,
             app_verbose=self.parent_verbose,
             app_message_summary=self.parent_message_summary,
+            layout=parent_layout if parent_layout is not None else layout,
         )
         self.setup_logging()
+        add_child = add_child or start_child or add_all or start_all
+        start_child = start_child or start_all
         if add_child or start_child:
             self.add_child()
             if start_child:
                 self.start_child()
+        add_parent = add_parent or start_parent or add_all or start_all
+        start_parent = start_parent or start_all
         if add_parent or start_parent:
             self.add_parent()
             if start_parent:
@@ -168,6 +179,7 @@ class LiveTest:
         *,
         app_verbose: bool = False,
         app_message_summary: bool = False,
+        layout: Optional[HardwareLayout] = None,
     ) -> App:
         # Copy hardware layout file.
         paths = Paths(name=app_type.paths_name())
@@ -193,6 +205,7 @@ class LiveTest:
             if app_settings is None
             else app_settings.with_paths(paths=paths),
             sub_types=sub_types,
+            layout=layout,
         )
         # Copy keys.
         if uses_tls(app.config.settings):
