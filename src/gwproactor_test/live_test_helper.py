@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import datetime
+import functools
 import logging
 import shutil
 import typing
@@ -21,7 +22,15 @@ from gwproactor_test.clean import TEST_HARDWARE_LAYOUT_PATH
 from gwproactor_test.dummies.pair.child import DummyChildApp
 from gwproactor_test.dummies.pair.parent import DummyParentApp
 from gwproactor_test.event_consistency_checks import EventAckCounts
-from gwproactor_test.instrumented_proactor import InstrumentedProactor, caller_str
+from gwproactor_test.instrumented_proactor import (
+    InstrumentedProactor,
+    MinRangeTuple,
+    RangeTuple,
+    as_min_range_tuple,
+    as_range_tuple,
+    caller_str,
+    range_min,
+)
 from gwproactor_test.logger_guard import LoggerGuards
 from gwproactor_test.wait import (
     AwaitablePredicate,
@@ -475,45 +484,15 @@ class LiveTest:
         elif print_summary:
             self.child.logger.log(log_level, f"{called_from_str}\n{counts.summary}")
 
-    async def await_quiescent_connections(
+    async def await_child_at_rest(
         self,
         *,
-        exp_child_persists: Optional[int] = None,
-        exp_parent_pending: Optional[int] = None,
-        exp_parent_persists: Optional[int] = None,
-        exact: bool = False,
+        exp_child_persists: Optional[int | RangeTuple] = None,  # noqa: ARG002
+        exact: bool = False,  # noqa: ARG002
+        caller_depth: int = 4,
     ) -> None:
         child = self.child
         child_link = child.links.link(child.upstream_client)
-        parent = self.parent
-        parent_link = parent.links.link(parent.downstream_client)
-        exp_child_persists = (
-            exp_child_persists
-            if exp_child_persists is not None
-            else sum(
-                [
-                    1,  # child startup
-                    2,  # child connect, substribe
-                ]
-            )
-        )
-        exp_parent_pending = (
-            exp_parent_pending
-            if exp_parent_pending is not None
-            else sum(
-                [
-                    exp_child_persists,
-                    1,  # child peer active
-                    1,  # parent startup
-                    3,  # parent connect, subscribe, peer active
-                ]
-            )
-        )
-        exp_parent_persists = (
-            exp_parent_persists
-            if exp_parent_persists is not None
-            else exp_parent_pending
-        )
         # Multiple waits for clarity when something goes wrong, rather than
         # one long wait with many possible failures.
         await self.await_for(
@@ -524,48 +503,161 @@ class LiveTest:
         await self.await_for(
             lambda: child.events_at_rest(),
             "ERROR in await_quiescent_connections: waiting for child events to upload",
-            caller_depth=3,
+            caller_depth=caller_depth,
         )
+
+    async def await_parent_at_rest(
+        self,
+        exp_parent_pending: int | MinRangeTuple,
+        exp_parent_persists: Optional[int | MinRangeTuple] = None,
+        exact: bool = False,
+        caller_depth: int = 4,
+    ) -> None:
+        parent = self.parent
+        parent_link = parent.links.link(parent.downstream_client)
         await self.await_for(
             lambda: parent_link.active(),
             "ERROR in await_quiescent_connections: waiting for parent link to be active",
             caller_depth=3,
         )
+        num_pending = range_min(exp_parent_pending)
         await self.await_for(
             lambda: parent.events_at_rest(
-                num_pending=exp_parent_pending,
+                num_pending=num_pending,
                 exact_pending=exact,
-                num_persists=exp_parent_persists,
+                num_persists=None
+                if exp_parent_persists is None
+                else range_min(exp_parent_persists),
                 exact_persists=exact,
             ),
-            f"ERROR in await_quiescent_connections: waiting for parent to persist {exp_parent_pending} events",
-            caller_depth=3,
+            f"ERROR in await_quiescent_connections: waiting for parent to persist {num_pending} events",
+            caller_depth=caller_depth,
         )
-        exp_child_persists_range: tuple[int, int | None]
-        exp_parent_pending_range: tuple[int, int | None]
-        exp_parent_perists_range: tuple[int, int | None]
-        if exact:
-            exp_child_persists_range = exp_child_persists, exp_child_persists
-            exp_parent_pending_range = exp_parent_pending, exp_parent_persists
-            exp_parent_perists_range = exp_parent_persists, exp_parent_persists
-        else:
-            exp_child_persists_range = exp_child_persists, None
-            exp_parent_pending_range = exp_parent_pending, None
-            exp_parent_perists_range = exp_parent_persists, None
-        parent.assert_event_counts(
-            num_pending=exp_parent_pending_range,
-            num_persists=exp_parent_perists_range,
+
+    # noinspection PyMethodMayBeStatic
+    def default_quiesecent_child_persists(self) -> int:
+        return sum(
+            [
+                1,  # child startup
+                2,  # child connect, subscribe
+            ]
+        )
+
+    def default_quiesecent_parent_pending(
+        self,
+        exp_child_persists: Optional[int | MinRangeTuple] = None,
+    ) -> int:
+        return sum(
+            [
+                range_min(
+                    exp_child_persists
+                    if exp_child_persists is not None
+                    else self.default_quiesecent_child_persists()
+                ),
+                1,  # child peer active
+                1,  # parent startup
+                3,  # parent connect, subscribe, peer active
+            ]
+        )
+
+    def default_quiesecent_parent_persists(
+        self,
+        exp_parent_pending: Optional[int | MinRangeTuple] = None,
+        exp_child_persists: Optional[int | MinRangeTuple] = None,
+    ) -> int:
+        return range_min(
+            exp_parent_pending
+            if exp_parent_pending is not None
+            else self.default_quiesecent_parent_pending(
+                exp_child_persists=exp_child_persists
+            )
+        )
+
+    def assert_quiescent_event_counts(
+        self,
+        *,
+        exp_child_persists: int | tuple[int | None, int | None],
+        exp_parent_pending: int | tuple[int | None, int | None],
+        exp_parent_persists: int | tuple[int | None, int | None],
+        exact: bool = False,
+    ) -> None:
+        exp_child_persists = as_range_tuple(exp_child_persists, exact)
+        exp_parent_pending = as_range_tuple(exp_parent_pending, exact)
+        exp_parent_persists = as_range_tuple(exp_parent_persists, exact)
+        self.parent.assert_event_counts(
+            num_pending=exp_parent_pending,
+            num_persists=exp_parent_persists,
             num_clears=0,
             num_retrieves=0,
             tag="parent",
             err_str=self.summary_str(),
         )
-        child.assert_event_counts(
-            num_persists=exp_child_persists_range,
+        self.child.assert_event_counts(
+            num_persists=exp_child_persists,
             all_clear=True,
             tag="child",
             err_str=self.summary_str(),
         )
+
+    @classmethod
+    def _as_tuple(
+        cls,
+        val: Optional[int | RangeTuple],
+        default_func: typing.Callable[[], int],
+        exact: bool,
+    ) -> MinRangeTuple:
+        return (
+            as_min_range_tuple(default_func(), exact=exact)
+            if val is None
+            else as_min_range_tuple(val, exact=exact)
+        )
+
+    async def await_quiescent_connections(
+        self,
+        *,
+        exp_child_persists: Optional[int | RangeTuple] = None,
+        exp_parent_pending: Optional[int | RangeTuple] = None,
+        exp_parent_persists: Optional[int | RangeTuple] = None,
+        exact: bool = False,
+        assert_event_counts: bool = True,
+    ) -> None:
+        exp_child_persists = self._as_tuple(
+            exp_child_persists, self.default_quiesecent_child_persists, exact
+        )
+        exp_parent_pending = self._as_tuple(
+            exp_parent_pending,
+            functools.partial(
+                self.default_quiesecent_parent_pending, exp_child_persists[0]
+            ),
+            exact,
+        )
+        exp_parent_persists = self._as_tuple(
+            exp_parent_persists,
+            functools.partial(
+                self.default_quiesecent_parent_persists,
+                exp_parent_pending=exp_child_persists,
+                exp_child_persists=exp_child_persists,
+            ),
+            exact,
+        )
+        # Multiple waits for clarity when something goes wrong, rather than
+        # one long wait with many possible failures.
+        await self.await_child_at_rest(
+            exp_child_persists=exp_child_persists,
+            exact=exact,
+        )
+        await self.await_parent_at_rest(
+            exp_parent_pending=exp_parent_pending,
+            exact=exact,
+            exp_parent_persists=exp_parent_persists,
+        )
+        if assert_event_counts:
+            self.assert_quiescent_event_counts(
+                exp_child_persists=exp_child_persists,
+                exp_parent_pending=exp_parent_pending,
+                exp_parent_persists=exp_parent_persists,
+                exact=exact,
+            )
 
     def pings_from_parent_topic(self) -> str:
         return MQTTTopic.encode(

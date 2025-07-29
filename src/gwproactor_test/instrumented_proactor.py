@@ -37,11 +37,47 @@ def split_subscriptions(client_wrapper: MQTTClientWrapper) -> Tuple[int, Optiona
 
 def caller_str(depth: int = 3) -> str:
     caller = getframeinfo(stack()[depth][0])
-    return f"{Path(caller.filename).relative_to(Path.cwd())}:{caller.lineno}, {caller.function}()"
+    return (
+        f"{Path(caller.filename).relative_to(Path.cwd(), walk_up=True)}:"
+        f"{caller.lineno}, {caller.function}()"
+    )
+
+
+RangeTuple = tuple[int | None, int | None]
+MinRangeTuple = tuple[int, int | None]
+
+
+def as_range_tuple(val: int | RangeTuple, exact: bool) -> RangeTuple:
+    if isinstance(val, int):
+        val = (val, val) if exact else (val, None)
+    return val
+
+
+def range_min(val: int | RangeTuple) -> int:
+    if isinstance(val, int):
+        return val
+    if isinstance(val[0], int):
+        return val[0]
+    raise TypeError(
+        "ERROR. range_min() requires first entry to be an int. "
+        f"Got {type(val[0])} instead."
+    )
+
+
+def as_min_range_tuple(
+    val: int | RangeTuple | MinRangeTuple, exact: bool
+) -> MinRangeTuple:
+    range_tuple = as_range_tuple(val, exact)
+    if not isinstance(range_tuple[0], int):
+        raise TypeError(
+            "ERROR. as_min_range_tuple() requires first entry to be an int. "
+            f"Got {type(range_tuple[0])} instead."
+        )
+    return range_tuple[0], range_tuple[1]
 
 
 def assert_count(
-    exp: Optional[int | tuple[int | None, int | None] | typing.Sequence[int | None]],
+    exp: Optional[int | RangeTuple],
     got: int,
     tag: str = "",
     err_str: str = "",
