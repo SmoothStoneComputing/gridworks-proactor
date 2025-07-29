@@ -34,10 +34,10 @@ class StubPersister(PersisterInterface):
         return False
 
     def retrieve(self, uid: str) -> Result[Optional[bytes], Problems]:  # noqa: ARG002
+        self._num_retrieves += 1
         return Ok(None)
 
     def reindex(self) -> Result[Optional[bool], Problems]:
-        self._num_retrieves += 1
         return Ok()
 
     @property
