@@ -4,6 +4,8 @@ import textwrap
 import typing
 from typing import Any, Optional, Self
 
+from gwproto import HardwareLayout
+
 from gwproactor import AppSettings, setup_logging
 from gwproactor.app import App
 from gwproactor.config import MQTTClient
@@ -39,7 +41,9 @@ class TreeLiveTest(LiveTest):
         start_child1: bool = False,
         child1_verbose: Optional[bool] = None,
         child1_message_summary: Optional[bool] = None,
+        child1_layout: Optional[HardwareLayout] = None,
         child2_app_settings: Optional[AppSettings] = None,
+        child2_layout: Optional[HardwareLayout] = None,
         child2_verbose: Optional[bool] = None,
         child2_message_summary: Optional[bool] = None,
         add_child2: bool = False,
@@ -61,6 +65,7 @@ class TreeLiveTest(LiveTest):
                 option_name="--child1-message-summary",
                 request=kwargs.get("request"),
             )
+        kwargs["child_layout"] = child1_layout or kwargs.get("child_layout")
         kwargs["request"] = kwargs.get("request")
         super().__init__(**kwargs)
         self.child2_verbose = get_option_value(
@@ -83,8 +88,16 @@ class TreeLiveTest(LiveTest):
             child2_app_settings,
             app_verbose=self.child2_verbose,
             app_message_summary=self.child2_message_summary,
+            layout=child2_layout if child2_layout is not None else kwargs.get("layout"),
         )
         self.setup_child2_logging()
+        add_child2 = (
+            add_child2
+            or start_child2
+            or kwargs.get("add_all", False)
+            or kwargs.get("start_all", False)
+        )
+        start_child2 = start_child2 or kwargs.get("start_all", False)
         if add_child2 or start_child2:
             self.add_child2()
             if start_child2:
