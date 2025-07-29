@@ -2,6 +2,7 @@
 
 import dataclasses
 import logging
+import sys
 import typing
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -37,10 +38,15 @@ def split_subscriptions(client_wrapper: MQTTClientWrapper) -> Tuple[int, Optiona
 
 def caller_str(depth: int = 3) -> str:
     caller = getframeinfo(stack()[depth][0])
-    return (
-        f"{Path(caller.filename).relative_to(Path.cwd(), walk_up=True)}:"
-        f"{caller.lineno}, {caller.function}()"
-    )
+    caller_filename = Path(caller.filename)
+    try:
+        if sys.version_info >= (3, 12):
+            path_str = Path(caller.filename).relative_to(Path.cwd(), walk_up=True)
+        else:
+            path_str = Path(caller.filename).relative_to(Path.cwd())
+    except:  # noqa: E722
+        path_str = caller_filename
+    return f"{path_str}:{caller.lineno}, {caller.function}()"
 
 
 RangeTuple = tuple[int | None, int | None]

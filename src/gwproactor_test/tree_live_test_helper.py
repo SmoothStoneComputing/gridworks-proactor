@@ -319,6 +319,22 @@ class TreeLiveTest(LiveTest):
             caller_depth=caller_depth,
         )
 
+    async def await_parent_at_rest(
+        self,
+        *,
+        exp_parent_pending: int | MinRangeTuple,
+        exp_parent_persists: Optional[int | MinRangeTuple] = None,
+        exp_total_children_events: Optional[int] = None,  # noqa: ARG002
+        exact: bool = False,
+        caller_depth: int = 4,
+    ) -> None:
+        await super().await_parent_at_rest(
+            exp_parent_pending=exp_parent_pending,
+            exp_parent_persists=exp_parent_persists,
+            exact=exact,
+            caller_depth=caller_depth + 1,
+        )
+
     # noinspection PyMethodMayBeStatic
     def default_quiesecent_child2_persists(self) -> int:
         # child2 will persist at least 3 events (startup, connect, subscribe),
@@ -466,6 +482,7 @@ class TreeLiveTest(LiveTest):
         await self.await_parent_at_rest(
             exp_parent_pending=exp_parent_pending,
             exp_parent_persists=exp_parent_persists,
+            exp_total_children_events=exp_total_children_events,
             exact=exact,
         )
         if assert_event_counts:

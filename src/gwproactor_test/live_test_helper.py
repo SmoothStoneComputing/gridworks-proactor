@@ -508,6 +508,7 @@ class LiveTest:
 
     async def await_parent_at_rest(
         self,
+        *,
         exp_parent_pending: int | MinRangeTuple,
         exp_parent_persists: Optional[int | MinRangeTuple] = None,
         exact: bool = False,
