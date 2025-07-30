@@ -18,7 +18,7 @@ from gwproactor.app import App
 from gwproactor.config import DEFAULT_BASE_NAME as DEFAULT_LOG_BASE_NAME
 from gwproactor.config import MQTTClient, Paths
 from gwproactor_test.certs import copy_keys, uses_tls
-from gwproactor_test.clean import TEST_HARDWARE_LAYOUT_PATH
+from gwproactor_test.clean import hardware_layout_test_path
 from gwproactor_test.dummies.pair.child import DummyChildApp
 from gwproactor_test.dummies.pair.parent import DummyParentApp
 from gwproactor_test.event_consistency_checks import EventAckCounts
@@ -170,7 +170,7 @@ class LiveTest:
 
     @classmethod
     def test_layout_path(cls) -> Path:
-        return TEST_HARDWARE_LAYOUT_PATH
+        return hardware_layout_test_path()
 
     def _make_app(
         self,

@@ -15,14 +15,29 @@ from gwproactor_test.dummies import DUMMY_CHILD_ENV_PREFIX, DUMMY_PARENT_ENV_PRE
 
 TEST_DOTENV_PATH = "tests/.env-gwproactor-test"
 TEST_DOTENV_PATH_VAR = "GWPROACTOR_TEST_DOTENV_PATH"
-TEST_HARDWARE_LAYOUT_PATH = Path(__file__).parent / "config" / DEFAULT_LAYOUT_FILE
-DUMMY_TEST_HARDWARE_LAYOUT_PATH = (
+GWPROACTOR_LAYOUT_TEST_PATH_VAR = "GWPROACTOR_LAYOUT_TEST_PATH"
+DEFAULT_HARDWARE_LAYOUT_TEST_PATH = (
+    Path(__file__).parent / "config" / DEFAULT_LAYOUT_FILE
+)
+_hardware_layout_test_path: Path = DEFAULT_HARDWARE_LAYOUT_TEST_PATH
+
+DUMMY_HARDWARE_LAYOUT_PATH = (
     Path(__file__).parent / "config" / "dummy-hardware-layout.json"
 )
 DEFAULT_PREFIXES = [
     DUMMY_CHILD_ENV_PREFIX,
     DUMMY_PARENT_ENV_PREFIX,
 ]
+
+
+def set_hardware_layout_test_path(path: Path | str) -> Path:
+    global _hardware_layout_test_path  # noqa: PLW0603
+    _hardware_layout_test_path = Path(path)
+    return _hardware_layout_test_path
+
+
+def hardware_layout_test_path() -> Path:
+    return _hardware_layout_test_path
 
 
 class DefaultTestEnv:
@@ -51,16 +66,16 @@ class DefaultTestEnv:
     DEFAULT_PREFIXES = DEFAULT_PREFIXES
 
     xdg_home: Path | None = None
-    src_test_layout: Path = TEST_HARDWARE_LAYOUT_PATH
+    src_test_layout: Path
     copy_test_layout: bool = True
     use_test_dotenv: bool = True
     prefixes: list[str]
 
     def __init__(
         self,
-        *,
         xdg_home: Path | str | None = None,
-        src_test_layout: Path = TEST_HARDWARE_LAYOUT_PATH,
+        *,
+        src_test_layout: Path | None = None,
         copy_test_layout: bool = True,
         use_test_dotenv: bool = True,
         prefixes: Optional[list[str]] = None,
@@ -68,7 +83,11 @@ class DefaultTestEnv:
         if isinstance(xdg_home, str):
             xdg_home = Path(xdg_home) if xdg_home else None
         self.xdg_home = xdg_home
-        self.src_test_layout = src_test_layout
+        self.src_test_layout = (
+            src_test_layout
+            if src_test_layout is not None
+            else hardware_layout_test_path()
+        )
         self.copy_test_layout = copy_test_layout
         self.use_test_dotenv = use_test_dotenv
         if prefixes is None:
@@ -133,14 +152,14 @@ def default_test_env(
     The behavior of this fixture can be customized by:
         1. Modifying the contents of tests/.env-gwproactor-test.
         2. Changing the the path to the test dotenv file via the GWPROACTOR_TEST_DOTENV_PATH environment variable.
-        3. Explicitly passing and parametrizing this fixture. For example, to run a test with a different hardware
-            layout file, such as DUMMY_TEST_HARDWARE_LAYOUT_PATH:
+        3. Calling gwproactor_test.set_hardware_layout_test_path() in conftest.py.
+        4. Explicitly passing and parametrizing this fixture. For example, to run a test with a different hardware
+            layout file, such as DUMMY_HARDWARE_LAYOUT_PATH:
 
-        >>> from gwproactor_test.clean import DUMMY_TEST_HARDWARE_LAYOUT_PATH
-        >>> @pytest.mark.parametrize("default_test_env", [(DefaultTestEnv(src_test_layout=DUMMY_TEST_HARDWARE_LAYOUT_PATH)], indirect=True)
-        >>> def test_something(default_test_env):
-        >>>    assert Paths().hardware_layout.open().read() == DUMMY_TEST_HARDWARE_LAYOUT_PATH.open().read()
-
+    >>> from gwproactor_test.clean import DUMMY_HARDWARE_LAYOUT_PATH
+    >>> @pytest.mark.parametrize("default_test_env", [(DefaultTestEnv(src_test_layout=DUMMY_HARDWARE_LAYOUT_PATH))], indirect=True)
+    >>> def test_something(default_test_env):
+    >>>    assert Path(Paths().hardware_layout).open().read() == DUMMY_HARDWARE_LAYOUT_PATH.open().read()
 
     """
     test_env = getattr(request, "param", DefaultTestEnv())
