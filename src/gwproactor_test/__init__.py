@@ -8,7 +8,13 @@ from gwproactor_test.certs import (
     test_ca_private_key_path,
     test_certificate_cache_dir,
 )
-from gwproactor_test.clean import DefaultTestEnv, clean_test_env, default_test_env
+from gwproactor_test.clean import (
+    DefaultTestEnv,
+    clean_test_env,
+    default_test_env,
+    hardware_layout_test_path,
+    set_hardware_layout_test_path,
+)
 from gwproactor_test.live_test_helper import LiveTest
 from gwproactor_test.logger_guard import LoggerGuard, LoggerGuards, restore_loggers
 from gwproactor_test.wait import (
@@ -35,7 +41,9 @@ __all__ = [
     "clean_test_env",
     "copy_keys",
     "default_test_env",
+    "hardware_layout_test_path",
     "restore_loggers",
+    "set_hardware_layout_test_path",
     "set_test_certificate_cache_dir",
     "test_ca_certificate_path",
     "test_ca_private_key_path",

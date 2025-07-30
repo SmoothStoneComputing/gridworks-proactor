@@ -6,7 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from gwproactor.config import Paths
-from gwproactor_test.clean import TEST_HARDWARE_LAYOUT_PATH
+from gwproactor_test.clean import hardware_layout_test_path
 from gwproactor_test.cli import app as cli_app
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
 from gwproactor_test.dummies.tree.scada1 import DummyScada1App
@@ -21,7 +21,7 @@ def test_cli_completes(request: pytest.FixtureRequest) -> None:
     for app_type in [DummyAtnApp, DummyScada1App, DummyScada2App]:
         paths = Paths(name=app_type.paths_name())
         paths.mkdirs(parents=True, exist_ok=True)
-        shutil.copyfile(Path(TEST_HARDWARE_LAYOUT_PATH), paths.hardware_layout)
+        shutil.copyfile(Path(hardware_layout_test_path()), paths.hardware_layout)
     command: list[str]
     for command in [
         [],
