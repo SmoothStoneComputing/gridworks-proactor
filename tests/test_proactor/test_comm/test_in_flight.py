@@ -22,8 +22,8 @@ async def test_in_flight_happy_path(request: pytest.FixtureRequest) -> None:
         await h.await_quiescent_connections()
         child = h.child
         parent = h.parent
-        child_stats = h.child.stats.link(h.child.upstream_client)
-        parent_stats = h.parent.stats.link(h.parent.downstream_client)
+        child_stats = h.child_to_parent_stats
+        parent_stats = h.parent_to_child_stats
 
         def _num_comm_events() -> int:
             return len(child_stats.comm_events) + len(parent_stats.comm_events)
@@ -125,18 +125,12 @@ async def test_in_flight_overflow(request: pytest.FixtureRequest) -> None:
             child.generate_event(
                 DBGEvent(Command=DBGPayload(), Msg=f"event {i+1} / {a_bunch}")
             )
-        last_in_flight = child.links.num_in_flight
-
-        def _child_got_more_acks() -> bool:
-            return child.links.num_in_flight < last_in_flight
 
         # now wait for all events to rest
-        await await_for(
+        await h.await_for(
             lambda: child.events_at_rest()
             and parent.events_at_rest(num_pending=exp_parent_events),
-            1,
             "ERROR waiting for child events upload",
-            err_str_f=h.summary_str,
         )
         parent.assert_event_counts(
             num_pending=(exp_parent_events, None),
@@ -573,7 +567,7 @@ async def test_in_flight_comm_loss(request: pytest.FixtureRequest) -> None:
     async with LiveTest(start_child=True, start_parent=True, request=request) as h:
         await h.await_quiescent_connections()
         child = h.child
-        upstream_link = child.links.link(child.upstream_client)
+        upstream_link = h.child_to_parent_link
         parent = h.parent
         parent.pause_acks()
 
@@ -650,8 +644,6 @@ async def test_in_flight_comm_loss(request: pytest.FixtureRequest) -> None:
             exp_parent_pending=exp_parent_pending,
             exp_parent_persists=exp_parent_persists,
         )
-        exp_in_flight = 0
-        exp_pending = 0
         child.assert_event_counts(
             num_pending=0,
             num_in_flight=0,
@@ -666,7 +658,7 @@ async def test_in_flight_overflow_comm_loss(request: pytest.FixtureRequest) -> N
     async with LiveTest(start_child=True, start_parent=True, request=request) as h:
         await h.await_quiescent_connections()
         child = h.child
-        upstream_link = child.links.link(child.upstream_client)
+        upstream_link = h.child_to_parent_link
         parent = h.parent
         parent.pause_acks()
 

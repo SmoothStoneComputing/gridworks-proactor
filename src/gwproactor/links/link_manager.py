@@ -165,6 +165,22 @@ class LinkManager:
     def link(self, name: str) -> Optional[LinkState]:
         return self._states.link(name)
 
+    @property
+    def downstream_link(self) -> LinkState:
+        link = self.link(self.downstream_client)
+        if link is None:
+            raise ValueError(
+                f"ERROR. downstream_link ({self.downstream_client}) is None"
+            )
+        return link
+
+    @property
+    def upstream_link(self) -> LinkState:
+        link = self.link(self.upstream_client)
+        if link is None:
+            raise ValueError(f"ERROR. upstream_link ({self.upstream_client}) is None")
+        return link
+
     def link_state(self, name: str) -> Optional[StateName]:
         return self._states.link_state(name)
 
@@ -495,7 +511,6 @@ class LinkManager:
     def stop(self) -> Result[bool, Problems]:
         problems: Optional[Problems] = None
         for link_name in self._states.link_names():
-            ret = self._states.stop(link_name)
             match ret := self._states.stop(link_name):
                 case Err():
                     if problems is None:

@@ -2,64 +2,70 @@ import pytest
 
 
 def add_live_test_options(parser: pytest.Parser, *, include_tree: bool = False) -> None:
-    parser.addoption(
+    group = parser.getgroup("gridworks-proactor")
+    group.addoption(
         "--live-test-verbose",
         action="store_true",
-        help="Pass verbose=True to LiveTest",
+        help="Run LiveTest with verbose logging for parent and child.",
     )
-    parser.addoption(
+    group.addoption(
         "--live-test-message-summary",
         action="store_true",
-        help="Pass message_summary=True to LiveTest",
+        help="Run LiveTest with message summary logging for parent and child.",
     )
-    parser.addoption(
+    group.addoption(
         "--child-verbose",
         action="store_true",
-        help="Pass child_verbose=True to LiveTest",
+        help="Run LiveTest with verbose logging for child.",
     )
-    parser.addoption(
+    group.addoption(
         "--child-message-summary",
         action="store_true",
-        help="Pass child_message_summary=True to LiveTest",
+        help="Run LiveTest with message summary logging for child.",
     )
-    parser.addoption(
+    group.addoption(
         "--parent-verbose",
         action="store_true",
-        help="Pass parent_verbose=True to LiveTest",
+        help="Run LiveTest with verbose logging for parent.",
     )
-    parser.addoption(
+    group.addoption(
         "--parent-message-summary",
         action="store_true",
-        help="Pass parent_message_summary=True to LiveTest",
+        help="Run LiveTest with message summary logging for parent.",
     )
-    parser.addoption(
+    group.addoption(
         "--parent-on-screen",
         action="store_true",
         help="Pass parent_on_screen=True to LiveTest",
     )
     if include_tree:
-        parser.addoption(
+        group.addoption(
             "--child1-verbose",
             action="store_true",
-            help="Pass child1_verbose=True to TreeLiveTest",
+            help="Run TreeLiveTest with verbose logging for child1. Identical to --child-verbose",
         )
-        parser.addoption(
+        group.addoption(
             "--child1-message-summary",
             action="store_true",
-            help="Pass child1_message_summary=True to TreeLiveTest",
+            help="Run LiveTest with message summary logging for child1. Identical to --child-message-summary",
         )
-        parser.addoption(
+        group.addoption(
             "--child2-verbose",
             action="store_true",
-            help="Pass child2_verbose=True to TreeLiveTest",
+            help="Run TreeLiveTest with verbose logging for child2.",
         )
-        parser.addoption(
+        group.addoption(
             "--child2-message-summary",
             action="store_true",
-            help="Pass child2_message_summary=True to TreeLiveTest",
+            help="Run LiveTest with message summary logging for child2.",
         )
-        parser.addoption(
+        group.addoption(
             "--child2-on-screen",
             action="store_true",
             help="Pass child2_on_screen=True to TreeLiveTest",
         )
+    group.addoption(
+        "--ack-tracking",
+        action="store_true",
+        help="Print ack tracking information in LiveTest exceptions",
+    )

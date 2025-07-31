@@ -14,6 +14,35 @@ from tests.test_misc.test_clean import (
 
 
 @pytest.mark.asyncio
+async def test_live_test_accesors(request: pytest.FixtureRequest) -> None:
+    async with LiveTest(start_all=True, request=request) as h:
+        assert h.child_to_parent_link == h.child.links.link(h.child.upstream_client)
+        assert h.child_to_parent_stats == h.child.stats.link(h.child.upstream_client)
+        assert h.parent_to_child_link == h.parent.links.link(h.parent.downstream_client)
+        assert h.parent_to_child_stats == h.parent.stats.link(
+            h.parent.downstream_client
+        )
+
+    async with TreeLiveTest(start_all=True, request=request) as h:
+        assert h.child1_to_parent_link == h.child1.links.link(h.child1.upstream_client)
+        assert h.child1_to_parent_stats == h.child1.stats.link(h.child1.upstream_client)
+        assert h.child1_to_child2_link == h.child1.links.link(
+            h.child1.downstream_client
+        )
+        assert h.child1_to_child2_stats == h.child1.stats.link(
+            h.child1.downstream_client
+        )
+        assert h.child2_to_child1_link == h.child2.links.link(h.child2.upstream_client)
+        assert h.child2_to_child1_stats == h.child2.stats.link(h.child2.upstream_client)
+        assert h.parent_to_child1_link == h.parent.links.link(
+            h.parent.downstream_client
+        )
+        assert h.parent_to_child1_stats == h.parent.stats.link(
+            h.parent.downstream_client
+        )
+
+
+@pytest.mark.asyncio
 async def test_hardware_layout_defaults(request: pytest.FixtureRequest) -> None:
     async with TreeLiveTest(add_all=True, request=request) as h:
         for app in [h.parent, h.child1, h.child2]:

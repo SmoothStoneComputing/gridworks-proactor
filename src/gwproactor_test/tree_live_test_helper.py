@@ -9,6 +9,7 @@ from gwproto import HardwareLayout
 from gwproactor import AppSettings, setup_logging
 from gwproactor.app import App
 from gwproactor.config import MQTTClient
+from gwproactor.links import LinkState
 from gwproactor_test.dummies.tree.atn import DummyAtnApp
 from gwproactor_test.dummies.tree.scada1 import DummyScada1App
 from gwproactor_test.dummies.tree.scada2 import DummyScada2App
@@ -20,6 +21,7 @@ from gwproactor_test.instrumented_proactor import (
     as_range_tuple,
     caller_str,
 )
+from gwproactor_test.instrumented_stats import RecorderLinkStats
 from gwproactor_test.live_test_helper import (
     LiveTest,
     get_option_value,
@@ -177,6 +179,38 @@ class TreeLiveTest(LiveTest):
         self.child2_app.raw_proactor = None
         return self
 
+    @property
+    def child1_to_parent_link(self) -> LinkState:
+        return self.child_to_parent_link
+
+    @property
+    def child1_to_child2_link(self) -> LinkState:
+        return self.child1.downstream_link
+
+    @property
+    def child2_to_child1_link(self) -> LinkState:
+        return self.child2.upstream_link
+
+    @property
+    def parent_to_child1_link(self) -> LinkState:
+        return self.parent_to_child_link
+
+    @property
+    def child1_to_parent_stats(self) -> RecorderLinkStats:
+        return self.child_to_parent_stats
+
+    @property
+    def child1_to_child2_stats(self) -> RecorderLinkStats:
+        return self.child1.downstream_stats
+
+    @property
+    def child2_to_child1_stats(self) -> RecorderLinkStats:
+        return self.child2.upstream_stats
+
+    @property
+    def parent_to_child1_stats(self) -> RecorderLinkStats:
+        return self.parent_to_child_stats
+
     def _get_child2_clients_supporting_tls(self) -> list[MQTTClient]:
         return self._get_clients_supporting_tls(self.child2_app.config.settings)
 
@@ -220,17 +254,32 @@ class TreeLiveTest(LiveTest):
             s += "SCADA1: None\n"
         else:
             s += "SCADA1:\n"
-            s += textwrap.indent(self.child1.summary_str(), "    ") + "\n"
+            s += (
+                textwrap.indent(
+                    self.child1.summary_str(ack_tracking=self.ack_tracking), "    "
+                )
+                + "\n"
+            )
         if self.child2_app.raw_proactor is None:
             s += "SCADA2: None\n"
         else:
             s += "SCADA2:\n"
-            s += textwrap.indent(self.child2.summary_str(), "    ") + "\n"
+            s += (
+                textwrap.indent(
+                    self.child2.summary_str(ack_tracking=self.ack_tracking), "    "
+                )
+                + "\n"
+            )
         if self.parent_app.raw_proactor is None:
             s += "ATN: None\n"
         else:
             s += "ATN:\n"
-            s += textwrap.indent(self.parent.summary_str(), "    ") + "\n"
+            s += (
+                textwrap.indent(
+                    self.parent.summary_str(ack_tracking=self.ack_tracking), "    "
+                )
+                + "\n"
+            )
         return s
 
     def assert_child1_events_at_rest(
