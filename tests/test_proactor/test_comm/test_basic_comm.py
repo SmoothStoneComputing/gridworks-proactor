@@ -20,9 +20,9 @@ async def test_basic_connection(request: pytest.FixtureRequest) -> None:
 async def test_no_parent(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, request=request) as h:
         child = h.child
-        link_stats = child.stats.link(child.upstream_client)
+        link_stats = h.child_to_parent_stats
         comm_event_counts = link_stats.comm_event_counts
-        link = child.links.link(child.upstream_client)
+        link = h.child_to_parent_link
 
         # unstarted child
         assert link_stats.num_received == 0
@@ -78,9 +78,9 @@ async def test_no_parent(request: pytest.FixtureRequest) -> None:
 async def test_basic_comm_child_first(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
-        child_stats = child.stats.link(child.upstream_client)
+        child_stats = h.child_to_parent_stats
         child_comm_event_counts = child_stats.comm_event_counts
-        child_link = child.links.link(child.upstream_client)
+        child_link = h.child_to_parent_link
 
         # unstarted child, parent
         assert child_stats.num_received == 0
@@ -194,12 +194,10 @@ async def test_basic_comm_parent_first(
                 h.set_use_tls(False)
         h.add_child()
         h.add_parent()
-        child = h.child
-        child_stats = child.stats.link(child.upstream_client)
+        child_stats = h.child_to_parent_stats
         child_comm_event_counts = child_stats.comm_event_counts
-        child_link = child.links.link(child.upstream_client)
-        parent = h.parent
-        parent_link = parent.links.link(parent.downstream_client)
+        child_link = h.child_to_parent_link
+        parent_link = h.parent_to_child_link
 
         # unstarted parent
         assert parent_link.state == StateName.not_started
@@ -241,11 +239,11 @@ async def test_basic_comm_parent_first(
 async def test_basic_parent_comm_loss(request: pytest.FixtureRequest) -> None:
     async with LiveTest(add_child=True, add_parent=True, request=request) as h:
         child = h.child
-        child_stats = child.stats.link(child.upstream_client)
+        child_stats = h.child_to_parent_stats
         child_comm_event_counts = child_stats.comm_event_counts
-        child_link = child.links.link(child.upstream_client)
+        child_link = h.child_to_parent_link
         parent = h.parent
-        parent_link = parent.links.link(parent.downstream_client)
+        parent_link = h.parent_to_child_link
 
         # unstarted child, parent
         assert parent_link.state == StateName.not_started

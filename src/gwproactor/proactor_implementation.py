@@ -42,6 +42,7 @@ from gwproactor.links import (
     AckWaitInfo,
     AsyncioTimerManager,
     LinkManager,
+    LinkState,
 )
 from gwproactor.links.mqtt import QOS
 from gwproactor.logger import ProactorLogger
@@ -374,6 +375,14 @@ class Proactor(Runnable):
     @property
     def downstream_client(self) -> str:
         return self._links.downstream_client
+
+    @property
+    def downstream_link(self) -> LinkState:
+        return self._links.downstream_link
+
+    @property
+    def upstream_link(self) -> LinkState:
+        return self._links.upstream_link
 
     @property
     def async_receive_queue(self) -> Optional[asyncio.Queue[Any]]:

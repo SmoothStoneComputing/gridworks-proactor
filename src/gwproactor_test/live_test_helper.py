@@ -17,6 +17,7 @@ from gwproactor import AppSettings, Proactor, setup_logging
 from gwproactor.app import App
 from gwproactor.config import DEFAULT_BASE_NAME as DEFAULT_LOG_BASE_NAME
 from gwproactor.config import MQTTClient, Paths
+from gwproactor.links import LinkState
 from gwproactor_test.certs import copy_keys, uses_tls
 from gwproactor_test.clean import hardware_layout_test_path
 from gwproactor_test.dummies.pair.child import DummyChildApp
@@ -31,6 +32,7 @@ from gwproactor_test.instrumented_proactor import (
     caller_str,
     range_min,
 )
+from gwproactor_test.instrumented_stats import RecorderLinkStats
 from gwproactor_test.logger_guard import LoggerGuards
 from gwproactor_test.wait import (
     AwaitablePredicate,
@@ -281,6 +283,22 @@ class LiveTest:
     ) -> Self:
         self.parent_app.raw_proactor = None
         return self
+
+    @property
+    def child_to_parent_link(self) -> LinkState:
+        return self.child.upstream_link
+
+    @property
+    def parent_to_child_link(self) -> LinkState:
+        return self.parent.downstream_link
+
+    @property
+    def child_to_parent_stats(self) -> RecorderLinkStats:
+        return self.child.upstream_stats
+
+    @property
+    def parent_to_child_stats(self) -> RecorderLinkStats:
+        return self.parent.downstream_stats
 
     @classmethod
     def _get_clients_supporting_tls(cls, settings: BaseSettings) -> list[MQTTClient]:
