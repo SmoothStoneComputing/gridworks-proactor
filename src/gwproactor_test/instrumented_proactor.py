@@ -250,7 +250,30 @@ class InstrumentedProactor(Proactor):
     def drop_mqtt(self, client_name: str, drop: bool) -> None:
         self._mqtt_messages_dropped[client_name] = drop
 
-    def summary_str(self) -> str:
+    def ack_tracking_str(self) -> str:
+        s = "Tracked acks/ackables\n"
+        for link_name, tracked_items in self.links.ack_tracker.ackables.items():
+            s += f"  {link_name}:{len(tracked_items):3d}\n"
+            for message_id, tracked in tracked_items.items():
+                rp = int(message_id in self.links._reuploads._reupload_pending)  # noqa
+                ru = int(message_id in self.links._reuploads._reuploaded_unacked)  # noqa
+                is_ack_str = "*" if tracked.is_ack else " "
+                s += (
+                    f"    {message_id[:8]}  "
+                    f"p:{int(message_id in self.event_persister)}  "
+                    f"f:{int(message_id in self.links.in_flight_events)}  "
+                    f"rp:{rp}  ru:{ru}  "
+                    f"sent: {tracked.send_count:2d}  "
+                    f"acked: {tracked.ack_count}  "
+                    f"{is_ack_str}  "
+                    f"{tracked.message_type:45s}  "
+                )
+                for ack_path in tracked.ack_paths:
+                    s += f"  0x{ack_path:08X}"
+                s += "\n"
+        return s
+
+    def summary_str(self, *, ack_tracking: bool = False) -> str:
         s = ""
         if self._loop is not None:
             s += str_tasks(self._loop, self.paths_name, self._tasks)
@@ -281,26 +304,8 @@ class InstrumentedProactor(Proactor):
                 f"subacks paused: {self._subacks_paused[link_name]}  "
                 f"subacks available: {len(self._subacks_available[link_name])}\n"
             )
-        s += "Tracked acks/ackables\n"
-        for link_name, tracked_items in self.links.ack_tracker.ackables.items():
-            s += f"  {link_name}:{len(tracked_items):3d}\n"
-            for message_id, tracked in tracked_items.items():
-                rp = int(message_id in self.links._reuploads._reupload_pending)  # noqa
-                ru = int(message_id in self.links._reuploads._reuploaded_unacked)  # noqa
-                is_ack_str = "*" if tracked.is_ack else " "
-                s += (
-                    f"    {message_id[:8]}  "
-                    f"p:{int(message_id in self.event_persister)}  "
-                    f"f:{int(message_id in self.links.in_flight_events)}  "
-                    f"rp:{rp}  ru:{ru}  "
-                    f"sent: {tracked.send_count:2d}  "
-                    f"acked: {tracked.ack_count}  "
-                    f"{is_ack_str}  "
-                    f"{tracked.message_type:45s}  "
-                )
-                for ack_path in tracked.ack_paths:
-                    s += f"  0x{ack_path:08X}"
-                s += "\n"
+        if ack_tracking:
+            s += self.ack_tracking_str()
         return s
 
     def summarize(self) -> None:

@@ -65,6 +65,7 @@ class LiveTest:
     parent_on_screen: bool
     lifecycle_logging: bool
     logger_guards: LoggerGuards
+    ack_tracking: bool
 
     def __init__(
         self,
@@ -82,6 +83,7 @@ class LiveTest:
         parent_message_summary: Optional[bool] = None,
         lifecycle_logging: bool = False,
         parent_on_screen: Optional[bool] = None,
+        ack_tracking: Optional[bool] = None,
         add_child: bool = False,
         add_parent: bool = False,
         add_all: bool = False,
@@ -126,6 +128,11 @@ class LiveTest:
             request=request,
         )
         self.lifecycle_logging = lifecycle_logging
+        self.ack_tracking = get_option_value(
+            parameter_value=ack_tracking,
+            option_name="--ack-tracking",
+            request=request,
+        )
         self._child_app = self._make_app(
             self.child_app_type(),
             child_app_settings,
@@ -421,11 +428,15 @@ class LiveTest:
     def summary_str(self) -> str:
         s = ""
         if self.child_app.raw_proactor is not None:
-            s += "CHILD:\n" f"{self.child.summary_str()}\n"
+            s += (
+                "CHILD:\n" f"{self.child.summary_str(ack_tracking=self.ack_tracking)}\n"
+            )
         else:
             s += "CHILD: None\n"
         if self.parent_app.raw_proactor is not None:
-            s += "PARENT:\n" f"{self.parent.summary_str()}"
+            s += (
+                "PARENT:\n" f"{self.parent.summary_str(ack_tracking=self.ack_tracking)}"
+            )
         else:
             s += "PARENT: None\n"
         return s

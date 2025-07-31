@@ -254,17 +254,32 @@ class TreeLiveTest(LiveTest):
             s += "SCADA1: None\n"
         else:
             s += "SCADA1:\n"
-            s += textwrap.indent(self.child1.summary_str(), "    ") + "\n"
+            s += (
+                textwrap.indent(
+                    self.child1.summary_str(ack_tracking=self.ack_tracking), "    "
+                )
+                + "\n"
+            )
         if self.child2_app.raw_proactor is None:
             s += "SCADA2: None\n"
         else:
             s += "SCADA2:\n"
-            s += textwrap.indent(self.child2.summary_str(), "    ") + "\n"
+            s += (
+                textwrap.indent(
+                    self.child2.summary_str(ack_tracking=self.ack_tracking), "    "
+                )
+                + "\n"
+            )
         if self.parent_app.raw_proactor is None:
             s += "ATN: None\n"
         else:
             s += "ATN:\n"
-            s += textwrap.indent(self.parent.summary_str(), "    ") + "\n"
+            s += (
+                textwrap.indent(
+                    self.parent.summary_str(ack_tracking=self.ack_tracking), "    "
+                )
+                + "\n"
+            )
         return s
 
     def assert_child1_events_at_rest(
