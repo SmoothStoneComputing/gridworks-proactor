@@ -1,80 +1,89 @@
-[tool.poetry]
+[project]
 name = "gridworks-proactor"
 version = "4.1.9"
 description = "Gridworks Proactor"
-authors = ["Jessica Millar <jmillar@gridworks-consulting.com>"]
-license = "MIT"
+authors = [{ name = "Jessica Millar", email = "jmillar@gridworks-consulting.com" }]
+requires-python = ">=3.11, <4"
 readme = "README.md"
-homepage = "https://github.com/thegridelectric/gridworks-proactor"
-repository = "https://github.com/thegridelectric/gridworks-proactor"
-documentation = "https://gridworks-proactor.readthedocs.io"
-packages = [
-    { include = "gwproactor", from = "src" },
-    { include = "gwproactor_test", from = "src" },
-]
-classifiers = [
-    "Development Status :: 3 - Alpha",
+license = "MIT"
+classifiers = ["Development Status :: 3 - Alpha"]
+dependencies = [
+    "pydantic>=2.10.0,<3",
+    "python-dotenv>=1.0.0,<2",
+    "xdg>=6.0.0,<7",
+    "paho-mqtt>=2.1.0,<3",
+    "result>=0.9.0,<0.10",
+    "gridworks-protocol>=1.2.9,<2",
+    "aiohttp>=3.11.11,<4",
+    "yarl>=1.9.2,<2",
+    "multidict>=6.0.4,<7",
+    "pydantic-settings>=2.4.0,<3",
+    "rich>=14.0.0,<15",
 ]
 
-[tool.poetry.scripts]
-gwtest = "gwproactor_test.cli:app"
+[project.optional-dependencies]
+tests = [
+    "pytest>=7.2.0",
+    "pytest-asyncio>=0.20.3",
+    "gridworks-cert>=0.4.2",
+    "freezegun>=1.5.1,<2",
+    "typer>=0.15.4",
+    "click<8.2.0",
+]
 
-[tool.poetry.urls]
+[project.urls]
+Homepage = "https://github.com/thegridelectric/gridworks-proactor"
+Repository = "https://github.com/thegridelectric/gridworks-proactor"
+Documentation = "https://gridworks-proactor.readthedocs.io"
 Changelog = "https://github.com/thegridelectric/gridworks-proactor/releases"
 
-[tool.poetry.dependencies]
-python = "^3.11"
-pydantic = "^2.10.0"
-python-dotenv = "^1.0.0"
-xdg = "^6.0.0"
-paho-mqtt = "^2.1.0"
-result = "^0.9.0"
-gridworks-protocol = "^1.2.9"
-# gridworks-protocol = { path = "../gridworks-protocol", develop = true }
-# gridworks-protocol = { git = "https://github.com/thegridelectric/gridworks-protocol.git", branch = "dev" }
-aiohttp = "^3.11.11"
-yarl = "^1.9.2"
-multidict = "^6.0.4"
-pytest = { version = ">=7.2.0", optional = true }
-pytest-asyncio = { version = ">=0.20.3", optional = true }
-gridworks-cert = { version = ">=0.4.2", optional = true }
-freezegun = { version = "^1.5.1", optional = true }
-pydantic-settings = "^2.4.0"
-rich = "^14.0.0"
-typer = { version = ">=0.15.4", optional = true }
-# TODO: remove when typer adjusts to click 8.2:
-#   https://github.com/fastapi/typer/pull/1240
-#   https://github.com/fastapi/typer/discussions/1233
-#   Older layers of discussion of click 8.2 support in typer:
-#     https://github.com/fastapi/typer/discussions/1215
-#     https://github.com/fastapi/typer/pull/1222
-#     https://github.com/fastapi/typer/commits/click-8.2/
-#
-click = { version = "<8.2.0", optional = true }
+[project.scripts]
+gwtest = "gwproactor_test.cli:app"
 
-[tool.poetry.group.dev.dependencies]
-Pygments = ">=2.10.0"
-coverage = { extras = ["toml"], version = ">=6.2" }
-furo = ">=2021.11.12"
-mypy = ">=0.930"
-pep8-naming = ">=0.12.1"
-pre-commit = ">=2.16.0"
-pre-commit-hooks = ">=4.1.0"
-pyupgrade = ">=2.29.1"
-sphinx = ">=4.3.2"
-sphinx-autobuild = ">=2021.3.14"
-sphinx-click = ">=3.0.2"
-xdoctest = { extras = ["colors"], version = ">=0.15.10" }
-myst-parser = { version = ">=0.16.1" }
-sphinxcontrib-mermaid = "^0.8.1"
-ruff = "^0.6.2"
-importtime-output-wrapper = "^1.1.0"
+[dependency-groups]
+dev = [
+    "Pygments>=2.10.0",
+    "coverage[toml]>=6.2",
+    "furo>=2021.11.12",
+    "mypy>=0.930",
+    "pep8-naming>=0.12.1",
+    "pre-commit>=2.16.0",
+    "pre-commit-hooks>=4.1.0",
+    "pyupgrade>=2.29.1",
+    "sphinx>=4.3.2",
+    "sphinx-autobuild>=2021.3.14",
+    "sphinx-click>=3.0.2",
+    "xdoctest[colors]>=0.15.10",
+    "myst-parser>=0.16.1",
+    "sphinxcontrib-mermaid>=0.8.1,<0.9",
+    "ruff>=0.6.2,<0.7",
+    "importtime-output-wrapper>=1.1.0,<2",
+    "nox>=2025.5.1",
+    "nox-uv>=0.6.2",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/gwproactor",
+    "src/gwproactor_test",
+]
+
+[tool.hatch.build.targets.wheel]
+include = [
+    "src/gwproactor",
+    "src/gwproactor_test",
+]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/gwproactor" = "gwproactor"
+"src/gwproactor_test" = "gwproactor_test"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
-
-[tool.poetry.extras]
-tests = ["pytest", "pytest-asyncio", "gridworks-cert", "freezegun", "typer", "click"]
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
@@ -101,16 +110,11 @@ plugins = [
     "pydantic.mypy"
 ]
 
-
 [[tool.mypy.overrides]]
 module = [
     "trogon",
 ]
 ignore_missing_imports = true
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 exclude = [

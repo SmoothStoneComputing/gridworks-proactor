@@ -19,12 +19,11 @@ jobs:
           - { python: "3.13", os: "ubuntu-latest", session: "tests", coverage: true }
           - { python: "3.12", os: "ubuntu-latest", session: "tests" }
           - { python: "3.11", os: "ubuntu-latest", session: "tests" }
-          # mosuqitto github action only supported on ubuntu
+          # mosquitto github action only supported on ubuntu
           # - { python: "3.13", os: "macos-latest", session: "tests" }
           # - { python: "3.13", os: "windows-latest", session: "tests" }
           - { python: "3.13", os: "ubuntu-latest", session: "xdoctest" }
           - { python: "3.13", os: "ubuntu-latest", session: "docs-build" }
-          # - { python: "3.12", os: "ubuntu-latest", session: "mypy" }
 
     env:
       NOXSESSION: ${{ matrix.session }}
@@ -52,23 +51,20 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Upgrade pip
-        run: |
-          pip install ${{ env.PIP_ARGS }} pip
-          pip --version
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          # Install a specific version of uv.
+          version: "0.8.7"
 
-      - name: Upgrade pip in virtual environments
-        shell: python
+      - name: Install Nox
         run: |
-          import os
-          import pip
-
-          with open(os.environ["GITHUB_ENV"], mode="a") as io:
-              print(f"VIRTUALENV_PIP={pip.__version__}", file=io)
+          uv tool install nox --with nox-uv
+          nox --version
 
       - name: Install gwcert
         run: |
-          pipx install gridworks-cert
+          uv tool install gridworks-cert
           gwcert --version
 
       - name: Generate CA
@@ -118,17 +114,6 @@ jobs:
       #           --cert ${{ github.workspace }}/tests/.ci-ca/certs/ci/ci.crt \
       #           --key ${{ github.workspace }}/tests/.ci-ca/certs/ci/private/ci.pem \
       #           -E
-
-      - name: Install Poetry
-        run: |
-          pipx install --pip-args=${{ env.PIP_ARGS }} poetry
-          poetry --version
-
-      - name: Install Nox
-        run: |
-          pipx install --pip-args=${{ env.PIP_ARGS }} nox
-          pipx inject --pip-args=${{ env.PIP_ARGS }} nox nox-poetry
-          nox --version
 
       - name: Compute pre-commit cache key
         if: matrix.session == 'pre-commit'
@@ -223,20 +208,15 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Upgrade pip
-        run: |
-          pip install ${{ env.PIP_ARGS }} pip
-          pip --version
-
-      - name: Install Poetry
-        run: |
-          pipx install --pip-args=${{ env.PIP_ARGS }} poetry
-          poetry --version
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          # Install a specific version of uv.
+          version: "0.8.7"
 
       - name: Install Nox
         run: |
-          pipx install --pip-args=${{ env.PIP_ARGS }} nox
-          pipx inject --pip-args=${{ env.PIP_ARGS }} nox nox-poetry
+          uv tool install nox --with nox-uv
           nox --version
 
       - name: Download coverage data
