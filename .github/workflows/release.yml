@@ -18,18 +18,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5.6.0
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
-      - name: Upgrade pip
-        run: |
-          pip install --constraint=.github/workflows/constraints.txt pip
-          pip --version
-
-      - name: Install Poetry
-        run: |
-          pip install --constraint=.github/workflows/constraints.txt poetry
-          poetry --version
-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.8"
+          enable-cache: true          
+          
       - name: Check if there is a parent commit
         id: check-parent-commit
         run: |
@@ -41,20 +37,20 @@ jobs:
         uses: salsify/action-detect-and-tag-new-version@v2.0.3
         with:
           version-command: |
-            bash -o pipefail -c "poetry version | awk '{ print \$2 }'"
+            bash -o pipefail -c "uv version | awk '{ print \$2 }'"
 
       - name: Bump version for developmental release
         if: "! steps.check-version.outputs.tag"
         run: |
           echo "no outputs tag"
-          poetry version patch &&
-          version=$(poetry version | awk '{ print $2 }') &&
-          poetry version $version.dev.$(date +%s)
-          poetry version
+          uv version --bump patch &&
+          version=$(uv version | awk '{ print $2 }') &&
+          uv version $version.dev.$(date +%s)
+          uv version
 
       - name: Build package
         run: |
-          poetry build --ansi
+          uv build
 
       - name: Publish package on PyPI
         if: steps.check-version.outputs.tag
