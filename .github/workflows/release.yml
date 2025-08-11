@@ -3,8 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - main
-      - master
+      - as/uv-ci
 
 jobs:
   release:
@@ -47,9 +46,11 @@ jobs:
       - name: Bump version for developmental release
         if: "! steps.check-version.outputs.tag"
         run: |
+          echo "no outputs tag"
           poetry version patch &&
           version=$(poetry version | awk '{ print $2 }') &&
           poetry version $version.dev.$(date +%s)
+          poetry version
 
       - name: Build package
         run: |
@@ -57,23 +58,28 @@ jobs:
 
       - name: Publish package on PyPI
         if: steps.check-version.outputs.tag
-        uses: pypa/gh-action-pypi-publish@v1.12.2
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          echo "Got a tag but not publishing"
+          echo "tag: ${{ steps.check-version.outputs.tag }}"
+        # uses: pypa/gh-action-pypi-publish@v1.12.2
+        # with:
+        #   user: __token__
+        #   password: ${{ secrets.PYPI_TOKEN }}
 
       - name: Publish package on TestPyPI
         if: "! steps.check-version.outputs.tag"
-        uses: pypa/gh-action-pypi-publish@v1.12.2
-        with:
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
+        run: |
+          echo "Got no tag, should publish to TestPyPI, but not"
+        # uses: pypa/gh-action-pypi-publish@v1.12.2
+        # with:
+        #   user: __token__
+        #   password: ${{ secrets.TEST_PYPI_TOKEN }}
+        #   repository_url: https://test.pypi.org/legacy/
 
-      - name: Publish the release notes
-        uses: release-drafter/release-drafter@v6.0.0
-        with:
-          publish: ${{ steps.check-version.outputs.tag != '' }}
-          tag: ${{ steps.check-version.outputs.tag }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Publish the release notes
+      #   uses: release-drafter/release-drafter@v6.0.0
+      #   with:
+      #     publish: ${{ steps.check-version.outputs.tag != '' }}
+      #     tag: ${{ steps.check-version.outputs.tag }}
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
