@@ -52,6 +52,11 @@ jobs:
         run: |
           uv build
 
+      - name: Upgrade pip
+        run: |
+          pip install --constraint=.github/workflows/constraints.txt pip
+          pip --version
+
       - name: Publish package on PyPI
         if: steps.check-version.outputs.tag
         run: |
