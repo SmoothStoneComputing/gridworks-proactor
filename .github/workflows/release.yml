@@ -18,17 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5.6.0
         with:
-          python-version: "3.11"
-
-      - name: Upgrade pip
-        run: |
-          pip install --constraint=.github/workflows/constraints.txt pip
-          pip --version
-
-      - name: Install Poetry
-        run: |
-          pip install --constraint=.github/workflows/constraints.txt poetry
-          poetry --version
+          python-version: "3.13"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -62,26 +52,14 @@ jobs:
         run: |
           uv build
 
-      # - name: Publish package on PyPI
-      #   if: steps.check-version.outputs.tag
-      #   run: |
-      #     echo "Got a tag but not publishing"
-      #     echo "tag: ${{ steps.check-version.outputs.tag }}"
-      #   # uses: pypa/gh-action-pypi-publish@v1.12.2
-      #   # with:
-      #   #   user: __token__
-      #   #   password: ${{ secrets.PYPI_TOKEN }}
+      - name: Publish package Publish package on **PyPI**
+        if: "steps.check-version.outputs.tag"
+        run: uv publish
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
 
-      # - name: Publish package on TestPyPI
-      #   if: "! steps.check-version.outputs.tag"
-      #   uses: pypa/gh-action-pypi-publish@v1.12.2
-      #   with:
-      #     user: __token__
-      #     password: ${{ secrets.TEST_PYPI_TOKEN }}
-      #     repository_url: https://test.pypi.org/legacy/
-      #     verbose: true
-
-      - name: Publish package
+      - name: Publish package Publish package on **TestPyPI**
+        if: "! steps.check-version.outputs.tag"
         run: uv publish --publish-url https://test.pypi.org/legacy/
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
