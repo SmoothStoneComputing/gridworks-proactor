@@ -65,12 +65,12 @@ jobs:
       - name: Publish package on TestPyPI
         if: "! steps.check-version.outputs.tag"
         run: |
-          echo "Got no tag, should publish to TestPyPI, but not"
-        # uses: pypa/gh-action-pypi-publish@v1.12.2
-        # with:
-        #   user: __token__
-        #   password: ${{ secrets.TEST_PYPI_TOKEN }}
-        #   repository_url: https://test.pypi.org/legacy/
+          echo "Got no tag, publishing to TestPyPI"
+          uses: pypa/gh-action-pypi-publish@v1.12.2
+          with:
+           user: __token__
+           password: ${{ secrets.TEST_PYPI_TOKEN }}
+           repository_url: https://test.pypi.org/legacy/
 
       # - name: Publish the release notes
       #   uses: release-drafter/release-drafter@v6.0.0
