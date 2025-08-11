@@ -82,7 +82,7 @@ jobs:
       #     verbose: true
 
       - name: Publish package
-        run: uv publish
+        run: uv publish --index https://test.pypi.org/legacy/
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
 
