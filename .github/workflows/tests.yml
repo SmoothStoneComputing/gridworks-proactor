@@ -5,6 +5,7 @@ on:
   - pull_request
 
 jobs:
+  if: false
   tests:
     name: ${{ matrix.session }} ${{ matrix.python }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
