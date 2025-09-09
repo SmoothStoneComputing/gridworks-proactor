@@ -126,8 +126,8 @@ async def test_reupload_flow_control_simple(request: pytest.FixtureRequest) -> N
         for i in range(events_to_generate):
             child.generate_event(
                 DBGEvent(
-                    Command=DBGPayload(),
-                    Msg=f"event {i + 1} / {events_to_generate}",
+                    command=DBGPayload(),
+                    msg=f"event {i + 1} / {events_to_generate}",
                 )
             )
             assert child.links.num_pending == 3 + i + 1
@@ -216,8 +216,8 @@ async def test_reupload_flow_control_detail(request: pytest.FixtureRequest) -> N
         for i in range(events_to_generate):
             child.generate_event(
                 DBGEvent(
-                    Command=DBGPayload(),
-                    Msg=f"event {i + 1} / {events_to_generate}",
+                    command=DBGPayload(),
+                    msg=f"event {i + 1} / {events_to_generate}",
                 )
             )
         child.logger.info(
@@ -484,7 +484,7 @@ class _EventGen:
         self.persister = persister
 
     def _generate_event(self, member_name: str) -> _EventEntry:
-        event = DBGEvent(Command=DBGPayload(), Msg=f"event {len(self)} {member_name}")
+        event = DBGEvent(command=DBGPayload(), msg=f"event {len(self)} {member_name}")
         match self.persister.persist(
             event.MessageId, event.model_dump_json(indent=2).encode()
         ):

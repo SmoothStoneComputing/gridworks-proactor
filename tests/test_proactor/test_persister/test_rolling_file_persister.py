@@ -175,10 +175,10 @@ def test_persister_happy_path(tmp_path: Path) -> None:
     settings = AppSettings()
     settings.paths.mkdirs()
     event = ProblemEvent(
-        Src="foo",
-        ProblemType=gwproto.messages.Problems.error,
-        Summary="Problems, I've got a few",
-        Details="Too numerous to name",
+        src="foo",
+        problem_type=gwproto.messages.Problems.error,
+        summary="Problems, I've got a few",
+        details="Too numerous to name",
     )
     event_bytes = event.model_dump_json().encode()
 
@@ -216,17 +216,18 @@ def test_persister_happy_path(tmp_path: Path) -> None:
     assert persister.num_retrieves == 1
 
     # deserialize
-    loaded = json.loads(retrieved.value.decode("utf-8"))
-    assert loaded == json.loads(event.model_dump_json())
     assert isinstance(retrieved.value, bytes)
-    loaded_event = ProblemEvent.model_validate_json(retrieved.value)
+    loaded_event = ProblemEvent.from_type(retrieved.value)
+    # round-trip structural equality via GwBase dicts
+    assert loaded_event.to_dict() == event.to_dict()
+
     assert loaded_event == event
 
     # add another
     event2 = ProblemEvent(
-        Src="foo",
-        Summary="maybe not great",
-        ProblemType=gwproto.messages.Problems.warning,
+        src="foo",
+        summary="maybe not great",
+        problem_type=gwproto.messages.Problems.warning,
     )
     event2_bytes = event2.model_dump_json().encode()
     result = persister.persist(event2.MessageId, event2.model_dump_json().encode())
@@ -304,11 +305,11 @@ def test_persister_max_size() -> None:
     settings = AppSettings()
     settings.paths.mkdirs()
     event = ProblemEvent(
-        MessageId=" 0",
-        Src=".",
-        ProblemType=gwproto.messages.Problems.error,
-        Summary="0",
-        Details="x" * 1024,
+        message_id=" 0",
+        src=".",
+        problem_type=gwproto.messages.Problems.error,
+        summary="0",
+        details="x" * 1024,
     )
 
     def inc_event() -> None:
@@ -393,11 +394,11 @@ def test_persister_roll_day() -> None:
     settings = AppSettings()
     settings.paths.mkdirs()
     event = ProblemEvent(
-        MessageId=" 0",
-        Src=".",
-        ProblemType=gwproto.messages.Problems.error,
-        Summary="0",
-        Details="x" * 1024,
+        message_id=" 0",
+        src=".",
+        problem_type=gwproto.messages.Problems.error,
+        summary="0",
+        details="x" * 1024,
     )
 
     def inc_event() -> None:
@@ -961,19 +962,19 @@ def test_reindex_pat(tmp_path: Path, monkeypatch: Any) -> None:
     event_dir.mkdir(parents=True)
     events = [
         ProblemEvent(
-            Src="foo",
-            ProblemType=gwproto.messages.Problems.error,
-            Summary="Problems, I've got a few",
+            src="foo",
+            problem_type=gwproto.messages.Problems.error,
+            summary="Problems, I've got a few",
         ),
         ProblemEvent(
-            Src="foo",
-            ProblemType=gwproto.messages.Problems.error,
-            Summary="maybe not great",
+            src="foo",
+            problem_type=gwproto.messages.Problems.error,
+            summary="maybe not great",
         ),
         ProblemEvent(
-            Src="foo",
-            ProblemType=gwproto.messages.Problems.error,
-            Summary="Don't worry, be happy",
+            src="foo",
+            problem_type=gwproto.messages.Problems.error,
+            summary="Don't worry, be happy",
         ),
     ]
 

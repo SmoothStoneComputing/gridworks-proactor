@@ -476,7 +476,7 @@ class Proactor(Runnable):
             case _:
                 path_dbg |= 0x00000004
         self.generate_event(
-            DBGEvent(Command=dbg, Path=f"0x{path_dbg:08X}", Count=count_dbg, Msg="")
+            DBGEvent(command=dbg, path=f"0x{path_dbg:08X}", count=count_dbg, msg="")
         )
         self._logger.path("--_process_dbg  path:0x%08X  count:%d", path_dbg, count_dbg)
 
@@ -654,9 +654,9 @@ class Proactor(Runnable):
             clip_len = 70
             self.generate_event(
                 ProblemEvent(
-                    ProblemType=gwproto.messages.Problems.warning,
-                    Summary=f"Decoding error topic [{mqtt_payload.message.topic}]  error [{type(e)}]",
-                    Details=(
+                    problem_type=gwproto.messages.Problems.warning,
+                    summary=f"Decoding error topic [{mqtt_payload.message.topic}]  error [{type(e)}]",
+                    details=(
                         f"Topic: {mqtt_payload.message.topic}\n"
                         f"Message: {mqtt_payload.message.payload[:clip_len]!r}"
                         f"{'...' if len(mqtt_payload.message.payload) > clip_len else ''}\n"
@@ -801,9 +801,9 @@ class Proactor(Runnable):
     ) -> Result[bool, Exception]:
         self.generate_event(
             ProblemEvent(
-                ProblemType=gwproto.messages.Problems.error,
-                Summary=f"Error in mqtt event loop for client [{message.Payload.client_name}]",
-                Details=(
+                problem_type=gwproto.messages.Problems.error,
+                summary=f"Error in mqtt event loop for client [{message.Payload.client_name}]",
+                details=(
                     f"{message.Payload.problems}\n"
                     f"{message.Payload.problems.error_traceback_str()}"
                 ),

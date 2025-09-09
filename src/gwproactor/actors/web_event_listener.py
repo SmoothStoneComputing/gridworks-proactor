@@ -92,8 +92,8 @@ class WebEventListener(Actor):
         cls, name: str = DEFAULT_NODE_NAME, parent_name: str = "s"
     ) -> SpaceheatNodeGt:
         return SpaceheatNodeGt(
-            ShNodeId=str(uuid.uuid4()),
-            Name=name,
-            ActorHierarchyName=f"{parent_name}.{name}",
-            ActorClass=cls.__name__,
+            sh_node_id=str(uuid.uuid4()),
+            name=name,
+            actor_hierarchy_name=f"{parent_name}.{name}",
+            actor_class=cls.__name__,
         )

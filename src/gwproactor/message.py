@@ -301,8 +301,8 @@ class DBGPayload(BaseModel):
 
 
 class DBGEvent(EventBase):
-    Command: DBGPayload
-    Path: str = ""
-    Count: int = 0
-    Msg: str = ""
-    TypeName: Literal["gridworks.event.proactor.dbg"] = "gridworks.event.proactor.dbg"
+    command: DBGPayload
+    path: str = ""
+    count: int = 0
+    msg: str = ""
+    type_name: Literal["gridworks.event.proactor.dbg"] = "gridworks.event.proactor.dbg"

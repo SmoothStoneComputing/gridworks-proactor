@@ -72,10 +72,10 @@ class Problems(ValueError):
 
     def problem_event(self, summary: str, src: str = "") -> ProblemEvent:
         return ProblemEvent(
-            Src=src,
-            ProblemType=ProblemType.error if self.errors else ProblemType.warning,
-            Summary=summary,
-            Details=str(self),
+            src=src,
+            problem_type=ProblemType.error if self.errors else ProblemType.warning,
+            summary=summary,
+            details=str(self),
         )
 
     def __len__(self) -> int:

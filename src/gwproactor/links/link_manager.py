@@ -258,8 +258,8 @@ class LinkManager:
                 f"Error. Specify at most one of use_link_topic "
                 f"({use_link_topic}) and topic ({topic})"
             )
-        if not message.Header.Dst:
-            message.Header.Dst = self._mqtt_clients.topic_dst(link_name)
+        if not message.header.dst:
+            message.header.dst = self._mqtt_clients.topic_dst(link_name)
         if use_link_topic:
             topic = MQTTTopic.encode(
                 envelope_type=message.type_name(),
@@ -272,17 +272,17 @@ class LinkManager:
         payload = self._mqtt_codecs[link_name].encode(message)
         self._logger.message_summary(
             direction="OUT mqtt    ",
-            src=message.Header.Src,
-            dst=message.Header.Dst,
+            src=message.header.src,
+            dst=message.header.dst,
             topic=topic,
             payload_object=message.Payload,
             message_id=message.Payload.AckMessageID
             if isinstance(message.Payload, Ack)
-            else message.Header.MessageId,
+            else message.header.message_id,
         )
-        if message.Header.AckRequired:
+        if message.header.ack_required:
             self._acks.start_ack_timer(
-                link_name, message.Header.MessageId, context=context
+                link_name, message.header.message_id, context=context
             )
         self._message_times.update_send(link_name)
         return self._mqtt_clients.publish(link_name, topic, payload, qos)
@@ -291,9 +291,9 @@ class LinkManager:
         self, payload: Any, qos: QOS = QOS.AtMostOnce, **message_args: Any
     ) -> MQTTMessageInfo:
         message = Message[Any](
-            Src=self.publication_name,
-            Dst=self._mqtt_clients.upstream_topic_dst,
-            Payload=payload,
+            src=self.publication_name,
+            dst=self._mqtt_clients.upstream_topic_dst,
+            payload=payload,
             **message_args,
         )
         return self.publish_message(
@@ -313,12 +313,12 @@ class LinkManager:
             self._event_persister.num_retrieves,
             self._event_persister.num_clears,
         )
-        if not event.Src:
+        if not event.src:
             path_dbg |= 0x00000001
-            event.Src = self.publication_name
+            event.src = self.publication_name
         if (
             isinstance(event, CommEvent)
-            and event.Src == self.publication_name
+            and event.src == self.publication_name
             and self._stats.has_link(event.PeerName)
         ):
             path_dbg |= 0x00000002
@@ -528,7 +528,7 @@ class LinkManager:
         state_result = self._states.process_mqtt_connected(message)
         if state_result.is_ok():
             self._logger.comm_event(str(state_result.value))
-        self.generate_event(MQTTConnectEvent(PeerName=message.Payload.client_name))
+        self.generate_event(MQTTConnectEvent(peer_name=message.payload.client_name))
         self._mqtt_clients.subscribe_all(message.Payload.client_name)
         return state_result
 
@@ -610,7 +610,7 @@ class LinkManager:
                     if self._states[wait_info.link_name].active_for_send():
                         path_dbg |= 0x00000004
                         self.publish_message(
-                            wait_info.link_name, PingMessage(Src=self.publication_name)
+                            wait_info.link_name, PingMessage(src=self.publication_name)
                         )
                 result = Ok(transition)
             case _:
@@ -642,12 +642,12 @@ class LinkManager:
         return path_dbg
 
     def send_ack(self, link_name: str, message: Message[Any]) -> None:
-        if message.Header.MessageId:
+        if message.header.message_id:
             self.publish_message(
                 link_name,
                 Message(
-                    Src=self.publication_name,
-                    Payload=Ack(AckMessageID=message.Header.MessageId),
+                    src=self.publication_name,
+                    payload=Ack(ack_message_i_d=message.header.message_id),
                 ),
             )
 
@@ -667,7 +667,7 @@ class LinkManager:
                 message_times.time_to_send_ping(self._settings.mqtt_link_poll_seconds)
                 and link_state.active_for_send()
             ):
-                self.publish_message(link_name, PingMessage(Src=self.publication_name))
+                self.publish_message(link_name, PingMessage(src=self.publication_name))
             await asyncio.sleep(
                 message_times.seconds_until_next_ping(
                     self._settings.mqtt_link_poll_seconds
@@ -711,7 +711,7 @@ class LinkManager:
                 )
                 self.publish_message(
                     message.Payload.client_name,
-                    PingMessage(Src=self.publication_name),
+                    PingMessage(src=self.publication_name),
                 )
             if state_result.value.recv_activated():
                 path_dbg |= 0x00000008

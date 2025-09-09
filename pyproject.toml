@@ -29,8 +29,8 @@ python-dotenv = "^1.0.0"
 xdg = "^6.0.0"
 paho-mqtt = "^2.1.0"
 result = "^0.9.0"
-gridworks-protocol = "^1.2.9"
-# gridworks-protocol = { path = "../gridworks-protocol", develop = true }
+# gridworks-protocol = "^1.2.9"
+gridworks-protocol = { path = "../gridworks-protocol", develop = true }
 # gridworks-protocol = { git = "https://github.com/thegridelectric/gridworks-protocol.git", branch = "dev" }
 aiohttp = "^3.11.11"
 yarl = "^1.9.2"

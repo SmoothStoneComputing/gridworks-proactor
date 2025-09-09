@@ -38,7 +38,7 @@ async def test_in_flight_happy_path(request: pytest.FixtureRequest) -> None:
 
         for i in range(a_bunch):
             child.generate_event(
-                DBGEvent(Command=DBGPayload(), Msg=f"event {i+1} / {a_bunch}")
+                DBGEvent(command=DBGPayload(), msg=f"event {i+1} / {a_bunch}")
             )
         last_in_flight = child.links.num_in_flight
 
@@ -49,7 +49,7 @@ async def test_in_flight_happy_path(request: pytest.FixtureRequest) -> None:
         for i in range(a_bunch):
             child.generate_event(
                 DBGEvent(
-                    Command=DBGPayload(), Msg=f"event {a_bunch + i+1} / {a_bunch * 2}"
+                    command=DBGPayload(), msg=f"event {a_bunch + i+1} / {a_bunch * 2}"
                 )
             )
             last_in_flight = child.links.num_in_flight
@@ -123,7 +123,7 @@ async def test_in_flight_overflow(request: pytest.FixtureRequest) -> None:
         h.child.delimit(f"Generating {a_bunch} events")
         for i in range(a_bunch):
             child.generate_event(
-                DBGEvent(Command=DBGPayload(), Msg=f"event {i+1} / {a_bunch}")
+                DBGEvent(command=DBGPayload(), msg=f"event {i+1} / {a_bunch}")
             )
 
         # now wait for all events to rest
@@ -182,7 +182,7 @@ async def test_in_flight_flowcontrol(request: pytest.FixtureRequest) -> None:
         for i in range(in_flight_buffer_size):
             child.generate_event(
                 DBGEvent(
-                    Command=DBGPayload(), Msg=f"event {i+1} / {in_flight_buffer_size}"
+                    command=DBGPayload(), msg=f"event {i+1} / {in_flight_buffer_size}"
                 )
             )
             child.assert_event_counts(
@@ -232,8 +232,8 @@ async def test_in_flight_flowcontrol(request: pytest.FixtureRequest) -> None:
             )
             child.generate_event(
                 DBGEvent(
-                    Command=DBGPayload(),
-                    Msg=f"event {in_flight_buffer_size + i + 1} / {in_flight_buffer_size * 2}",
+                    command=DBGPayload(),
+                    msg=f"event {in_flight_buffer_size + i + 1} / {in_flight_buffer_size * 2}",
                 )
             )
             child.assert_event_counts(
@@ -263,8 +263,8 @@ async def test_in_flight_flowcontrol(request: pytest.FixtureRequest) -> None:
         for i in range(overflow_size):
             child.generate_event(
                 DBGEvent(
-                    Command=DBGPayload(),
-                    Msg=f"overflow event {i + 1} / {overflow_size}",
+                    command=DBGPayload(),
+                    msg=f"overflow event {i + 1} / {overflow_size}",
                 )
             )
             child.assert_event_counts(
@@ -328,8 +328,8 @@ async def test_in_flight_flowcontrol(request: pytest.FixtureRequest) -> None:
         for i in range(acks_released):
             child.generate_event(
                 DBGEvent(
-                    Command=DBGPayload(),
-                    Msg=f"refill event event {i}",
+                    command=DBGPayload(),
+                    msg=f"refill event event {i}",
                 )
             )
             child.assert_event_counts(
@@ -358,8 +358,8 @@ async def test_in_flight_flowcontrol(request: pytest.FixtureRequest) -> None:
         # next event should be persisted
         child.generate_event(
             DBGEvent(
-                Command=DBGPayload(),
-                Msg="overflow event",
+                command=DBGPayload(),
+                msg="overflow event",
             )
         )
         child.assert_event_counts(
@@ -426,8 +426,8 @@ async def test_in_flight_flowcontrol(request: pytest.FixtureRequest) -> None:
         for i in range(num_to_generate):
             child.generate_event(
                 DBGEvent(
-                    Command=DBGPayload(),
-                    Msg=f"refill event {i}",
+                    command=DBGPayload(),
+                    msg=f"refill event {i}",
                 )
             )
             if exp_in_flight < in_flight_buffer_size:
@@ -585,7 +585,7 @@ async def test_in_flight_comm_loss(request: pytest.FixtureRequest) -> None:
         num_to_generate = 21
         exp_in_flight = num_to_generate - 1
         for i in range(exp_in_flight):
-            child.generate_event(DBGEvent(Command=DBGPayload(), Msg=f"event {i+1}"))
+            child.generate_event(DBGEvent(command=DBGPayload(), msg=f"event {i+1}"))
         await await_for(
             lambda: len(parent.needs_ack) == exp_in_flight,
             1,
@@ -602,7 +602,7 @@ async def test_in_flight_comm_loss(request: pytest.FixtureRequest) -> None:
         )
         # generate one more event and time it out
         child.set_ack_timeout_seconds(0.001)
-        child.generate_event(DBGEvent(Command=DBGPayload(), Msg=f"event {i+2}"))
+        child.generate_event(DBGEvent(command=DBGPayload(), msg=f"event {i+2}"))
         exp_in_flight += 1
         exp_pending = num_to_generate + 1  # generated + timeout
         exp_persists += exp_pending
@@ -669,10 +669,10 @@ async def test_in_flight_overflow_comm_loss(request: pytest.FixtureRequest) -> N
         # generate events, filling up the in-flight buffer and overflowing
         num_to_generate = child.settings.proactor.num_inflight_events * 2
         for i in range(num_to_generate - 1):
-            child.generate_event(DBGEvent(Command=DBGPayload(), Msg=f"event {i+1}"))
+            child.generate_event(DBGEvent(command=DBGPayload(), msg=f"event {i+1}"))
         # generate one more and time it out
         child.set_ack_timeout_seconds(0.001)
-        child.generate_event(DBGEvent(Command=DBGPayload(), Msg=f"event {i+2}"))
+        child.generate_event(DBGEvent(command=DBGPayload(), msg=f"event {i+2}"))
         await await_for(
             lambda: upstream_link.in_state(StateName.awaiting_peer),
             1,
