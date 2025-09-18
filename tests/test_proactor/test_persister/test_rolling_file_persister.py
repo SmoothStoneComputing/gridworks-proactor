@@ -362,7 +362,7 @@ def test_persister_max_size() -> None:
         # add a bigger item; more than one must be removed.
         inc_event()
         old_size = len(event_bytes)
-        event.Details *= 2
+        event.details *= 2
         big_event_bytes = event.to_type()
         exp_size = p.curr_bytes - (2 * old_size) + len(big_event_bytes)
         exp_pending = num_events_supported - 1
@@ -383,7 +383,7 @@ def test_persister_max_size() -> None:
 
         # Cannot add one too large, state of persister doesn't change
         inc_event()
-        event.Details = "." * (max_bytes + 1)
+        event.details = "." * (max_bytes + 1)
         result = p.persist(event.message_id, event.to_type())
         assert not result.is_ok()
         assert_contents(p, num_pending=exp_pending, curr_bytes=exp_size, uids=uids)
