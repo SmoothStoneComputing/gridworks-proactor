@@ -9,8 +9,8 @@ from pydantic_settings import BaseSettings
 #
 #
 # 	publication topic
-# 		src: self.long_name or message.Header.Src
-# 		dst: peer.short_name or message.Header.Dst
+# 		src: self.long_name or message.header.src
+# 		dst: peer.short_name or message.header.dst
 
 
 class CodecSettings(BaseSettings):

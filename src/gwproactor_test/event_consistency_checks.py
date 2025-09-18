@@ -60,14 +60,14 @@ class _EventAckCountsIntermediate:
         problems = Problems()
         for paused in parent.needs_ack:
             if paused.link_name == parent.downstream_client:
-                match paused.message.Payload:
+                match paused.message.payload:
                     case Ack():
-                        paused_ack_list.append(paused.message.Payload)
+                        paused_ack_list.append(paused.message.payload)
                     case _:
                         problems.add_error(
-                            UnexpectedMessage(paused.message.Header.TypeName)
+                            UnexpectedMessage(paused.message.header.type_name)
                         )
-        paused_ack_set = {paused_ack.AckMessageID for paused_ack in paused_ack_list}
+        paused_ack_set = {paused_ack.ack_message_i_d for paused_ack in paused_ack_list}
         in_flight_not_paused_set = in_flight_set - paused_ack_set
         pending_not_paused_set = pending_set - paused_ack_set
         paused_not_events_set = paused_ack_set - (in_flight_set | paused_ack_set)
@@ -89,7 +89,7 @@ class _EventAckCountsIntermediate:
                     if content is not None:
                         try:
                             pending_event_list.append(
-                                AnyEvent.model_validate_json(content)
+                                AnyEvent.from_type(content)
                             )
                         except Exception as e:  # noqa: BLE001
                             self.problems.add_error(e).add_error(
@@ -102,35 +102,35 @@ class _EventAckCountsIntermediate:
                 case Err(one_retrieve_problems):
                     self.problems.add_error(one_retrieve_problems)
         child.event_persister._num_retrieves -= len(pending_event_list)  # type: ignore # noqa
-        pending_event_list.sort(key=lambda event_: event_.TimeCreatedMs)
+        pending_event_list.sort(key=lambda event_: event_.time_created_ms)
         self.pending_events = {
-            pending_event.MessageId: pending_event
+            pending_event.message_id: pending_event
             for pending_event in pending_event_list
         }
 
     def _sort_events(self, *, child: InstrumentedProactor) -> None:
         self._sort_pending_events(child=child)
         self.in_flight_not_paused_events = {
-            event.MessageId: event
+            event.message_id: event
             for event in sorted(
                 [
                     child.links.in_flight_events[x]
                     for x in self.in_flight_not_paused_set
                 ],
-                key=lambda x: x.TimeCreatedMs,
+                key=lambda x: x.time_created_ms,
             )
         }
         self.pending_not_paused_events = {
-            event.MessageId: event
+            event.message_id: event
             for event in sorted(
                 [self.pending_events[x] for x in self.pending_not_paused_set],
-                key=lambda x: x.TimeCreatedMs,
+                key=lambda x: x.time_created_ms,
             )
         }
         self.paused_not_events_list = [
-            ack.AckMessageID
+            ack.ack_message_i_d
             for ack in self.paused_ack_list
-            if ack.AckMessageID in self.paused_not_events_set
+            if ack.ack_message_i_d in self.paused_not_events_set
         ]
 
     def ok(self) -> bool:
@@ -186,14 +186,14 @@ class _EventAckReportGenerator:
         report = f"Parent paused acks: {len(self.c.paused_ack_list)}\n"
         event: EventBase | str
         for i, paused_ack in enumerate(self.c.paused_ack_list):
-            if paused_ack.AckMessageID in self.child.links.in_flight_events:
-                event = self.child.links.in_flight_events[paused_ack.AckMessageID]
+            if paused_ack.ack_message_i_d in self.child.links.in_flight_events:
+                event = self.child.links.in_flight_events[paused_ack.ack_message_i_d]
                 loc = "in-flight"
-            elif paused_ack.AckMessageID in self.c.pending_events:
-                event = self.c.pending_events[paused_ack.AckMessageID]
+            elif paused_ack.ack_message_i_d in self.c.pending_events:
+                event = self.c.pending_events[paused_ack.ack_message_i_d]
                 loc = "pending"
             else:
-                event = paused_ack.AckMessageID
+                event = paused_ack.ack_message_i_d
                 loc = "*UKNONWN*"
             report += self._event_line(event, loc, i + 1, len(self.c.paused_ack_list))
         report += f"Child in-flight events: {self.child.links.num_in_flight}\n"
@@ -241,11 +241,11 @@ class _EventAckReportGenerator:
     @classmethod
     def _event_line(cls, event: EventBase | str, loc: str, i: int, n: int) -> str:
         if isinstance(event, EventBase):
-            event_id = event.MessageId
+            event_id = event.message_id
             dt = datetime.datetime.fromtimestamp(
-                event.TimeCreatedMs / 1000, tz=datetime.UTC
+                event.time_created_ms / 1000, tz=datetime.UTC
             )
-            info_s = f"{dt}   {event.TypeName}"
+            info_s = f"{dt}   {event.type_name}"
         else:
             event_id = event
             info_s = ""

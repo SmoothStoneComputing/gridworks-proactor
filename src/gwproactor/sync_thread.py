@@ -258,7 +258,7 @@ class SyncAsyncInteractionThread(threading.Thread, ABC):
                                 f"{handle_exception_str}\n"
                             )
                         self._put_to_async_queue(
-                            InternalShutdownMessage(Src=self.name, Reason=reason)
+                            InternalShutdownMessage(src=self.name, reason=reason)
                         )
 
     def time_to_pat(self) -> bool:

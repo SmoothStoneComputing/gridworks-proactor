@@ -41,7 +41,7 @@ class LinkConfig:
 
     def subscription_topic(self, receiver_spaceheat_name: str) -> str:
         return MQTTTopic.encode(
-            envelope_type=Message.type_name(),
+            envelope_type=Message.type_name_value(),
             src=self.gnode_name,
             dst=receiver_spaceheat_name,
             message_type="#",

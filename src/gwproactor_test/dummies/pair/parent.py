@@ -10,6 +10,7 @@ from result import Ok, Result
 from gwproactor import App, AppSettings
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
+from gwproactor.config.mqtt import TLSInfo
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import DBGPayload, MQTTReceiptPayload
@@ -25,11 +26,11 @@ class DummyParent(PrimeActor):
         self.process_message(message)
 
     def process_message(self, message: Message[Any]) -> Result[bool, Exception]:
-        match message.Payload:
+        match message.payload:
             case DBGPayload():
-                message.Header.Src = self.services.publication_name
-                dst_client = message.Header.Dst
-                message.Header.Dst = ""
+                message.header.src = self.services.publication_name
+                dst_client = message.header.dst
+                message.header.dst = ""
                 self.services.publish_message(dst_client, message)
         return Ok(True)
 
@@ -38,14 +39,14 @@ class DummyParent(PrimeActor):
     ) -> None:
         self.services.logger.path(
             f"++{self.name}.process_mqtt_message %s",
-            mqtt_client_message.Payload.message.topic,
+            mqtt_client_message.payload.message.topic,
         )
         path_dbg = 0
         self.services.stats.add_message(decoded)
-        match decoded.Payload:
+        match decoded.payload:
             case EventBase():
                 path_dbg |= 0x00000001
-                self.services.generate_event(decoded.Payload)
+                self.services.generate_event(decoded.payload)
             case _:
                 path_dbg |= 0x00000002
         self.services.logger.path(
@@ -54,7 +55,8 @@ class DummyParent(PrimeActor):
 
 
 class DummyParentSettings(AppSettings):
-    child: MQTTClient = MQTTClient()
+    #child: MQTTClient = MQTTClient()
+    child:  MQTTClient = MQTTClient(tls=TLSInfo(use_tls=False, port=1883))
 
 
 class DummyParentApp(App):

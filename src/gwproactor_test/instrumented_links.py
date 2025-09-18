@@ -41,24 +41,24 @@ class _AckTracker:
         return len(self.ackables)
 
     def track_publish(self, link_name: str, message: Message[Any]) -> None:
-        is_ack = isinstance(message.Payload, Ack)
+        is_ack = isinstance(message.payload, Ack)
         if is_ack:
-            tracked_id = message.Payload.AckMessageID
+            tracked_id = message.payload.ack_message_i_d
         else:
-            tracked_id = message.Header.MessageId
-        if is_ack or message.Header.AckRequired:
+            tracked_id = message.header.message_id
+        if is_ack or message.header.ack_required:
             link_tracks = self.ackables[link_name]
             tracked = link_tracks[tracked_id]
             if (
                 tracked.message_type
-                and tracked.message_type != message.Header.MessageType
+                and tracked.message_type != message.header.message_type
             ):
                 raise ValueError(
                     f"ERROR. _AckTracker recored {tracked_id} "
                     f"with message type {tracked.message_type} but message "
-                    f"resent with type {message.Header.MessageType}"
+                    f"resent with type {message.header.message_type}"
                 )
-            tracked.message_type = message.Header.MessageType
+            tracked.message_type = message.header.message_type
             tracked.is_ack = is_ack
             tracked.send_count += 1
 
@@ -150,14 +150,14 @@ class RecorderLinks(LinkManager):
         return len(needs_ack)
 
     def generate_event(self, event: EventT) -> Result[bool, Exception]:
-        if not event.Src:
-            event.Src = self.publication_name
-        if isinstance(event, CommEvent) and event.Src == self.publication_name:
+        if not event.src:
+            event.src = self.publication_name
+        if isinstance(event, CommEvent) and event.src == self.publication_name:
             cast(
-                RecorderLinkStats, self._stats.link(event.PeerName)
+                RecorderLinkStats, self._stats.link(event.peer_name)
             ).comm_events.append(event)
-        if event.Src != self.publication_name and event.Src in self._stats.links:
-            cast(RecorderLinkStats, self._stats.link(event.Src)).forwarded[
-                event.TypeName
+        if event.src != self.publication_name and event.src in self._stats.links:
+            cast(RecorderLinkStats, self._stats.link(event.src)).forwarded[
+                event.type_name
             ] += 1
         return super().generate_event(event)

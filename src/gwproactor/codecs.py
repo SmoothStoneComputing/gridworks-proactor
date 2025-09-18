@@ -23,7 +23,6 @@ class ProactorCodec(MQTTCodec):
         *,
         src_name: str = "",
         dst_name: str = "",
-        model_name: str = "",
         module_names: Optional[Sequence[str]] = None,
         use_default_modules: bool = True,
     ) -> None:
@@ -43,7 +42,6 @@ class ProactorCodec(MQTTCodec):
     def create_message_model(
         cls,
         *,
-        model_name: str = "",
         module_names: Optional[Sequence[str]] = None,
         use_default_modules: bool = True,
     ) -> MessageDecoder:
@@ -52,11 +50,13 @@ class ProactorCodec(MQTTCodec):
             module_names_used.extend(cls.DEFAULT_MESSAGE_MODULES)
         if module_names is not None:
             module_names_used.extend(module_names)
-        model_name = (
-            model_name if model_name else "ProactorCodec-" + secrets.token_hex(4)
-        )
+        # model_name parameter removed - was only used for debugging/introspection
+        # and added unnecessary complexity. Codecs are identified by link name.
+        # model_name = (
+        #     model_name if model_name else "ProactorCodec-" + secrets.token_hex(4)
+        # )
         return create_message_model(
-            model_name=model_name, module_names=module_names_used
+            module_names=module_names_used
         )
 
     def validate_source_and_destination(self, src: str, dst: str) -> None:

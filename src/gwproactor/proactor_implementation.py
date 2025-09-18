@@ -161,14 +161,14 @@ class Proactor(Runnable):
     def send(self, message: Message[Any]) -> None:
         if self._receive_queue is None:
             raise RuntimeError("ERROR. send() called before Proactor started.")
-        if not isinstance(message.Payload, PatWatchdog):
+        if not isinstance(message.payload, PatWatchdog):
             self._logger.message_summary(
                 direction="OUT internal",
-                src=message.Header.Src,
-                dst=message.Header.Dst,
-                topic=f"{message.Header.Src}/to/{message.Header.Dst}/{message.Header.MessageType}",
-                payload_object=message.Payload,
-                message_id=message.Header.MessageId,
+                src=message.header.src,
+                dst=message.header.dst,
+                topic=f"{message.header.src}/to/{message.header.dst}/{message.header.message_type}",
+                payload_object=message.payload,
+                message_id=message.header.message_id,
             )
         self._receive_queue.put_nowait(message)
 
@@ -456,7 +456,7 @@ class Proactor(Runnable):
         path_dbg = 0
         count_dbg = 0
         for logger_name in ["message_summary", "lifecycle", "comm_event"]:
-            requested_level = getattr(dbg.Levels, logger_name)
+            requested_level = getattr(dbg.levels, logger_name)
             if requested_level > -1:
                 path_dbg |= 0x00000001
                 count_dbg += 1
@@ -469,7 +469,7 @@ class Proactor(Runnable):
                     old_level,
                     logger.getEffectiveLevel(),
                 )
-        match dbg.Command:
+        match dbg.command:
             case DBGCommands.show_subscriptions:
                 path_dbg |= 0x00000002
                 self._links.log_subscriptions("message")
@@ -508,7 +508,7 @@ class Proactor(Runnable):
                 try:
                     self.generate_event(
                         ShutdownEvent(
-                            Reason=(
+                            reason=(
                                 f"ERROR in process_message {e}\n"
                                 f"{traceback.format_exception(e)}"
                             )
@@ -575,27 +575,27 @@ class Proactor(Runnable):
         )
 
     async def async_process_message(self, message: Message[Any]) -> None:  # noqa: C901, PLR0912
-        if self._logger.path_enabled and not isinstance(message.Payload, PatWatchdog):
-            if isinstance(message.Payload, MQTTReceiptPayload):
-                msg_type_str = message.Payload.message.topic.split("/")[-1]
+        if self._logger.path_enabled and not isinstance(message.payload, PatWatchdog):
+            if isinstance(message.payload, MQTTReceiptPayload):
+                msg_type_str = message.payload.message.topic.split("/")[-1]
             else:
-                msg_type_str = f"{message.Header.Src}/{message.Header.MessageType}"
+                msg_type_str = f"{message.header.src}/{message.header.message_type}"
             self._logger.message_enter(
                 "++Proactor<%s>.process_message  [%s]", self.short_name, msg_type_str
             )
         path_dbg = 0
-        if not isinstance(message.Payload, (MQTTReceiptPayload, PatWatchdog)):
+        if not isinstance(message.payload, (MQTTReceiptPayload, PatWatchdog)):
             path_dbg |= 0x00000001
             self._logger.message_summary(
                 direction="IN  internal",
                 src=message.src(),
                 dst=message.dst(),
-                topic=f"{message.src()}/to/{message.dst()}/{message.Header.MessageType}",
-                payload_object=message.Payload,
-                message_id=message.Header.MessageId,
+                topic=f"{message.src()}/to/{message.dst()}/{message.header.message_type}",
+                payload_object=message.payload,
+                message_id=message.header.message_id,
             )
         self._stats.add_message(message)
-        match message.Payload:
+        match message.payload:
             case MQTTReceiptPayload():
                 path_dbg |= 0x00000002
                 self._process_mqtt_message(message)
@@ -622,12 +622,12 @@ class Proactor(Runnable):
                 self._process_shutdown_message(message)
             case EventBase():
                 path_dbg |= 0x00000200
-                self.generate_event(message.Payload)
+                self.generate_event(message.payload)
             case _:
                 path_dbg |= 0x00000400
                 self._callbacks.process_internal_message(message)
         await self._notify_message_future(message)
-        if self._logger.path_enabled and not isinstance(message.Payload, PatWatchdog):
+        if self._logger.path_enabled and not isinstance(message.payload, PatWatchdog):
             self._logger.message_exit(
                 "--Proactor<%s>.process_message  path:0x%08X", self.short_name, path_dbg
             )
@@ -674,30 +674,30 @@ class Proactor(Runnable):
         self._logger.path(
             "++Proactor<%s>._process_mqtt_message %s/%s",
             self.short_name,
-            mqtt_receipt_message.Header.Src,
-            mqtt_receipt_message.Header.MessageType,
+            mqtt_receipt_message.header.src,
+            mqtt_receipt_message.header.message_type,
         )
         path_dbg = 0
         self._stats.add_mqtt_message(mqtt_receipt_message)
-        match decode_result := self._decode_mqtt_message(mqtt_receipt_message.Payload):
+        match decode_result := self._decode_mqtt_message(mqtt_receipt_message.payload):
             case Ok(decoded_message):
                 path_dbg |= 0x00000001
                 decoded_message = decode_result.value
                 self._stats.add_decoded_mqtt_message_type(
-                    mqtt_receipt_message.Payload.client_name,
+                    mqtt_receipt_message.payload.client_name,
                     decoded_message.message_type(),
                 )
                 if self._logger.message_summary_enabled:
-                    if isinstance(decoded_message.Payload, Ack):
-                        message_id = decoded_message.Payload.AckMessageID
+                    if isinstance(decoded_message.payload, Ack):
+                        message_id = decoded_message.payload.ack_message_i_d
                     else:
-                        message_id = decoded_message.Header.MessageId
+                        message_id = decoded_message.header.message_id
                     self._logger.message_summary(
                         direction="IN  mqtt    ",
                         src=decoded_message.src(),
                         dst=decoded_message.dst(),
-                        topic=mqtt_receipt_message.Payload.message.topic,
-                        payload_object=decoded_message.Payload,
+                        topic=mqtt_receipt_message.payload.message.topic,
+                        payload_object=decoded_message.payload,
                         message_id=message_id,
                     )
                 match self._links.process_mqtt_message(mqtt_receipt_message):
@@ -712,27 +712,27 @@ class Proactor(Runnable):
                             error,
                             "_process_mqtt_message/_link_states.process_mqtt_message",
                         )
-                match decoded_message.Payload:
+                match decoded_message.payload:
                     case Ack():
                         path_dbg |= 0x00000010
                         self._process_ack(
-                            mqtt_receipt_message.Payload.client_name,
-                            decoded_message.Payload.AckMessageID,
+                            mqtt_receipt_message.payload.client_name,
+                            decoded_message.payload.ack_message_i_d,
                         )
                     case Ping():
                         path_dbg |= 0x00000020
                     case DBGPayload():
                         path_dbg |= 0x00000040
-                        self._process_dbg(decoded_message.Payload)
+                        self._process_dbg(decoded_message.payload)
                     case _:
                         path_dbg |= 0x00000080
                         self._callbacks.process_mqtt_message(
                             mqtt_receipt_message, decoded_message
                         )
-                if decoded_message.Header.AckRequired:
+                if decoded_message.header.ack_required:
                     path_dbg |= 0x00000200
                     self._links.send_ack(
-                        mqtt_receipt_message.Payload.client_name, decoded_message
+                        mqtt_receipt_message.payload.client_name, decoded_message
                     )
         self._logger.path(
             "--Proactor<%s>._process_mqtt_message:%s  path:0x%08X",
@@ -775,7 +775,7 @@ class Proactor(Runnable):
         self._logger.path(
             "++Proactor<%s>._process_mqtt_suback client:%s",
             self.short_name,
-            message.Payload.client_name,
+            message.payload.client_name,
         )
         path_dbg = 0
         result: Result[bool, Exception] = Ok()
@@ -802,10 +802,10 @@ class Proactor(Runnable):
         self.generate_event(
             ProblemEvent(
                 problem_type=gwproto.messages.Problems.error,
-                summary=f"Error in mqtt event loop for client [{message.Payload.client_name}]",
+                summary=f"Error in mqtt event loop for client [{message.payload.client_name}]",
                 details=(
-                    f"{message.Payload.problems}\n"
-                    f"{message.Payload.problems.error_traceback_str()}"
+                    f"{message.payload.problems}\n"
+                    f"{message.payload.problems.error_traceback_str()}"
                 ),
             )
         )
@@ -813,10 +813,10 @@ class Proactor(Runnable):
 
     def _process_shutdown_message(self, message: Message[Shutdown]) -> None:
         self._stop_requested = True
-        self.generate_event(ShutdownEvent(Reason=message.Payload.Reason))
+        self.generate_event(ShutdownEventreason=message.payload.reason)
         self._links.flush_in_flight_events()
         self._logger.lifecycle(
-            f"Shutting down due to ShutdownMessage, [{message.Payload.Reason}]"
+            f"Shutting down due to ShutdownMessage, [{message.payload.reason}]"
         )
 
     def _start(self) -> None:

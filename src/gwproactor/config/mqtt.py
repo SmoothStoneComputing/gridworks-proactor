@@ -46,6 +46,7 @@ class MQTTClient(BaseModel):
         return self
 
     def effective_port(self) -> int:
+        print(f"DEBUG: self.tls.use_tls={self.tls.use_tls}, self.tls.port={self.tls.port}, self.port={self.port}")
         if self.tls.use_tls:
             return self.tls.port
         return self.port

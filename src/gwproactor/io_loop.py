@@ -102,7 +102,7 @@ class IOLoop(Communicator, IOLoopInterface):
             with contextlib.suppress(Exception):
                 self._services.send_threadsafe(
                     Message(
-                        Payload=Problems(errors=[e]).problem_event(
+                        payload=Problems(errors=[e]).problem_event(
                             summary=summary, src=self.name
                         )
                     )
@@ -110,8 +110,8 @@ class IOLoop(Communicator, IOLoopInterface):
             with contextlib.suppress(Exception):
                 self._services.send_threadsafe(
                     ShutdownMessage(
-                        Src=self.name,
-                        Reason=summary,
+                        src=self.name,
+                        reason=summary,
                     )
                 )
         finally:

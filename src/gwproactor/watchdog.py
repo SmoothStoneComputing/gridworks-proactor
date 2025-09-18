@@ -69,7 +69,7 @@ class WatchdogManager(Communicator, Runnable):
     def process_message(self, message: Message[Any]) -> Result[bool, Exception]:
         # self.lg.path("++WatchdogManager.process_message")
         path_dbg = 0
-        match message.Payload:
+        match message.payload:
             case PatInternalWatchdog():
                 path_dbg |= 0x00000001
                 self._pat_internal_watchdog(message.src())
@@ -79,7 +79,7 @@ class WatchdogManager(Communicator, Runnable):
             case _:
                 path_dbg |= 0x00000004
                 raise ValueError(
-                    f"WatchdogManager does not handle message payloads of type {type(message.Payload)}"
+                    f"WatchdogManager does not handle message payloads of type {type(message.payload)}"
                 )
         # self.lg.path(f"--WatchdogManager.process_message  0x{path_dbg:08X}")
         return Ok()
@@ -135,8 +135,8 @@ class WatchdogManager(Communicator, Runnable):
             await asyncio.sleep(self._seconds_per_pat)
         self._send(
             InternalShutdownMessage(
-                Src=self.name,
-                Reason=(
+                src=self.name,
+                reason=(
                     f"Monitored object ({expired.name}) failed to pat internal watchdog.  \n"
                     f"  Last pat from {expired.name}: {int(time.time() - expired.last_pat)} seconds ago\n"
                     f"  Allowed seconds: {int(expired.timeout_seconds)}"

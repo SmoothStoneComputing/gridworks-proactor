@@ -120,6 +120,8 @@ class MQTTClientWrapper:
     def _client_thread(self) -> None:
         max_back_off = 1024
         backoff = 1
+        print(f"Attempting MQTT connection to host={self._client_config.host}, effective port={self._client_config.effective_port()}")
+
         while not self._stop_requested:
             try:
                 self._client.connect(

@@ -48,7 +48,7 @@ async def test_no_parent(request: pytest.FixtureRequest) -> None:
         )
         assert len(link_stats.comm_events) == 2
         for comm_event in link_stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
 
         # Tell client we lost comm.
         child.force_mqtt_disconnect("parent")
@@ -71,7 +71,7 @@ async def test_no_parent(request: pytest.FixtureRequest) -> None:
             num_in_flight=0,
         )
         for comm_event in link_stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
 
 
 @pytest.mark.asyncio
@@ -108,7 +108,7 @@ async def test_basic_comm_child_first(request: pytest.FixtureRequest) -> None:
         )
         assert len(child_stats.comm_events) == 2
         for comm_event in child_stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
 
         # start parent
         h.start_parent()

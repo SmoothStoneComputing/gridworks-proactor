@@ -102,7 +102,7 @@ class MQTTAdmin:
         self, _: Any, _userdata: Any, _flags: dict[str, Any], _rc: int
     ) -> None:
         topic = MQTTTopic.encode(
-            envelope_type=Message.type_name(),
+            envelope_type=Message.type_name_value(),
             src=self.settings.target_gnode,
             dst=self.mqtt_config.long_name,
             message_type="#",
@@ -117,28 +117,28 @@ class MQTTAdmin:
     ) -> None:
         self.state = AppState.awaiting_command_ack
         message = Message[AdminCommandSetRelay](
-            Src=DUMMY_ADMIN_NAME,
-            Dst=self.settings.target_gnode,
-            MessageId=str(uuid.uuid4()),
-            AckRequired=True,
-            Payload=AdminCommandSetRelay(
-                CommandInfo=AdminInfo(
-                    User=self.user,
-                    SrcMachine=platform.node(),
+            src=DUMMY_ADMIN_NAME,
+            dst=self.settings.target_gnode,
+            message_id=str(uuid.uuid4()),
+            ack_required=True,
+            payload=AdminCommandSetRelay(
+                command_info=AdminInfo(
+                    user=self.user,
+                    src_machine=platform.node(),
                 ),
-                RelayInfo=RelayInfo(
-                    RelayName=self.relay_name,
-                    Closed=self.closed,
+                relay_info=RelayInfo(
+                    relay_name=self.relay_name,
+                    closed=self.closed,
                 ),
             ),
         )
-        self.command_message_id = message.Payload.MessageId
+        self.command_message_id = message.payload.message_id
         topic = message.mqtt_topic()
         if not self.json:
             rich.print("Subscribed. Sending:")
             rich.print(message)
             rich.print(f"to topic <{topic}>")
-        self.client.publish(topic=topic, payload=message.model_dump_json().encode())
+        self.client.publish(topic=topic, payload=message.to_type())
 
     def on_connect_fail(self, _: Any, _userdata: Any) -> None:
         if not self.json:
@@ -160,37 +160,37 @@ class MQTTAdmin:
         msg_type = message.topic.split("/")[-1].replace("-", ".")
         if (
             self.state == AppState.awaiting_command_ack
-            and msg_type == Ack.__pydantic_fields__["TypeName"].default
+            and msg_type == Ack.__pydantic_fields__["type_name"].default
         ):
             ack_message = Message[Ack].model_validate_json(message.payload)
-            if ack_message.Payload.AckMessageID == self.command_message_id:
+            if ack_message.payload.ack_message_i_d  == self.command_message_id:
                 self.state = AppState.awaiting_report
                 out_message = Message[AdminCommandReadRelays](
-                    Src=self.mqtt_config.long_name,
-                    Dst=self.settings.target_gnode,
-                    MessageId=str(uuid.uuid4()),
-                    AckRequired=True,
-                    Payload=AdminCommandReadRelays(
-                        CommandInfo=AdminInfo(
-                            User=self.user,
-                            SrcMachine=platform.node(),
+                    src=self.mqtt_config.long_name,
+                    dst=self.settings.target_gnode,
+                    message_id=str(uuid.uuid4()),
+                    ack_required=True,
+                    payload=AdminCommandReadRelays(
+                        command_info=AdminInfo(
+                            user=self.user,
+                            src_machine=platform.node(),
                         ),
                     ),
                 )
-                self.command_message_id = out_message.Payload.MessageId
+                self.command_message_id = out_message.payload.message_id
                 topic = out_message.mqtt_topic()
                 if not self.json:
                     rich.print("Subscribed. Sending:")
                     rich.print(message)
                     rich.print(f"at topic <{topic}>")
                 self.client.publish(
-                    topic=topic, payload=out_message.model_dump_json().encode()
+                    topic=topic, payload=out_message.to_type()
                 )
             else:
                 if not self.json:
                     rich.print(
                         "Received unexpected ack for "
-                        f"{ack_message.Payload.AckMessageID}. Expected: "
+                        f"{ack_message.payload.ack_message_i_d}. Expected: "
                         f"{self.command_message_id}. Exiting."
                     )
                 self.state = AppState.stopped
@@ -198,13 +198,13 @@ class MQTTAdmin:
                 sys.exit(3)
         elif (
             self.state == AppState.awaiting_report
-            and msg_type == RelayStates.__pydantic_fields__["TypeName"].default
+            and msg_type == RelayStates.__pydantic_fields__["type_name"].default
         ):
             report_message = Message[RelayStates].model_validate_json(message.payload)
             if self.json:
-                print(report_message.Payload.model_dump_json(indent=2))  # noqa
+                print(report_message.payload.to_dict())  # noqa
             else:
-                rich.print(report_message.Payload)
+                rich.print(report_message.payload)
             self.state = AppState.stopped
             self.client.loop_stop()
             sys.exit(0)

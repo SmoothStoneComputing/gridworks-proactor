@@ -60,9 +60,9 @@ async def test_hardware_layout_parameter(request: pytest.FixtureRequest) -> None
     display_text3 = "and cheaply"
 
     default_text = layout1.node("s").display_name
-    layout1.node("s").DisplayName = display_text1
-    layout2.node("s").DisplayName = display_text2
-    layout3.node("s").DisplayName = display_text3
+    layout1.node("s").display_name = display_text1
+    layout2.node("s").display_name = display_text2
+    layout3.node("s").display_name = display_text3
 
     # set all the layouts
     async with TreeLiveTest(

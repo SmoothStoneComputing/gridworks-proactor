@@ -146,11 +146,11 @@ async def test_tree_message_exchange(request: pytest.FixtureRequest) -> None:
             err_str_f=h.summary_str,
         )
         assert stats2.num_received_by_type["gridworks.dummy.set.relay"] == 1
-        assert h.child_app.prime_actor.relays.Relays == {
-            relay_name: RelayInfoReported(Closed=True)
+        assert h.child_app.prime_actor.relays.relays == {
+            relay_name: RelayInfoReported(closed=True)
         }
         assert h.child2_app.prime_actor.relays == {relay_name: True}
-        assert h.child_app.prime_actor.relays.TotalChangeMismatches == 0
+        assert h.child_app.prime_actor.relays.total_change_mismatches == 0
 
         # wait for all events to be at rest
         exp_child1_events = sum(

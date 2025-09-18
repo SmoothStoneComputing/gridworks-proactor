@@ -1,30 +1,33 @@
 import uuid
 from typing import Literal
-
+from gw.named_types import GwBase
 from gwproto import Message
 from gwproto.messages import EventBase
-from pydantic import BaseModel, Field
+from pydantic import  Field
 
 
-class RelayInfo(BaseModel):
-    RelayName: str = ""
-    Closed: bool = False
-
+class RelayInfo(GwBase):
+    relay_name: str = ""
+    closed: bool = False
+    type_name: Literal["gridworks.dummy.relay.info"] = "gridworks.dummy.relay.info"
 
 class RelayInfoReported(RelayInfo):
-    CurrentChangeMismatch: bool = False
-    MismatchCount: int = 0
+    current_change_mismatch: bool = False
+    mismatch_count: int = 0
+    type_name: Literal["gridworks.dummy.relay.info.reported"] = "gridworks.dummy.relay.info.reported"
 
 
-class RelayStates(BaseModel):
-    TotalChangeMismatches: int = 0
-    Relays: dict[str, RelayInfoReported] = {}
-    TypeName: Literal["gridworks.dummy.relay.states"] = "gridworks.dummy.relay.states"
+class RelayStates(GwBase):
+    total_change_mismatches: int = 0
+    relays: dict[str, RelayInfoReported] = {}
+    type_name: Literal["gridworks.dummy.relay.states"] = "gridworks.dummy.relay.states"
 
 
-class SetRelay(RelayInfo):
-    MessageId: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    TypeName: Literal["gridworks.dummy.set.relay"] = "gridworks.dummy.set.relay"
+class SetRelay(GwBase):
+    relay_name: str = ""
+    closed: bool = False
+    message_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    type_name: Literal["gridworks.dummy.set.relay"] = "gridworks.dummy.set.relay"
 
 
 class SetRelayMessage(Message[SetRelay]):
@@ -38,10 +41,10 @@ class SetRelayMessage(Message[SetRelay]):
         ack_required: bool = False,
     ) -> None:
         super().__init__(
-            Src=src,
-            Dst=dst,
-            AckRequired=ack_required,
-            Payload=SetRelay(RelayName=relay_name, Closed=closed),
+            src=src,
+            dst=dst,
+            ack_required=ack_required,
+            payload=SetRelay(relay_name=relay_name, continuelosed=closed),
         )
 
 

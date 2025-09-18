@@ -3,14 +3,15 @@
 import uuid
 from enum import Enum
 from typing import Any, Generic, Literal, Optional, Sequence, TypeVar
-
+from gw.named_types import GwBase
 from gwproto import as_enum
-from gwproto.message import Header, Message, ensure_arg
+from gwproto.message import Message, ensure_arg
 from gwproto.messages import EventBase
 from paho.mqtt.client import ConnectFlags, MQTTMessage
 from paho.mqtt.reasoncodes import ReasonCode as PahoReasonCode
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from gw.named_types import GwBase
 from gwproactor.config import LoggerLevels
 from gwproactor.problems import Problems
 
@@ -33,9 +34,10 @@ class KnownNames(Enum):
     io_loop_manager = "io_loop_manager"
 
 
-class MQTTClientsPayload(BaseModel):
+class MQTTClientsPayload(GwBase):
     client_name: str
     userdata: Optional[Any] = None
+    type_name: Literal["gridworks.mqtt.clients.payload"] = "gridworks.mqtt.clients.payload"
 
 
 MQTTClientsPayloadT = TypeVar("MQTTClientsPayloadT", bound=MQTTClientsPayload)
@@ -44,16 +46,12 @@ MQTTClientsPayloadT = TypeVar("MQTTClientsPayloadT", bound=MQTTClientsPayload)
 class MQTTClientMessage(Message[MQTTClientsPayloadT], Generic[MQTTClientsPayloadT]):
     def __init__(
         self,
-        message_type: MessageType,
         payload: MQTTClientsPayloadT,
     ) -> None:
         super().__init__(
-            Header=Header(
-                Src=KnownNames.mqtt_clients.value,
-                Dst=KnownNames.proactor.value,
-                MessageType=message_type.value,
-            ),
-            Payload=payload,
+            src=KnownNames.mqtt_clients.value,
+            dst=KnownNames.proactor.value,
+            payload=payload,
         )
 
 
@@ -77,7 +75,8 @@ class MQTTMessageModel(BaseModel):
 
 class MQTTReceiptPayload(MQTTClientsPayload):
     message: MQTTMessageModel
-
+    type_name: Literal["gridworks.mqtt.receipt.payload"] = "gridworks.mqtt.receipt.payload"
+ 
 
 class MQTTReceiptMessage(MQTTClientMessage[MQTTReceiptPayload]):
     def __init__(
@@ -87,7 +86,6 @@ class MQTTReceiptMessage(MQTTClientMessage[MQTTReceiptPayload]):
         message: MQTTMessage,
     ) -> None:
         super().__init__(
-            message_type=MessageType.mqtt_message,
             payload=MQTTReceiptPayload(
                 client_name=client_name,
                 userdata=userdata,
@@ -115,7 +113,7 @@ class SerializedReasonCode(BaseModel):
 class MQTTSubackPayload(MQTTClientsPayload):
     mid: int
     reason_codes: Sequence[SerializedReasonCode]
-
+    type_name: Literal["gridworks.mqtt.suback.payload"] = "gridworks.mqtt.suback.payload"
 
 class MQTTSubackMessage(MQTTClientMessage[MQTTSubackPayload]):
     def __init__(
@@ -126,7 +124,6 @@ class MQTTSubackMessage(MQTTClientMessage[MQTTSubackPayload]):
         reason_codes: Sequence[PahoReasonCode],
     ) -> None:
         super().__init__(
-            message_type=MessageType.mqtt_suback,
             payload=MQTTSubackPayload(
                 client_name=client_name,
                 userdata=userdata,
@@ -141,11 +138,11 @@ class MQTTSubackMessage(MQTTClientMessage[MQTTSubackPayload]):
 
 class MQTTCommEventPayload(MQTTClientsPayload):
     rc: Optional[SerializedReasonCode]
-
+    type_name: Literal["gridworks.mqtt.comm.event.payload"] = "gridworks.mqtt.comm.event.payload"
 
 class MQTTConnectPayload(MQTTCommEventPayload):
     flags: ConnectFlags
-
+    type_name: Literal["gridworks.mqtt.connect.payload"] = "gridworks.mqtt.connect.payload"
 
 class MQTTConnectMessage(MQTTClientMessage[MQTTConnectPayload]):
     def __init__(
@@ -156,7 +153,6 @@ class MQTTConnectMessage(MQTTClientMessage[MQTTConnectPayload]):
         rc: PahoReasonCode,
     ) -> None:
         super().__init__(
-            message_type=MessageType.mqtt_connected,
             payload=MQTTConnectPayload(
                 client_name=client_name,
                 userdata=userdata,
@@ -167,13 +163,12 @@ class MQTTConnectMessage(MQTTClientMessage[MQTTConnectPayload]):
 
 
 class MQTTConnectFailPayload(MQTTClientsPayload):
-    pass
+    type_name: Literal["gridworks.mqtt.connect.fail.payload"] = "gridworks.mqtt.connect.fail.payload"
 
 
 class MQTTConnectFailMessage(MQTTClientMessage[MQTTConnectFailPayload]):
     def __init__(self, client_name: str, userdata: Optional[Any]) -> None:
         super().__init__(
-            message_type=MessageType.mqtt_connect_failed,
             payload=MQTTConnectFailPayload(
                 client_name=client_name,
                 userdata=userdata,
@@ -182,7 +177,7 @@ class MQTTConnectFailMessage(MQTTClientMessage[MQTTConnectFailPayload]):
 
 
 class MQTTDisconnectPayload(MQTTCommEventPayload):
-    pass
+    type_name: Literal["gridworks.mqtt.disconnect.payload"] = "gridworks.mqtt.disconnect.payload"
 
 
 class MQTTDisconnectMessage(MQTTClientMessage[MQTTDisconnectPayload]):
@@ -190,7 +185,6 @@ class MQTTDisconnectMessage(MQTTClientMessage[MQTTDisconnectPayload]):
         self, client_name: str, userdata: Optional[Any], rc: PahoReasonCode
     ) -> None:
         super().__init__(
-            message_type=MessageType.mqtt_disconnected,
             payload=MQTTDisconnectPayload(
                 client_name=client_name,
                 userdata=userdata,
@@ -202,14 +196,13 @@ class MQTTDisconnectMessage(MQTTClientMessage[MQTTDisconnectPayload]):
 class MQTTProblemsPayload(MQTTCommEventPayload):
     problems: Problems
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
+    type_name: Literal["gridworks.mqtt.problems.payload"] = "gridworks.mqtt.problems.payload"
 
 class MQTTProblemsMessage(MQTTClientMessage[MQTTCommEventPayload]):
     def __init__(
         self, client_name: str, problems: Problems, rc: Optional[PahoReasonCode] = None
     ) -> None:
         super().__init__(
-            message_type=MessageType.mqtt_problems,
             payload=MQTTProblemsPayload(
                 client_name=client_name,
                 rc=SerializedReasonCode.from_paho_reason_code(rc)
@@ -220,17 +213,18 @@ class MQTTProblemsMessage(MQTTClientMessage[MQTTCommEventPayload]):
         )
 
 
-class PatWatchdog(BaseModel): ...
+class PatWatchdog(GwBase):
+    type_name: Literal["gridworks.watchdog.pat"] = "gridworks.watchdog.pat"
 
 
 class PatInternalWatchdog(PatWatchdog):
-    TypeName: Literal["gridworks.watchdog.pat.internal"] = (
+    type_name: Literal["gridworks.watchdog.pat.internal"] = (
         "gridworks.watchdog.pat.internal"
     )
 
 
 class PatExternalWatchdog(PatWatchdog):
-    TypeName: Literal["gridworks.watchdog.pat.external"] = (
+    type_name: Literal["gridworks.watchdog.pat.external"] = (
         "gridworks.watchdog.pat.external"
     )
 
@@ -238,18 +232,18 @@ class PatExternalWatchdog(PatWatchdog):
 class PatInternalWatchdogMessage(Message[PatInternalWatchdog]):
     def __init__(self, src: str) -> None:
         super().__init__(
-            Src=src,
-            Dst=KnownNames.watchdog_manager.value,
-            Payload=PatInternalWatchdog(),
+            src=src,
+            dst=KnownNames.watchdog_manager.value,
+            payload=PatInternalWatchdog(),
         )
 
 
 class PatExternalWatchdogMessage(Message[PatExternalWatchdog]):
     def __init__(self) -> None:
         super().__init__(
-            Src=KnownNames.watchdog_manager.value,
-            Dst=KnownNames.watchdog_manager.value,
-            Payload=PatExternalWatchdog(),
+            src=KnownNames.watchdog_manager.value,
+            dst=KnownNames.watchdog_manager.value,
+            payload=PatExternalWatchdog(),
         )
 
 
@@ -260,41 +254,41 @@ CommandT = TypeVar("CommandT", bound=Command)
 
 
 class CommandMessage(Message[CommandT], Generic[CommandT]):
-    def __init__(self, *, AckRequired: bool = True, **kwargs: Any) -> None:
-        ensure_arg("MessageId", str(uuid.uuid4()), kwargs)
-        super().__init__(AckRequired=AckRequired, **kwargs)
+    def __init__(self, *, ack_required: bool = True, **kwargs: Any) -> None:
+        ensure_arg("message_id", str(uuid.uuid4()), kwargs)
+        super().__init__(ack_required=ack_required, **kwargs)
 
 
-class Shutdown(Command):
-    Reason: str = ""
-    TypeName: Literal["gridworks.shutdown"] = "gridworks.shutdown"
+class Shutdown(Command, GwBase):
+    reason: str = ""
+    type_name: Literal["gridworks.shutdown"] = "gridworks.shutdown"
 
 
 class ShutdownMessage(CommandMessage[Shutdown]):
-    def __init__(self, *, Reason: str = "", **data: Any) -> None:
-        ensure_arg("Payload", Shutdown(Reason=Reason), data)
+    def __init__(self, *, reason: str = "", **data: Any) -> None:
+        ensure_arg("payload", Shutdown(reason=reason), data)
         super().__init__(**data)
 
 
 class InternalShutdownMessage(ShutdownMessage):
-    def __init__(self, *, AckRequired: bool = False, **data: Any) -> None:
-        super().__init__(AckRequired=AckRequired, **data)
+    def __init__(self, *, ack_required: bool = False, **data: Any) -> None:
+        super().__init__(ack_required=ack_required, **data)
 
 
 class DBGCommands(Enum):
     show_subscriptions = "show_subscriptions"
 
 
-class DBGPayload(BaseModel):
-    Levels: LoggerLevels = LoggerLevels(
+class DBGPayload(GwBase):
+    levels: LoggerLevels = LoggerLevels(
         message_summary=-1,
         lifecycle=-1,
         comm_event=-1,
     )
-    Command: Optional[DBGCommands] = None
-    TypeName: Literal["gridworks.proactor.dbg"] = "gridworks.proactor.dbg"
+    command: Optional[DBGCommands] = None
+    type_name: Literal["gridworks.proactor.dbg"] = "gridworks.proactor.dbg"
 
-    @field_validator("Command", mode="before")
+    @field_validator("command", mode="before")
     @classmethod
     def command_value(cls, v: Any) -> Optional[DBGCommands]:
         return as_enum(v, DBGCommands)

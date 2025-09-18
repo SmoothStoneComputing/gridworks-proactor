@@ -21,7 +21,7 @@ class RecorderLinkStats(LinkStats):
             s += "\n  Comm events:"
             for comm_event in self.comm_events:
                 copy_event = comm_event.model_copy(
-                    update={"MessageId": comm_event.MessageId[:6] + "..."}
+                    update={"MessageId": comm_event.message_id[:6] + "..."}
                 )
                 s += f"\n    {str(copy_event)[:154]}"
         if self.forwarded:

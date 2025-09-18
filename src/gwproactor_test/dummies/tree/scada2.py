@@ -45,19 +45,19 @@ class DummyScada2(PrimeActor):
     def _process_set_relay(self, payload: RelayInfo) -> None:
         self.services.logger.path(
             f"++{self.name}._process_set_relay "
-            f"{payload.RelayName}  "
-            f"closed:{payload.Closed}"
+            f"{payload.relay_name}  "
+            f"closed:{payload.closed}"
         )
         path_dbg = 0
-        last_val = self.relays[payload.RelayName]
+        last_val = self.relays[payload.relay_name]
         event = RelayReportEvent(
-            relay_name=payload.RelayName,
-            closed=payload.Closed,
-            changed=last_val != payload.Closed,
+            relay_name=payload.relay_name,
+            closed=payload.closed,
+            changed=last_val != payload.closed,
         )
         if event.changed:
             path_dbg |= 0x00000001
-            self.relays[payload.RelayName] = event.closed
+            self.relays[payload.relay_name] = event.closed
         self.services.generate_event(event)
         self.services.logger.path(
             f"--{self.name}._process_set_relay  "
@@ -70,19 +70,19 @@ class DummyScada2(PrimeActor):
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
         self.services.logger.path(
-            f"++{self.name}._process_downstream_mqtt_message {message.Payload.message.topic}",
+            f"++{self.name}._process_downstream_mqtt_message {message.payload.message.topic}",
         )
         path_dbg = 0
-        match decoded.Payload:
+        match decoded.payload:
             case SetRelay():
                 path_dbg |= 0x00000001
-                self._process_set_relay(decoded.Payload)
+                self._process_set_relay(decoded.payload)
             case _:
                 path_dbg |= 0x00000002
                 rich.print(decoded.Header)
                 raise ValueError(
-                    f"There is no handler for mqtt message payload type [{type(decoded.Payload)}]\n"
-                    f"Received\n\t topic: [{message.Payload.message.topic}]"
+                    f"There is no handler for mqtt message payload type [{type(decoded.payload)}]\n"
+                    f"Received\n\t topic: [{message.payload.message.topic}]"
                 )
         self.services.logger.path(
             f"--{self.name}._process_downstream_mqtt_message  path:0x{path_dbg:08X}",
@@ -92,10 +92,10 @@ class DummyScada2(PrimeActor):
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
         self.services.logger.path(
-            f"++{self.name}._process_admin_mqtt_message {message.Payload.message.topic}",
+            f"++{self.name}._process_admin_mqtt_message {message.Ppyload.message.topic}",
         )
         path_dbg = 0
-        match decoded.Payload:
+        match decoded.payload:
             case AdminCommandSetRelay() as command:
                 path_dbg |= 0x00000001
                 self.services.generate_event(AdminSetRelayEvent(command=command))
@@ -104,8 +104,8 @@ class DummyScada2(PrimeActor):
                 raise ValueError(
                     "In this test, since the environment is controlled, "
                     "there is no handler for mqtt message payload type "
-                    f"[{type(decoded.Payload)}]\n"
-                    f"Received\n\t topic: [{message.Payload.message.topic}]"
+                    f"[{type(decoded.payload)}]\n"
+                    f"Received\n\t topic: [{message.payload.message.topic}]"
                 )
 
         self.services.logger.path(
@@ -116,13 +116,13 @@ class DummyScada2(PrimeActor):
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
         self.services.logger.path(
-            f"++{self.name}._derived_process_mqtt_message {message.Payload.message.topic}",
+            f"++{self.name}._derived_process_mqtt_message {message.payload.message.topic}",
         )
         path_dbg = 0
-        if message.Payload.client_name == self.services.upstream_client:
+        if message.payload.client_name == self.services.upstream_client:
             path_dbg |= 0x00000001
             self._process_upstream_mqtt_message(message, decoded)
-        elif message.Payload.client_name == self.admin_client:
+        elif message.payload.client_name == self.admin_client:
             path_dbg |= 0x00000002
             self._process_admin_mqtt_message(message, decoded)
         else:
@@ -130,8 +130,8 @@ class DummyScada2(PrimeActor):
             raise ValueError(
                 "In this test, since the environment is controlled, "
                 "there is no mqtt handler for message from client "
-                f"[{message.Payload.client_name}]\n"
-                f"Received\n\t topic: [{message.Payload.message.topic}]"
+                f"[{message.payload.client_name}]\n"
+                f"Received\n\t topic: [{message.payload.message.topic}]"
             )
         self.services.logger.path(
             f"--{self.name}._derived_process_mqtt_message  path:0x{path_dbg:08X}",

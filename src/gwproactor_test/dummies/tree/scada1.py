@@ -50,18 +50,18 @@ class DummyScada1(PrimeActor):
     def process_internal_message(self, message: Message[typing.Any]) -> None:
         self.services.logger.path(
             f"++{self.name}._derived_process_message "
-            f"{message.Header.Src}/{message.Header.MessageType}"
+            f"{message.header.src}/{message.header.message_type}"
         )
         path_dbg = 0
-        match message.Payload:
+        match message.payload:
             case SetRelay():
                 path_dbg |= 0x00000001
                 self.services.publish_message(
                     self.services.downstream_client,
                     SetRelayMessage(
                         src=self.services.publication_name,
-                        relay_name=message.Payload.RelayName,
-                        closed=message.Payload.Closed,
+                        relay_name=message.payload.relay_name,
+                        closed=message.payload.closed,
                         ack_required=True,
                     ),
                 )
@@ -79,14 +79,14 @@ class DummyScada1(PrimeActor):
             f"changed: {event.changed}"
         )
         path_dbg = 0
-        if event.relay_name not in self.relays.Relays:
-            self.relays.Relays[event.relay_name] = RelayInfoReported()
-        last_val = self.relays.Relays[event.relay_name].Closed
-        self.relays.Relays[event.relay_name].Closed = event.closed
-        changed = last_val != self.relays.Relays[event.relay_name].Closed
+        if event.relay_name not in self.relays.relays:
+            self.relays.relays[event.relay_name] = RelayInfoReported()
+        last_val = self.relays.relays[event.relay_name].closed
+        self.relays.relays[event.relay_name].closed = event.closed
+        changed = last_val != self.relays.relays[event.relay_name].closed
         self.services.logger.info(
             f"{event.relay_name}:  {int(last_val)} -> "
-            f"{int(self.relays.Relays[event.relay_name].Closed)}  "
+            f"{int(self.relays.relays[event.relay_name].closed)}  "
             f"changed: {int(changed)}/{int(event.changed)}"
         )
         report_received_event = RelayReportReceivedEvent(
@@ -98,14 +98,14 @@ class DummyScada1(PrimeActor):
         if changed != event.changed:
             path_dbg |= 0x00000001
             report_received_event.mismatch = True
-            self.relays.Relays[event.relay_name].CurrentChangeMismatch = True
-            self.relays.Relays[event.relay_name].MismatchCount += 1
-            self.relays.TotalChangeMismatches += 1
-            report_received_event.mismatch_count = self.relays.TotalChangeMismatches
+            self.relays.relays[event.relay_name].current_change_mismatch = True
+            self.relays.relays[event.relay_name].mismatch_count += 1
+            self.relays.total_change_mismatches += 1
+            report_received_event.mismatch_count = self.relays.total_change_mismatches
             self.services.logger.info(
                 f"State change mismatch for {event.relay_name}  "
                 f"found: {int(changed)}  reported: {event.changed}  "
-                f"total mismatches: {self.relays.TotalChangeMismatches}"
+                f"total mismatches: {self.relays.total_change_mismatches}"
             )
         self.services.generate_event(report_received_event)
         self.services.logger.path(
@@ -118,7 +118,7 @@ class DummyScada1(PrimeActor):
 
     def _process_event(self, event: EventBase) -> None:
         self.services.logger.path(
-            f"++_process_event  {event.TypeName}  from:{event.Src}",
+            f"++_process_event  {event.type_name}  from:{event.src}",
         )
         self.services.generate_event(event)
         if isinstance(event, RelayReportEvent):
@@ -129,22 +129,22 @@ class DummyScada1(PrimeActor):
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
         self.services.logger.path(
-            f"++{self.name}._process_downstream_mqtt_message {message.Payload.message.topic}",
+            f"++{self.name}._process_downstream_mqtt_message {message.payload.message.topic}",
         )
         path_dbg = 0
-        match decoded.Payload:
+        match decoded.payload:
             case EventBase():
                 path_dbg |= 0x00000001
-                self._process_event(decoded.Payload)
+                self._process_event(decoded.payload)
             case _:
                 # For testing purposes, this should fail.
                 path_dbg |= 0x00000002
-                rich.print(decoded.Header)
+                rich.print(decoded.header)
                 raise ValueError(
                     "In this test, since the environment is controlled, "
                     "there is no handler for mqtt message payload type "
-                    f"[{type(decoded.Payload)}]\n"
-                    f"Received\n\t topic: [{message.Payload.message.topic}]"
+                    f"[{type(decoded.payload)}]\n"
+                    f"Received\n\t topic: [{message.payload.message.topic}]"
                 )
         self.services.logger.path(
             f"--{self.name}._process_downstream_mqtt_message  path:0x{path_dbg:08X}",
@@ -154,10 +154,10 @@ class DummyScada1(PrimeActor):
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
         self.services.logger.path(
-            f"++{self.name}._process_admin_mqtt_message {message.Payload.message.topic}",
+            f"++{self.name}._process_admin_mqtt_message {message.payload.message.topic}",
         )
         path_dbg = 0
-        match decoded.Payload:
+        match decoded.payload:
             case AdminCommandSetRelay() as command:
                 path_dbg |= 0x00000001
                 self.services.generate_event(AdminSetRelayEvent(command=command))
@@ -175,16 +175,16 @@ class DummyScada1(PrimeActor):
                 self.services.publish_message(
                     self.admin_client,
                     Message(
-                        Src=self.services.publication_name,
-                        Payload=self.relays.model_copy(),
+                        src=self.services.publication_name,
+                        payload=self.relays.model_copy(),
                     ),
                 )
             case _:
                 raise ValueError(
                     "In this test, since the environment is controlled, "
                     "there is no handler for mqtt message payload type "
-                    f"[{type(decoded.Payload)}]\n"
-                    f"Received\n\t topic: [{message.Payload.message.topic}]"
+                    f"[{type(decoded.payload)}]\n"
+                    f"Received\n\t topic: [{message.payload.message.topic}]"
                 )
 
         self.services.logger.path(
@@ -195,22 +195,22 @@ class DummyScada1(PrimeActor):
         self, message: Message[MQTTReceiptPayload], decoded: Message[typing.Any]
     ) -> None:
         self.services.logger.path(
-            f"++{self.name}._derived_process_mqtt_message {message.Payload.message.topic}",
+            f"++{self.name}._derived_process_mqtt_message {message.payload.message.topic}",
         )
         path_dbg = 0
-        if message.Payload.client_name == self.services.downstream_client:
+        if message.payload.client_name == self.services.downstream_client:
             path_dbg |= 0x00000001
             self._process_downstream_mqtt_message(message, decoded)
-        elif message.Payload.client_name == self.admin_client:
+        elif message.payload.client_name == self.admin_client:
             path_dbg |= 0x00000002
             self._process_admin_mqtt_message(message, decoded)
         else:
-            rich.print(decoded.Header)
+            rich.print(decoded.header)
             raise ValueError(
                 "In this test, since the environment is controlled, "
                 "there is no mqtt handler for message from client "
-                f"[{message.Payload.client_name}]\n"
-                f"Received\n\t topic: [{message.Payload.message.topic}]"
+                f"[{message.payload.client_name}]\n"
+                f"Received\n\t topic: [{message.payload.message.topic}]"
             )
         self.services.logger.path(
             f"--{self.name}._derived_process_mqtt_message  path:0x{path_dbg:08X}",

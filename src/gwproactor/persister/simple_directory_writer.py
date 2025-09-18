@@ -25,14 +25,6 @@ class SimpleDirectoryWriter(StubPersister):
 
     def persist(self, uid: str, content: bytes) -> Result[bool, Problems]:
         self._num_persists += 1
-        # from gwproto.messages import AnyEvent
-        # event = AnyEvent.model_validate_json(content.decode())
-        # print(
-        #     f"{self._num_persists:3d}  "
-        #     f"{event.TypeName:45s}  "
-        #     f"{event.Src:35s}  "
-        #     f"{event.MessageId[:8]}"
-        # )
         problems = Problems()
         try:
             if not self._base_dir.exists():

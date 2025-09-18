@@ -17,3 +17,4 @@ tests/.ci-ca
 tests/failed_tests.json
 hacking
 output
+scratch*

@@ -150,17 +150,17 @@ class InstrumentedProactor(Proactor):
     def _process_mqtt_message(
         self, mqtt_receipt_message: Message[MQTTReceiptPayload]
     ) -> Result[Message[Any], Exception]:
-        if self._mqtt_messages_dropped[mqtt_receipt_message.Payload.client_name]:
+        if self._mqtt_messages_dropped[mqtt_receipt_message.payload.client_name]:
             return Ok(mqtt_receipt_message)
         match decoded_result := super()._process_mqtt_message(mqtt_receipt_message):
             case Ok(decoded):
-                match decoded.Payload:
+                match decoded.payload:
                     case EventBase() as event:
                         stats = cast(
                             RecorderLinkStats,
-                            self._stats.link(mqtt_receipt_message.Payload.client_name),
+                            self._stats.link(mqtt_receipt_message.payload.client_name),
                         )
-                        stats.event_counts[event.Src][event.TypeName] += 1
+                        stats.event_counts[event.src][event.type_name] += 1
         return decoded_result
 
     def subacks_paused(self, client_name: str) -> bool:
@@ -224,10 +224,10 @@ class InstrumentedProactor(Proactor):
 
     async def async_process_message(self, message: Message[Any]) -> None:
         if (
-            isinstance(message.Payload, MQTTSubackPayload)
-            and self._subacks_paused[message.Payload.client_name]
+            isinstance(message.payload, MQTTSubackPayload)
+            and self._subacks_paused[message.payload.client_name]
         ):
-            self._subacks_available[message.Payload.client_name].append(message)
+            self._subacks_available[message.payload.client_name].append(message)
         else:
             await super().async_process_message(message)
 
@@ -321,7 +321,7 @@ class InstrumentedProactor(Proactor):
             )
 
     def force_ping(self, client_name: str) -> None:
-        self._links.publish_message(client_name, PingMessage(Src=self.publication_name))
+        self._links.publish_message(client_name, PingMessage(src=self.publication_name))
 
     @property
     def mqtt_clients(self) -> MQTTClients:
@@ -354,15 +354,15 @@ class InstrumentedProactor(Proactor):
             command = DBGCommands(command)
         self.send_threadsafe(
             Message(
-                Src=self.name,
-                Dst=client_name,
-                Payload=DBGPayload(
-                    Levels=LoggerLevels(
+                src=self.name,
+                dst=client_name,
+                payload=DBGPayload(
+                    levels=LoggerLevels(
                         message_summary=message_summary,
                         lifecycle=lifecycle,
                         comm_event=comm_event,
                     ),
-                    Command=command,
+                    command=command,
                 ),
             )
         )

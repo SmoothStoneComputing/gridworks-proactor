@@ -91,7 +91,7 @@ def test_parametrize_hardware_layout_test_path(
         hardware_layout_path.open().read() == DUMMY_HARDWARE_LAYOUT_PATH.open().read()
     )
     layout = HardwareLayout.load(hardware_layout_path)
-    assert layout.node("s").DisplayName == DUMMY_SCADA_DISPLAY_NAME
+    assert layout.node("s").display_name == DUMMY_SCADA_DISPLAY_NAME
 
 
 def assert_expected_layout(
@@ -103,7 +103,7 @@ def assert_expected_layout(
         == home / ".config/gridworks/scada/hardware-layout.json"
     )
     default_layout = HardwareLayout.load(default_paths.hardware_layout)
-    assert default_layout.node("s").DisplayName == expected_scada_display_name
+    assert default_layout.node("s").display_name == expected_scada_display_name
 
 
 def test_hardware_layout_test_path(tmp_path: Path) -> None:

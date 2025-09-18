@@ -225,7 +225,7 @@ class LinkManager:
             client = self._mqtt_clients.client_wrapper(client_name)
             s += f"  Client name: <{client_name}>  topic_dst: <{client.topic_dst}>\n"
             publish_topic = MQTTTopic.encode(
-                envelope_type=Message.type_name(),
+                envelope_type=Message.type_name_value(),
                 src=self.publication_name,
                 dst=client.topic_dst,
                 message_type="SOME_MESSAGE_TYPE",
@@ -262,7 +262,7 @@ class LinkManager:
             message.header.dst = self._mqtt_clients.topic_dst(link_name)
         if use_link_topic:
             topic = MQTTTopic.encode(
-                envelope_type=message.type_name(),
+                envelope_type=Message.type_name_value(),
                 src=self.publication_name,
                 dst=self._mqtt_clients.topic_dst(link_name),
                 message_type=message.message_type(),
@@ -275,9 +275,9 @@ class LinkManager:
             src=message.header.src,
             dst=message.header.dst,
             topic=topic,
-            payload_object=message.Payload,
-            message_id=message.Payload.AckMessageID
-            if isinstance(message.Payload, Ack)
+            payload_object=message.payload,
+            message_id=message.payload.ack_message_i_d
+            if isinstance(message.payload, Ack)
             else message.header.message_id,
         )
         if message.header.ack_required:
@@ -306,7 +306,7 @@ class LinkManager:
         warning_count = 0
         self._logger.path(
             "++generate_event %s  f: %d  (p: %d)  (pr: %d  r: %d  c: %d)",
-            event.TypeName,
+            event.type_name,
             len(self._in_flight_events),
             self._event_persister.num_pending,
             self._event_persister.num_persists,
@@ -319,13 +319,13 @@ class LinkManager:
         if (
             isinstance(event, CommEvent)
             and event.src == self.publication_name
-            and self._stats.has_link(event.PeerName)
+            and self._stats.has_link(event.peer_name)
         ):
             path_dbg |= 0x00000002
-            self._stats.link(event.PeerName).comm_event_counts[event.TypeName] += 1
+            self._stats.link(event.peer_name).comm_event_counts[event.type_name] += 1
         if isinstance(event, ProblemEvent) and self._logger.path_enabled:
             path_dbg |= 0x00000004
-            self._logger.info(f"ProblemEvent <{event.Summary}>\n{event.Details}")  # noqa: G004
+            self._logger.info(f"ProblemEvent <{event.summary}>\n{event.details}")  # noqa: G004
         if (
             self._mqtt_clients.upstream_client
             and self._states[self._mqtt_clients.upstream_client].active()
@@ -334,18 +334,18 @@ class LinkManager:
             if len(self._in_flight_events) >= self._settings.num_inflight_events:
                 path_dbg |= 0x00000010
                 result = self._event_persister.persist(
-                    event.MessageId,
-                    event.model_dump_json().encode(PERSISTER_ENCODING),
+                    event.message_id,
+                    event.to_type(),
                 )
             else:
                 path_dbg |= 0x00000020
-                self._in_flight_events[event.MessageId] = event
+                self._in_flight_events[event.message_id] = event
                 result = Ok()
-            self.publish_upstream(event, AckRequired=True)
+            self.publish_upstream(event, ack_required=True)
         else:
             path_dbg |= 0x00000040
             result = self._event_persister.persist(
-                event.MessageId, event.model_dump_json().encode(PERSISTER_ENCODING)
+                event.message_id, event.to_type()
             )
             match result:
                 case Err(problems):
@@ -354,7 +354,7 @@ class LinkManager:
 
         self._logger.path(
             "--generate_event %s  f: %d  (p: %d)  (pr: %d  r: %d  c: %d)  problems: (%d %d)  path:0x%08X",
-            event.TypeName,
+            event.type_name,
             len(self._in_flight_events),
             self._event_persister.num_pending,
             self._event_persister.num_persists,
@@ -475,7 +475,10 @@ class LinkManager:
                     else:
                         path_dbg |= 0x00000020
                         try:
-                            event = json.loads(event_str)
+                            event_dict = json.loads(event_str)
+                            # use the upstream codec to decode the payload dict
+                            upstream_codec = self._mqtt_codecs[self.upstream_client]
+                            event = upstream_codec.message_decoder.decode_payload(event_dict)
                         except Exception as e:  # noqa: BLE001
                             path_dbg |= 0x00000040
                             problems.add_error(e).add_error(
@@ -486,7 +489,7 @@ class LinkManager:
                             )
                         else:
                             path_dbg |= 0x00000080
-                            self.publish_upstream(event, AckRequired=True)
+                            self.publish_upstream(event, ack_required=True)
                             self._logger.path(
                                 "--_reupload_event:1  path:0x%08X", path_dbg
                             )
@@ -529,7 +532,7 @@ class LinkManager:
         if state_result.is_ok():
             self._logger.comm_event(str(state_result.value))
         self.generate_event(MQTTConnectEvent(peer_name=message.payload.client_name))
-        self._mqtt_clients.subscribe_all(message.Payload.client_name)
+        self._mqtt_clients.subscribe_all(message.payload.client_name)
         return state_result
 
     def process_mqtt_disconnected(
@@ -542,12 +545,12 @@ class LinkManager:
                 # noinspection PyTypeChecker
                 result = Ok(LinkManagerTransition(**(asdict(state_result.value))))
                 self.generate_event(
-                    MQTTDisconnectEvent(PeerName=message.Payload.client_name)
+                    MQTTDisconnectEvent(peer_name=message.payload.client_name)
                 )
                 self._logger.comm_event(str(result.value))
                 if result.value.recv_deactivated() or result.value.send_deactivated():
                     result.value.canceled_acks = self._acks.cancel_ack_timers(
-                        message.Payload.client_name
+                        message.payload.client_name
                     )
                     self._reuploads.clear()
                     self.flush_in_flight_events()
@@ -558,7 +561,7 @@ class LinkManager:
     def flush_in_flight_events(self) -> None:
         for event_id, event in self._in_flight_events.items():
             self._event_persister.persist(
-                event_id, event.model_dump_json().encode(PERSISTER_ENCODING)
+                event_id, event.to_type()
             )
         self._in_flight_events.clear()
 
@@ -572,7 +575,7 @@ class LinkManager:
     ) -> Result[Transition, InvalidCommStateInput]:
         match result := self._states.process_mqtt_message(message):
             case Ok():
-                self.update_recv_time(message.Payload.client_name)
+                self.update_recv_time(message.payload.client_name)
                 if result.value:
                     self._logger.comm_event(str(result.value))
                 if result.value.recv_activated():
@@ -601,7 +604,7 @@ class LinkManager:
                     self.flush_in_flight_events()
                     self._reuploads.clear()
                     self.generate_event(
-                        ResponseTimeoutEvent(PeerName=transition.link_name)
+                        ResponseTimeoutEvent(peer_name=transition.link_name)
                     )
                     self._logger.comm_event(str(transition))
                     transition.canceled_acks.extend(
@@ -683,7 +686,7 @@ class LinkManager:
         if transition.link_name == self.upstream_client:
             path_dbg |= 0x00000001
             self._start_reupload()
-        self.generate_event(PeerActiveEvent(PeerName=transition.link_name))
+        self.generate_event(PeerActiveEvent(peer_name=transition.link_name))
         self._logger.path(
             "--LinkManager._recv_activated.<%s>  path:0x%08X", transition, path_dbg
         )
@@ -692,12 +695,12 @@ class LinkManager:
         self, message: Message[MQTTSubackPayload]
     ) -> Result[Transition, InvalidCommStateInput]:
         self._logger.path(
-            "++LinkManager.process_mqtt_suback client:%s", message.Payload.client_name
+            "++LinkManager.process_mqtt_suback client:%s", message.payload.client_name
         )
         path_dbg = 0
         state_result = self._states.process_mqtt_suback(
-            message.Payload.client_name,
-            self._mqtt_clients.handle_suback(message.Payload),
+            message.payload.client_name,
+            self._mqtt_clients.handle_suback(message.payload),
         )
         if isinstance(state_result, Ok):
             path_dbg |= 0x00000001
@@ -707,10 +710,10 @@ class LinkManager:
             if state_result.value.send_activated():
                 path_dbg |= 0x00000004
                 self.generate_event(
-                    MQTTFullySubscribedEvent(PeerName=message.Payload.client_name)
+                    MQTTFullySubscribedEvent(peer_name=message.payload.client_name)
                 )
                 self.publish_message(
-                    message.Payload.client_name,
+                    message.payload.client_name,
                     PingMessage(src=self.publication_name),
                 )
             if state_result.value.recv_activated():

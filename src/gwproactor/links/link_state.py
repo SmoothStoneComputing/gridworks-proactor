@@ -486,17 +486,17 @@ class LinkStates:
     def process_mqtt_connected(
         self, message: Message[MQTTConnectPayload]
     ) -> Result[Transition, InvalidCommStateInput]:
-        return self[message.Payload.client_name].process_mqtt_connected()
+        return self[message.payload.client_name].process_mqtt_connected()
 
     def process_mqtt_disconnected(
         self, message: Message[MQTTDisconnectPayload]
     ) -> Result[Transition, InvalidCommStateInput]:
-        return self[message.Payload.client_name].process_mqtt_disconnected()
+        return self[message.payload.client_name].process_mqtt_disconnected()
 
     def process_mqtt_connect_fail(
         self, message: Message[MQTTConnectFailPayload]
     ) -> Result[Transition, InvalidCommStateInput]:
-        return self[message.Payload.client_name].process_mqtt_connect_fail()
+        return self[message.payload.client_name].process_mqtt_connect_fail()
 
     def process_mqtt_suback(
         self, name: str, num_pending_subscriptions: int
@@ -506,7 +506,7 @@ class LinkStates:
     def process_mqtt_message(
         self, message: Message[MQTTReceiptPayload]
     ) -> Result[Transition, InvalidCommStateInput]:
-        return self[message.Payload.client_name].process_mqtt_message()
+        return self[message.payload.client_name].process_mqtt_message()
 
     def process_ack_timeout(
         self, name: str

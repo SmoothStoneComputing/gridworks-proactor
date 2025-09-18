@@ -26,14 +26,14 @@ class DummyAtn(PrimeActor):
     ) -> None:
         self.services.logger.path(
             f"++{self.name}.process_mqtt_message %s",
-            mqtt_client_message.Payload.message.topic,
+            mqtt_client_message.payload.message.topic,
         )
         path_dbg = 0
         self.services.stats.add_message(decoded)
-        match decoded.Payload:
+        match decoded.payload:
             case EventBase():
                 path_dbg |= 0x00000001
-                self.services.generate_event(decoded.Payload)
+                self.services.generate_event(decoded.payload)
             case _:
                 path_dbg |= 0x00000002
         self.services.logger.path(

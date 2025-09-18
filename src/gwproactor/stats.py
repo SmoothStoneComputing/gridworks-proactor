@@ -40,7 +40,7 @@ class LinkStats:
 
     @property
     def num_received(self) -> int:
-        return self.num_received_by_type[Message.type_name()]
+        return self.num_received_by_type[Message.type_name_value()]
 
     def __str__(self) -> str:
         s = f"LinkStats [{self.name}]  num_received: {self.num_received}  timeouts: {self.timeouts}"
@@ -77,15 +77,15 @@ class ProactorStats:
             self.add_link(link_name)
 
     def add_message(self, message: Message[Any]) -> None:
-        self.num_received_by_type[message.Header.MessageType] += 1
+        self.num_received_by_type[message.header.message_type] += 1
 
     def add_mqtt_message(self, message: Message[MQTTReceiptPayload]) -> None:
-        self.num_received_by_topic[message.Payload.message.topic] += 1  # noqa
-        link_stats = self.link(message.Payload.client_name)
-        link_stats.num_received_by_type[Message.type_name()] += 1
-        link_stats.num_received_by_type[message.Header.MessageType] += 1
-        link_stats.num_received_by_topic[message.Payload.message.topic] += 1  # noqa
-        if "gridworks-event" in message.Payload.message.topic:
+        self.num_received_by_topic[message.payload.message.topic] += 1  # noqa
+        link_stats = self.link(message.payload.client_name)
+        link_stats.num_received_by_type[Message.type_name_value()] += 1
+        link_stats.num_received_by_type[message.header.message_type] += 1
+        link_stats.num_received_by_topic[message.payload.message.topic] += 1  # noqa
+        if "gridworks-event" in message.payload.message.topic:
             self.num_events_received += 1
 
     def add_decoded_mqtt_message_type(
@@ -98,7 +98,7 @@ class ProactorStats:
 
     @property
     def num_received(self) -> int:
-        return self.num_received_by_type[Message.type_name()]
+        return self.num_received_by_type[Message.type_name_value()]
 
     @classmethod
     def make_link(cls, link_name: str) -> LinkStats:

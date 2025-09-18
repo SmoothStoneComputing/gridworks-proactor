@@ -14,7 +14,6 @@ class AdminCodec(MQTTCodec):
     def __init__(self) -> None:
         super().__init__(
             create_message_model(
-                model_name="AdminMessageDecoder",
                 explicit_types=[AdminCommandSetRelay, AdminCommandReadRelays],
             )
         )

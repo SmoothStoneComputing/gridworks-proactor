@@ -22,6 +22,7 @@ async def test_awaiting_setup_and_peer_happy_path(
      (awaiting_setup_and_peer -> mqtt_suback -> awaiting_peer)
      (awaiting_setup_and_peer -> disconnected -> connecting)
     """
+    
     async with LiveTest(add_child=True, request=request) as h:
         child = h.child
         stats = child.stats.link(child.upstream_client)
@@ -50,7 +51,7 @@ async def test_awaiting_setup_and_peer_happy_path(
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert len(stats.comm_events) == 1
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
 
         # Allow suback to arrive
         child.release_upstream_subacks()
@@ -68,7 +69,7 @@ async def test_awaiting_setup_and_peer_happy_path(
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert len(stats.comm_events) == 2
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
         assert child.event_persister.num_persists == 3
         assert child.links.num_in_flight == 0
 
@@ -90,7 +91,7 @@ async def test_awaiting_setup_and_peer_happy_path(
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 1
         assert len(stats.comm_events) == 4
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
         assert child.event_persister.num_persists == 5
         assert child.links.num_in_flight == 0
 
@@ -117,7 +118,7 @@ async def test_awaiting_setup_and_peer_happy_path(
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 2
         assert len(stats.comm_events) == 6
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
         assert child.event_persister.num_persists == 7
         assert child.links.num_in_flight == 0
 
@@ -137,7 +138,7 @@ async def test_awaiting_setup_and_peer_happy_path(
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 2
         assert len(stats.comm_events) == 7
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
         assert child.event_persister.num_persists == 8
         assert child.links.num_in_flight == 0
 
@@ -199,18 +200,18 @@ async def test_awaiting_setup_and_peer_corner_cases(
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert len(stats.comm_events) == 1
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
         assert child.event_persister.num_persists == 2
         assert child.links.num_in_flight == 0
 
         # Allow one suback at a time to arrive
         # suback 1/3
         # (mqtt_suback -> awaiting_setup_and_peer)
-        num_subacks = child.stats.num_received_by_type["mqtt_suback"]
+        num_subacks = child.stats.num_received_by_type["gridworks.mqtt.suback.payload"]
         child.release_upstream_subacks(1)
         exp_subacks = num_subacks + 1
         await await_for(
-            lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
+            lambda: child.stats.num_received_by_type["gridworks.mqtt.suback.payload"] == exp_subacks,
             1,
             f"ERROR waiting mqtt_suback {exp_subacks} (1/3)",
             err_str_f=child.summary_str,
@@ -224,7 +225,7 @@ async def test_awaiting_setup_and_peer_corner_cases(
         child.release_upstream_subacks(1)
         exp_subacks += 1
         await await_for(
-            lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
+            lambda: child.stats.num_received_by_type["gridworks.mqtt.suback.payload"] == exp_subacks,
             1,
             f"ERROR waiting mqtt_suback {exp_subacks} (2/3)",
             err_str_f=child.summary_str,
@@ -238,7 +239,7 @@ async def test_awaiting_setup_and_peer_corner_cases(
         child.release_upstream_subacks(1)
         exp_subacks += 1
         await await_for(
-            lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
+            lambda: child.stats.num_received_by_type["gridworks.mqtt.suback.payload"] == exp_subacks,
             1,
             f"ERROR waiting mqtt_suback {exp_subacks} (3/3)",
             err_str_f=child.summary_str,
@@ -252,7 +253,7 @@ async def test_awaiting_setup_and_peer_corner_cases(
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert len(stats.comm_events) == 2
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
         assert child.event_persister.num_persists == 3
         assert child.links.num_in_flight == 0
 
@@ -275,18 +276,18 @@ async def test_awaiting_setup_and_peer_corner_cases(
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 1
         assert len(stats.comm_events) == 4
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
         assert child.event_persister.num_persists == 5
         assert child.links.num_in_flight == 0
 
         # Allow one suback at a time to arrive
         # (Not strictly necessary, since message receiving code does not check
         # if the source topic suback has arrived).
-        num_subacks = child.stats.num_received_by_type["mqtt_suback"]
+        num_subacks = child.stats.num_received_by_type["gridworks.mqtt.suback.payload"]
         child.release_upstream_subacks(1)
         exp_subacks = num_subacks + 1
         await await_for(
-            lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
+            lambda: child.stats.num_received_by_type["gridworks.mqtt.suback.payload"] == exp_subacks,
             1,
             f"ERROR waiting mqtt_suback {exp_subacks} (1/3)",
             err_str_f=h.summary_str,
@@ -376,18 +377,18 @@ async def test_awaiting_setup_state(request: pytest.FixtureRequest) -> None:
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 0
         assert len(stats.comm_events) == 1
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
         assert child.event_persister.num_persists == 2
         assert child.links.num_in_flight == 0
 
         # Allow one suback at a time to arrive
         # (Not strictly necessary, since message receiving code does not check if the source topic suback
         #  has arrived).
-        num_subacks = child.stats.num_received_by_type["mqtt_suback"]
+        num_subacks = child.stats.num_received_by_type["gridworks.mqtt.suback.payload"]
         child.release_upstream_subacks(1)
         exp_subacks = num_subacks + 1
         await await_for(
-            lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
+            lambda: child.stats.num_received_by_type["gridworks.mqtt.suback.payload"] == exp_subacks,
             1,
             f"ERROR waiting mqtt_suback {exp_subacks} (1/3)",
             err_str_f=h.summary_str,
@@ -437,7 +438,7 @@ async def test_awaiting_setup_state(request: pytest.FixtureRequest) -> None:
         child.release_upstream_subacks(1)
         exp_subacks = num_subacks + 1
         await await_for(
-            lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
+            lambda: child.stats.num_received_by_type["gridworks.mqtt.suback.payload"] == exp_subacks,
             1,
             f"ERROR waiting mqtt_suback {exp_subacks} (2/3)",
             err_str_f=h.summary_str,
@@ -453,7 +454,7 @@ async def test_awaiting_setup_state(request: pytest.FixtureRequest) -> None:
             "gw",
             parent.publication_name,
             parent.links.topic_dst(parent.downstream_client),
-            DBGPayload.__pydantic_fields__["TypeName"].default,
+            DBGPayload.__pydantic_fields__["type_name"].default,
         )
         assert stats.num_received_by_topic[dbg_topic] == 0
         parent.send_dbg(parent.downstream_client)
@@ -484,18 +485,18 @@ async def test_awaiting_setup_state(request: pytest.FixtureRequest) -> None:
         assert comm_event_counts["gridworks.event.comm.mqtt.disconnect"] == 1
         assert len(stats.comm_events) == 3
         for comm_event in stats.comm_events:
-            assert comm_event.MessageId in child.event_persister
+            assert comm_event.message_id in child.event_persister
         assert child.event_persister.num_persists == 5
         assert child.links.num_in_flight == 0
 
         # Allow one suback at a time to arrive
         # (Not strictly necessary, since message receiving code does not check if the source topic suback
         #  has arrived).
-        num_subacks = child.stats.num_received_by_type["mqtt_suback"]
+        num_subacks = child.stats.num_received_by_type["gridworks.mqtt.suback.payload"]
         child.release_upstream_subacks(1)
         exp_subacks = num_subacks + 1
         await await_for(
-            lambda: child.stats.num_received_by_type["mqtt_suback"] == exp_subacks,
+            lambda: child.stats.num_received_by_type["gridworks.mqtt.suback.payload"] == exp_subacks,
             1,
             f"ERROR waiting mqtt_suback {exp_subacks} (1/3)",
             err_str_f=h.summary_str,

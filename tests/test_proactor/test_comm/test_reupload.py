@@ -486,13 +486,13 @@ class _EventGen:
     def _generate_event(self, member_name: str) -> _EventEntry:
         event = DBGEvent(command=DBGPayload(), msg=f"event {len(self)} {member_name}")
         match self.persister.persist(
-            event.MessageId, event.model_dump_json(indent=2).encode()
+            event.message_id, event.to_type()
         ):
             case Err(exception):
                 raise exception
         entry = _EventEntry(
-            event.MessageId,
-            self.persister.get_path(event.MessageId),  # type: ignore[arg-type]
+            event.message_id,
+            self.persister.get_path(event.message_id),  # type: ignore[arg-type]
         )
         getattr(self, member_name).append(entry)
         return entry
