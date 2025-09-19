@@ -67,12 +67,12 @@ class WebEventListener(Actor):
                 )
             )
         if problem_event is not None:
-            self.services.send_threadsafe(Message(Payload=problem_event))
+            self.services.send_threadsafe(Message(payload=problem_event))
         return Response(status=status, body=response_text)
 
     def _wait_for_event_processing(self, event: EventBase) -> None:
         self.services.wait_for_processing_threadsafe(
-            Message(Payload=event),
+            Message(payload=event),
         )
 
     def process_message(self, message: Message[Any]) -> Result[bool, Exception]:

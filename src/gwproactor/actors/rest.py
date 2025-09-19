@@ -128,7 +128,7 @@ class RESTPoller:
                 try:  # noqa: SIM105
                     self._forward(
                         Message(
-                            Payload=Problems(errors=[e]).problem_event(
+                            payload=Problems(errors=[e]).problem_event(
                                 summary=(
                                     f"Request error for <{self._name}>: {type(e)} <{e}>"
                                 ),
@@ -150,7 +150,7 @@ class RESTPoller:
                 try:  # noqa: SIM105
                     self._forward(
                         Message(
-                            Payload=Problems(errors=[convert_exception]).problem_event(
+                            payload=Problems(errors=[convert_exception]).problem_event(
                                 summary=(
                                     f"Convert error for <{self._name}>: {type(convert_exception)} <{convert_exception}>"
                                 ),

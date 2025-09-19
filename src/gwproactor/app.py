@@ -276,7 +276,7 @@ class App(AppInterface):
                 self.proactor.add_communicator(
                     ActorInterface.load(
                         actor_config.node.name,
-                        actor_config.node.actor_class.value,
+                        actor_config.node.actor_class,
                         self,
                         actors_module=self.sub_types.actors_module,
                         **actor_config.constructor_args,

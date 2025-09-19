@@ -77,6 +77,7 @@ async def test_http_event_upload(request: pytest.FixtureRequest) -> None:
                 json=SomeData(
                     TimestampUTC=round(time.time(), 3),
                     Reading=38.00,
+                    TypeName="gridworks.event.some.data"
                 ).model_dump(),
             )
         assert response.ok, response.text
