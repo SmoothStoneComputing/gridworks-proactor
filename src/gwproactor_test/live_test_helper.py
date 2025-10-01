@@ -191,14 +191,27 @@ class LiveTest:
         layout: Optional[HardwareLayout] = None,
     ) -> App:
         # Copy hardware layout file.
-        paths = Paths(name=app_type.paths_name())
+        if app_settings is None:
+            paths = Paths(name=app_type.paths_name())
+        else:
+            if "name" in app_settings.paths.model_dump(
+                exclude_unset=True, exclude_defaults=True
+            ):
+                name = app_settings.paths.name
+            else:
+                name = app_type.paths_name()
+            paths = app_settings.paths.duplicate(name=name)
         paths.mkdirs(parents=True, exist_ok=True)
-        shutil.copyfile(self.test_layout_path(), paths.hardware_layout)
+        if not paths.hardware_layout.exists():
+            shutil.copyfile(self.test_layout_path(), paths.hardware_layout)
+
         # Use an instrumented proactor
         sub_types = app_type.make_subtypes()
         sub_types.proactor_type = InstrumentedProactor
         app_settings = app_type.update_settings_from_command_line(
-            app_type.get_settings(settings=app_settings, paths=paths),
+            app_type.get_settings(
+                settings=app_settings, paths_name=paths.name, paths=paths
+            ),
             verbose=self.verbose or app_verbose,
             message_summary=self.message_summary or app_message_summary,
         )
@@ -209,6 +222,7 @@ class LiveTest:
 
         # Create the app
         app = app_type(
+            paths_name=paths.name,
             paths=paths,
             app_settings=app_settings
             if app_settings is None
