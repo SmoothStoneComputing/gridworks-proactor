@@ -1,11 +1,15 @@
+# ruff: noqa: C408
 from pathlib import Path
 
 import pytest
 from gwproto import HardwareLayout
 from gwproto.enums import ActorClass
 
+from gwproactor import ProactorSettings
+from gwproactor.config import Paths
 from gwproactor_test import DefaultTestEnv, LiveTest, set_hardware_layout_test_path
 from gwproactor_test.clean import DUMMY_HARDWARE_LAYOUT_PATH, hardware_layout_test_path
+from gwproactor_test.dummies.pair.child import DummyChildSettings
 from gwproactor_test.tree_live_test_helper import TreeLiveTest
 from tests.test_misc.test_clean import (
     DEFAULT_TEST_SCADA_DISPLAY_NAME,
@@ -113,19 +117,43 @@ async def test_setting_hardware_layout_test_path(
     request: pytest.FixtureRequest, tmp_path: Path
 ) -> None:
     original_layout_path = hardware_layout_test_path()
-    new_home = tmp_path / "new_home"
     try:
+        # Verify you get the new layout if you change the test layout path
         set_hardware_layout_test_path(DUMMY_HARDWARE_LAYOUT_PATH)
-        with DefaultTestEnv(new_home).context():
+        with DefaultTestEnv(tmp_path / "1").context():
             async with LiveTest(add_child=True, request=request) as h_new:
+                copied_layout_path = Path(
+                    h_new.child_app.settings.paths.hardware_layout
+                )
                 assert (
                     h_new.child.hardware_layout.node("s").display_name
                     == DUMMY_SCADA_DISPLAY_NAME
                 )
 
+        # Verify that even after changing the test layout path back we don't
+        # overwrite an existing layout (which allows test writers to explicitly
+        # modify the contents of a layout file and have their change take
+        # effect).
         set_hardware_layout_test_path(original_layout_path)
+        with DefaultTestEnv(tmp_path / "1").context():
+            async with LiveTest(add_child=True, request=request) as h_orig:
+                assert (
+                    h_orig.child.hardware_layout.node("s").display_name
+                    == DUMMY_SCADA_DISPLAY_NAME
+                )
 
-        with DefaultTestEnv(new_home).context():
+        # Verify with no existing layout file we get the layout from the restored
+        # test layout path.
+        copied_layout_path.unlink()
+        with DefaultTestEnv(tmp_path / "1").context():
+            async with LiveTest(add_child=True, request=request) as h_orig:
+                assert (
+                    h_orig.child.hardware_layout.node("s").display_name
+                    == DEFAULT_TEST_SCADA_DISPLAY_NAME
+                )
+
+        # Verify a new home gets the original value
+        with DefaultTestEnv(tmp_path / "2").context():
             async with LiveTest(add_child=True, request=request) as h_orig:
                 assert (
                     h_orig.child.hardware_layout.node("s").display_name
@@ -134,3 +162,48 @@ async def test_setting_hardware_layout_test_path(
 
     finally:
         set_hardware_layout_test_path(original_layout_path)
+
+
+@pytest.mark.asyncio
+async def test_setting_child_name() -> None:
+    for kwargs, exp in [
+        (dict(), "child"),
+        (dict(child_app_settings=DummyChildSettings()), "child"),
+        (
+            dict(
+                child_app_settings=DummyChildSettings(
+                    proactor=ProactorSettings(num_initial_event_reuploads=5)
+                )
+            ),
+            "child",
+        ),
+        (
+            dict(
+                child_app_settings=DummyChildSettings(
+                    proactor=ProactorSettings(num_initial_event_reuploads=5),
+                    paths=Paths(),
+                )
+            ),
+            "child",
+        ),
+        (
+            dict(
+                child_app_settings=DummyChildSettings(
+                    proactor=ProactorSettings(num_initial_event_reuploads=5),
+                    paths=Paths(base="bar"),
+                )
+            ),
+            "child",
+        ),
+        (
+            dict(
+                child_app_settings=DummyChildSettings(
+                    proactor=ProactorSettings(num_initial_event_reuploads=5),
+                    paths=Paths(name="foo"),
+                )
+            ),
+            "foo",
+        ),
+    ]:
+        async with LiveTest(**kwargs) as h:  # type: ignore[arg-type]
+            assert str(h.child_app.settings.paths.name) == exp
