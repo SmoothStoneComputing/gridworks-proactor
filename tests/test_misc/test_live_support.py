@@ -122,7 +122,9 @@ async def test_setting_hardware_layout_test_path(
         set_hardware_layout_test_path(DUMMY_HARDWARE_LAYOUT_PATH)
         with DefaultTestEnv(tmp_path / "1").context():
             async with LiveTest(add_child=True, request=request) as h_new:
-                copied_layout_path = h_new.child_app.settings.paths.hardware_layout
+                copied_layout_path = Path(
+                    h_new.child_app.settings.paths.hardware_layout
+                )
                 assert (
                     h_new.child.hardware_layout.node("s").display_name
                     == DUMMY_SCADA_DISPLAY_NAME
@@ -203,5 +205,5 @@ async def test_setting_child_name() -> None:
             "foo",
         ),
     ]:
-        async with LiveTest(**kwargs) as h:
+        async with LiveTest(**kwargs) as h:  # type: ignore[arg-type]
             assert str(h.child_app.settings.paths.name) == exp

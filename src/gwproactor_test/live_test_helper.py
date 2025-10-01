@@ -199,10 +199,10 @@ class LiveTest:
             ):
                 name = app_settings.paths.name
             else:
-                name = app_type.paths_name()
+                name = str(app_type.paths_name())
             paths = app_settings.paths.duplicate(name=name)
         paths.mkdirs(parents=True, exist_ok=True)
-        if not paths.hardware_layout.exists():
+        if not Path(paths.hardware_layout).exists():
             shutil.copyfile(self.test_layout_path(), paths.hardware_layout)
 
         # Use an instrumented proactor
@@ -210,7 +210,7 @@ class LiveTest:
         sub_types.proactor_type = InstrumentedProactor
         app_settings = app_type.update_settings_from_command_line(
             app_type.get_settings(
-                settings=app_settings, paths_name=paths.name, paths=paths
+                settings=app_settings, paths_name=str(paths.name), paths=paths
             ),
             verbose=self.verbose or app_verbose,
             message_summary=self.message_summary or app_message_summary,
@@ -222,7 +222,7 @@ class LiveTest:
 
         # Create the app
         app = app_type(
-            paths_name=paths.name,
+            paths_name=str(paths.name),
             paths=paths,
             app_settings=app_settings
             if app_settings is None
