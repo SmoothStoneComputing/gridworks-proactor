@@ -7,6 +7,7 @@ from gwproto import HardwareLayout, Message
 from gwproactor import App, AppInterface, AppSettings
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
+from gwproactor.config.mqtt import TLSInfo
 from gwproactor.config.links import CodecSettings, LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import MQTTReceiptPayload
@@ -139,8 +140,8 @@ class DummyScada2(PrimeActor):
 
 
 class DummyScada2Settings(AppSettings):
-    dummy_scada1: MQTTClient = MQTTClient()
-    dummy_admin: MQTTClient = MQTTClient()
+    dummy_scada1: MQTTClient = MQTTClient(tls=TLSInfo(use_tls=False, port=1883))  # MQTTClient = MQTTClient()
+    dummy_admin: MQTTClient = MQTTClient(tls=TLSInfo(use_tls=False, port=1883))  #MQTTClient = MQTTClient()
 
 
 class DummyScada2App(App):

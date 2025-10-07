@@ -52,9 +52,7 @@ class ProactorCodec(MQTTCodec):
             module_names_used.extend(module_names)
         # model_name parameter removed - was only used for debugging/introspection
         # and added unnecessary complexity. Codecs are identified by link name.
-        # model_name = (
-        #     model_name if model_name else "ProactorCodec-" + secrets.token_hex(4)
-        # )
+
         return create_message_model(
             module_names=module_names_used
         )
