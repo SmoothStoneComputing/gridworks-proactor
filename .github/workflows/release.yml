@@ -11,6 +11,10 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
@@ -32,8 +36,8 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: "0.8.8"
-          enable-cache: true          
-          
+          enable-cache: true
+
       - name: Check if there is a parent commit
         id: check-parent-commit
         run: |
@@ -61,14 +65,10 @@ jobs:
       - name: Publish package Publish package on **PyPI**
         if: "steps.check-version.outputs.tag"
         run: uv publish
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
 
       - name: Publish package Publish package on **TestPyPI**
         if: "! steps.check-version.outputs.tag"
         run: uv publish --publish-url https://test.pypi.org/legacy/
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
 
       - name: Publish the release notes
         uses: release-drafter/release-drafter@v6.0.0

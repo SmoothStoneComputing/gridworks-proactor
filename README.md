@@ -28,7 +28,7 @@ allows the scada code to be more focussed on on application specific details and
 
 ## Features
 
-- [](Proactor), a single threaded event loop running on asyncio, for exchanging messages between the main application
+- `Proactor`, a single threaded event loop running on asyncio, for exchanging messages between the main application
   object, "live actor" subobjects and MQTT clients.
 - A [communication state] ("active" or not) for each external communications link is available to the proactor and
   sub-objects. "Active" communications is defined as ALL of the following:
