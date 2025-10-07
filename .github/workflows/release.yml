@@ -29,13 +29,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
-          version: "0.8.8"
-          enable-cache: true
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          version: "0.8.8"
+          version: "0.8.24"
           enable-cache: true
 
       - name: Check if there is a parent commit
