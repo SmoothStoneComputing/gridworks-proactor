@@ -120,6 +120,15 @@ module = [
 ignore_missing_imports = true
 
 [tool.ruff]
+# This is the python version found in the poetry project, per
+#
+#    ruff check --show-settings
+#
+# With the uv project, if this is not specified, ruff (correctly) finds Py311.
+# Using Py311 ruff finds a lot of errors. To cut down on diff noise the code
+# will be brought up to support Py311 in a separate PR.
+#
+target-version="py38"
 exclude = [
     ".ci",
     ".github",

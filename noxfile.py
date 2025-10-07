@@ -6,7 +6,6 @@ import os
 import shlex
 import shutil
 import sys
-import warnings
 from pathlib import Path
 from textwrap import dedent
 
@@ -107,27 +106,27 @@ def activate_virtualenv_in_precommit_hooks(session: Session) -> None:
 @session(name="pre-commit", python=python_versions[0], uv_groups=["dev"])
 def precommit(session: Session) -> None:  # noqa: ARG001
     """Lint using pre-commit."""
-    warnings.warn(
-        "ruff currently failing in pre-commit with uv. Returning without doing "
-        "anything",
-        stacklevel=2,
-    )
-    # args = session.posargs or [
-    #     "run",
-    #     "--all-files",
-    #     "--hook-stage=manual",
-    #     "--show-diff-on-failure",
-    # ]
-    # session.install(
-    #     "ruff",
-    #     "pep8-naming",
-    #     "pre-commit",
-    #     "pre-commit-hooks",
-    #     "pyupgrade",
+    # warnings.warn(
+    #     "ruff currently failing in pre-commit with uv. Returning without doing "
+    #     "anything",
+    #     stacklevel=2,
     # )
-    # session.run("pre-commit", *args)
-    # if args and args[0] == "install":
-    #     activate_virtualenv_in_precommit_hooks(session)
+    args = session.posargs or [
+        "run",
+        "--all-files",
+        "--hook-stage=manual",
+        "--show-diff-on-failure",
+    ]
+    session.install(
+        "ruff",
+        "pep8-naming",
+        "pre-commit",
+        "pre-commit-hooks",
+        "pyupgrade",
+    )
+    session.run("pre-commit", *args)
+    if args and args[0] == "install":
+        activate_virtualenv_in_precommit_hooks(session)
 
 
 @session(python=python_versions)
