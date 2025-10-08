@@ -8,7 +8,7 @@
 
 [![Read the documentation at https://gridworks-proactor.readthedocs.io/](https://img.shields.io/readthedocs/gridworks-proactor/latest.svg?label=Read%20the%20Docs)][read the docs]
 [![Tests](https://github.com/SmoothStoneComputing/gridworks-proactor/workflows/Tests/badge.svg)][tests]
-[![Codecov](https://app.codecov.io/gh/SmoothStoneComputing/gridworks-proactor/branch/main/graph/badge.svg)][codecov]
+[![Codecov](https://codecov.io/gh/SmoothStoneComputing/gridworks-proactor/branch/main/graph/badge.svg)][codecov]
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
 
