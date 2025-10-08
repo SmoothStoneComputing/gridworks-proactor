@@ -5,6 +5,7 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/gridworks-proactor)][pypi status]
 [![License](https://img.shields.io/pypi/l/gridworks-proactor)][license]
 
+
 [![Read the documentation at https://gridworks-proactor.readthedocs.io/](https://img.shields.io/readthedocs/gridworks-proactor/latest.svg?label=Read%20the%20Docs)][read the docs]
 [![Tests](https://github.com/SmoothStoneComputing/gridworks-proactor/workflows/Tests/badge.svg)][tests]
 [![Codecov](https://app.codecov.io/gh/SmoothStoneComputing/gridworks-proactor/branch/main/graph/badge.svg)][codecov]
@@ -12,14 +13,11 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
 
 [pypi status]: https://pypi.org/project/gridworks-proactor/
-
 [read the docs]: https://gridworks-proactor.readthedocs.io/
-
 [tests]: https://github.com/SmoothStoneComputing/gridworks-proactor/actions?workflow=Tests
-
 [codecov]: https://app.codecov.io/gh/SmoothStoneComputing/gridworks-proactor
-
 [pre-commit]: https://github.com/pre-commit/pre-commit
+
 
 This packages provides "live actor" and "application monitored communication" infrastructure for the
 [GridWorks SpaceHeat SCADA](https://github.com/thegridelectric/gridworks-scada) project. This separation
@@ -28,7 +26,7 @@ allows the scada code to be more focussed on on application specific details and
 
 ## Features
 
-- [](Proactor), a single threaded event loop running on asyncio, for exchanging messages between the main application
+- Proactor, a single threaded event loop running on asyncio, for exchanging messages between the main application
   object, "live actor" subobjects and MQTT clients.
 - A [communication state] ("active" or not) for each external communications link is available to the proactor and
   sub-objects. "Active" communications is defined as ALL of the following:
@@ -38,8 +36,8 @@ allows the scada code to be more focussed on on application specific details and
     - A message has been received "recently" (by default within 1 minute).
 - Reliable delievery of "Events" generated locally. Generated Events are stored locally until they are acknowledged
   and unacknowledged Events are retransmitted when the "Active" communication state is restored.
-- [](gwproactor_test), a test package for development and test environments of projects that implement a class derived
-  from [](Proactor), allowing the derived class to be tested with the base-class tests.
+- gwproactor_test, a package providing a "live test" infrastructure enabling tests that simulate
+  communication between Proactors.
 
 ## Requirements
 
