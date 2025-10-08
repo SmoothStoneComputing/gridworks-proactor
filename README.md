@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/gridworks-proactor.svg)][pypi status]
 [![Status](https://img.shields.io/pypi/status/gridworks-proactor.svg)][pypi status]
 [![Python Version](https://img.shields.io/pypi/pyversions/gridworks-proactor)][pypi status]
-[![License](https://img.shields.io/pypi/l/gridworks-proactor)][license]
+[![License](https://img.shields.io/pypi/l/gridworks-proactor)][MIT License]
 
 
 [![Read the documentation at https://gridworks-proactor.readthedocs.io/](https://img.shields.io/readthedocs/gridworks-proactor/latest.svg?label=Read%20the%20Docs)][read the docs]
@@ -188,8 +188,8 @@ To learn more, see the [Contributor Guide].
 
 ## License
 
-Distributed under the terms of the [MIT license][license],
-_Gridworks Proactor_ is free and open source software.
+Distributed under the terms of the [MIT license], _Gridworks Proactor_ is free
+and open source software.
 
 ## Issues
 
@@ -201,16 +201,13 @@ please [file an issue] along with a detailed description.
 This project was generated from [@cjolowicz]'s [Hypermodern Python Cookiecutter] template.
 
 [@cjolowicz]: https://github.com/cjolowicz
-
 [pypi]: https://pypi.org/
-
 [hypermodern python cookiecutter]: https://github.com/cjolowicz/cookiecutter-hypermodern-python
-
 [file an issue]: https://github.com/SmoothStoneComputing/gridworks-proactor/issues
-
 [pip]: https://pip.pypa.io/
-
 [example-test-mosquitto.conf]: https://github.com/SmoothStoneComputing/gridworks-proactor/blob/main/tests/config/example-test-mosquitto.conf
+[MIT license]: https://github.com/SmoothStoneComputing/gridworks-proactor/blob/main/LICENSE
+[communication state]: https://gridworks-proactor.readthedocs.io/en/latest/comm_state.html
 
 <!-- github-only -->
 
@@ -218,4 +215,3 @@ This project was generated from [@cjolowicz]'s [Hypermodern Python Cookiecutter]
 
 [contributor guide]: https://github.com/SmoothStoneComputing/gridworks-proactor/blob/main/CONTRIBUTING.md
 
-[communication state]: https://gridworks-proactor.readthedocs.io/en/latest/comm_state.html
