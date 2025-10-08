@@ -1,15 +1,18 @@
 [project]
 name = "gridworks-proactor"
-version = "4.1.11.dev0"
+version = "4.1.12.dev0"
 description = "Gridworks Proactor"
 authors = [
     { name = "Andrew Schweitzer", email = "schweitz72@gmail.com" },
     { name = "Jessica Millar", email = "jmillar@gridworks-consulting.com" }
 ]
+homepage = "https://github.com/thegridelectric/gridworks-proactor"
+repository = "https://github.com/thegridelectric/gridworks-proactor"
+documentation = "https://gridworks-proactor.readthedocs.io"
 requires-python = ">=3.11, <4"
 readme = "README.md"
 license = "MIT"
-classifiers = ["Development Status :: 3 - Alpha"]
+classifiers = ["Development Status :: 4 - Beta"]
 dependencies = [
     "pydantic>=2.10.0,<3",
     "python-dotenv>=1.0.0,<2",
