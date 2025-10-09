@@ -106,11 +106,6 @@ def activate_virtualenv_in_precommit_hooks(session: Session) -> None:
 @session(name="pre-commit", python=python_versions[0], uv_groups=["dev"])
 def precommit(session: Session) -> None:  # noqa: ARG001
     """Lint using pre-commit."""
-    # warnings.warn(
-    #     "ruff currently failing in pre-commit with uv. Returning without doing "
-    #     "anything",
-    #     stacklevel=2,
-    # )
     args = session.posargs or [
         "run",
         "--all-files",
