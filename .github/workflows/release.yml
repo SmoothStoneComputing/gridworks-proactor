@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - as/uv-ci
-      - as/uv
 
 jobs:
   release:
