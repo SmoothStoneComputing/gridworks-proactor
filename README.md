@@ -4,12 +4,11 @@
 [![Status](https://img.shields.io/pypi/status/gridworks-proactor.svg)][pypi status]
 [![Python Version](https://img.shields.io/pypi/pyversions/gridworks-proactor)][pypi status]
 [![License](https://img.shields.io/pypi/l/gridworks-proactor)][MIT License]
-
-
 [![Read the documentation at https://gridworks-proactor.readthedocs.io/](https://img.shields.io/readthedocs/gridworks-proactor/latest.svg?label=Read%20the%20Docs)][read the docs]
 [![Tests](https://github.com/SmoothStoneComputing/gridworks-proactor/workflows/Tests/badge.svg)][tests]
 [![Codecov](https://codecov.io/gh/SmoothStoneComputing/gridworks-proactor/branch/main/graph/badge.svg)][codecov]
-
+[![Linter: Ruff](https://img.shields.io/badge/Linter-Ruff-brightgreen?style=flat-square)](https://github.com/charliermarsh/ruff)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
 
 [pypi status]: https://pypi.org/project/gridworks-proactor/
@@ -59,7 +58,7 @@ of the MQTT broker. To set up TLS:
 Install gridworks-cert (gwcert):
 
 ```shell
-pipx install gridworks-cert
+uv tool install gridworks-cert
 ```
 
 Create a local Certificate Authority:
@@ -178,10 +177,27 @@ $ pip install gridworks-proactor
 
 ## Contributing
 
-Contributions are very welcome. In order to develop, do this:
+Contributions are very welcome. The project is developed with [uv], which can
+be installed from [here].
+
+The development environment requires the gwproactor_test package. Install with:
 
 ```console
-$ poetry install --all-extras
+uv sync --all-extras
+```
+The created environment can be explicitly activated with:
+```console
+source .venv/bin/activate
+```
+
+Run with:
+```console
+uv run pytest
+```
+
+Or run the whole test swuite with:
+```console
+uv run nox
 ```
 
 To learn more, see the [Contributor Guide].
@@ -208,6 +224,8 @@ This project was generated from [@cjolowicz]'s [Hypermodern Python Cookiecutter]
 [example-test-mosquitto.conf]: https://github.com/SmoothStoneComputing/gridworks-proactor/blob/main/tests/config/example-test-mosquitto.conf
 [MIT license]: https://github.com/SmoothStoneComputing/gridworks-proactor/blob/main/LICENSE
 [communication state]: https://gridworks-proactor.readthedocs.io/en/latest/comm_state.html
+[uv]: https://docs.astral.sh/uv/
+[here]: https://docs.astral.sh/uv/getting-started/installation/#standalone-installer
 
 <!-- github-only -->
 

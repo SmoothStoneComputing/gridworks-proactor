@@ -1,6 +1,6 @@
-# type: ignore  # noqa: PGH003
+# ruff: noqa: S101, PGH003, ERA001
+# type: ignore
 """Nox sessions."""
-# ruff: noqa: S101
 
 import os
 import shlex
@@ -10,17 +10,10 @@ from pathlib import Path
 from textwrap import dedent
 
 import nox  # noqa
+from nox import Session, options
+from nox_uv import session
 
-try:
-    from nox_poetry import Session, session
-except ImportError:
-    message = f"""\
-    Nox failed to import the 'nox-poetry' package.
-
-    Please install it using the following command:
-
-    {sys.executable} -m pip install nox-poetry"""
-    raise SystemExit(dedent(message)) from None
+options.default_venv_backend = "uv"
 
 
 package = "gwproactor"
@@ -110,8 +103,8 @@ def activate_virtualenv_in_precommit_hooks(session: Session) -> None:
                 break
 
 
-@session(name="pre-commit", python=python_versions[0])
-def precommit(session: Session) -> None:
+@session(name="pre-commit", python=python_versions[0], uv_groups=["dev"])
+def precommit(session: Session) -> None:  # noqa: ARG001
     """Lint using pre-commit."""
     args = session.posargs or [
         "run",
