@@ -10,7 +10,6 @@ from result import Ok, Result
 from gwproactor import App, AppSettings
 from gwproactor.actors.actor import PrimeActor
 from gwproactor.config import MQTTClient
-from gwproactor.config.mqtt import TLSInfo
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.message import DBGPayload, MQTTReceiptPayload
@@ -55,8 +54,7 @@ class DummyParent(PrimeActor):
 
 
 class DummyParentSettings(AppSettings):
-    #child: MQTTClient = MQTTClient()
-    child:  MQTTClient = MQTTClient(tls=TLSInfo(use_tls=False, port=1883))
+    child: MQTTClient = MQTTClient()
 
 
 class DummyParentApp(App):

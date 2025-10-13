@@ -2,7 +2,6 @@ from gwproto import HardwareLayout, Message, MQTTTopic
 
 from gwproactor import App, AppSettings, Proactor
 from gwproactor.config import MQTTClient
-from gwproactor.config.mqtt import TLSInfo
 from gwproactor.config.links import LinkSettings
 from gwproactor.config.proactor_config import ProactorName
 from gwproactor.links import QOS
@@ -11,8 +10,7 @@ from gwproactor_test.dummies import DUMMY_CHILD_NAME, DUMMY_PARENT_NAME
 
 
 class DummyChildSettings(AppSettings):
-    #parent: MQTTClient = MQTTClient()
-    parent: MQTTClient = MQTTClient(tls=TLSInfo(use_tls=False, port=1883))
+    parent: MQTTClient = MQTTClient()
 
 
 class DummyChildApp(App):
