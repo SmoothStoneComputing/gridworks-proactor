@@ -60,7 +60,7 @@ class IOLoop(Communicator, IOLoopInterface):
         self, coro: Coroutine[Any, Any, Any], name: str, task_id: int
     ) -> None:
         if not name:
-            name = coro.__name__
+            name = getattr(coro, "__name__", repr(coro))
         task = self._io_loop.create_task(
             coro,
             name=name,

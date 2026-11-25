@@ -323,6 +323,11 @@ class AppInterface(ABC):
         raise NotImplementedError
 
     @property
+    def instance_id(self) -> str:
+        """A uuid4 minted once per process; the upstream link's MQTT client_id."""
+        raise NotImplementedError
+
+    @property
     def upstream_client(self) -> str:
         raise NotImplementedError
 

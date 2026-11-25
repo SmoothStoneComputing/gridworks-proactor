@@ -166,17 +166,26 @@ class MQTTConnectMessage(MQTTClientMessage[MQTTConnectPayload]):
         )
 
 
-class MQTTConnectFailPayload(MQTTClientsPayload):
-    pass
+class MQTTConnectFailPayload(MQTTCommEventPayload):
+    """rc is the CONNACK reason code when the broker refused the connection;
+    None when the failure was below MQTT (no socket, no CONNACK)."""
 
 
 class MQTTConnectFailMessage(MQTTClientMessage[MQTTConnectFailPayload]):
-    def __init__(self, client_name: str, userdata: Optional[Any]) -> None:
+    def __init__(
+        self,
+        client_name: str,
+        userdata: Optional[Any],
+        rc: Optional[PahoReasonCode] = None,
+    ) -> None:
         super().__init__(
             message_type=MessageType.mqtt_connect_failed,
             payload=MQTTConnectFailPayload(
                 client_name=client_name,
                 userdata=userdata,
+                rc=None
+                if rc is None
+                else SerializedReasonCode.from_paho_reason_code(rc),
             ),
         )
 

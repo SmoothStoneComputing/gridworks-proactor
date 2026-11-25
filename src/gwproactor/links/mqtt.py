@@ -29,6 +29,7 @@ from paho.mqtt.reasoncodes import ReasonCode
 
 from gwproactor import config
 from gwproactor.links.link_settings import LinkConfig
+from gwproactor.links.reconnect_backoff import MAX_RECONNECT_WAIT_S, ReconnectBackoff
 from gwproactor.message import (
     MQTTConnectFailMessage,
     MQTTConnectMessage,
@@ -60,6 +61,14 @@ class MQTTClientWrapper:
     _client: PahoMQTTClient
     _stop_requested: bool
     _receive_queue: AsyncQueueWriter
+    _connack_accepted: bool
+    """True from an accepting CONNACK until the socket drops. A refusing
+    CONNACK (bad credentials, not authorized) never connected us, so the
+    socket close that follows it is not a disconnect."""
+    _backoff: ReconnectBackoff
+    """The one wait schedule for every connection attempt, whether the link
+    never connected or its connection dropped: paho's own reconnect is off,
+    so loop_forever returns on a drop and the client thread reconnects."""
     _subscriptions: Dict[str, int]
     _pending_subscriptions: Set[str]
     _pending_subacks: Dict[int, List[str]]
@@ -70,6 +79,7 @@ class MQTTClientWrapper:
         topic_dst: str,
         client_config: config.MQTTClient,
         receive_queue: AsyncQueueWriter,
+        client_id: str,
     ) -> None:
         self._client_name = client_name
         self.topic_dst = topic_dst
@@ -77,8 +87,10 @@ class MQTTClientWrapper:
         self._receive_queue = receive_queue
         self._client = PahoMQTTClient(
             callback_api_version=CallbackAPIVersion.VERSION2,
-            client_id="-".join(str(uuid.uuid4()).split("-")[:-1]),
+            client_id=client_id,
+            reconnect_on_failure=False,
         )
+        self._backoff = ReconnectBackoff(MAX_RECONNECT_WAIT_S)
         if self._client_config.username is not None:
             self._client.username_pw_set(
                 username=self._client_config.username,
@@ -107,6 +119,7 @@ class MQTTClientWrapper:
         self._client.on_connect_fail = self.on_connect_fail
         self._client.on_disconnect = self.on_disconnect
         self._client.on_subscribe = self.on_subscribe
+        self._connack_accepted = False
         self._subscriptions = {}
         self._pending_subscriptions = set()
         self._pending_subacks = {}
@@ -118,12 +131,12 @@ class MQTTClientWrapper:
         self._stop_requested = False
 
     def _client_thread(self) -> None:
-        max_back_off = 1024
-        backoff = 1
         while not self._stop_requested:
             try:
                 self._client.connect(
-                    self._client_config.host, port=self._client_config.effective_port()
+                    self._client_config.host,
+                    port=self._client_config.effective_port(),
+                    keepalive=self._client_config.keepalive,
                 )
                 self._client.loop_forever(retry_first_connection=True)
             except Exception as e:  # noqa: BLE001
@@ -136,13 +149,9 @@ class MQTTClientWrapper:
                 with contextlib.suppress(Exception):
                     self._client.disconnect()
             if not self._stop_requested:
-                if backoff >= max_back_off:
-                    backoff = 1
-                else:
-                    backoff = min(backoff * 2, max_back_off)
                 responsive_sleep(
                     self,
-                    backoff,
+                    self._backoff.next_wait(),
                     running_field_name="_stop_requested",
                     running_field=False,
                 )
@@ -216,6 +225,11 @@ class MQTTClientWrapper:
     def mqtt_client(self) -> PahoMQTTClient:
         return self._client
 
+    @property
+    def client_id(self) -> str:
+        """The MQTT client_id presented at CONNECT."""
+        return self._client._client_id.decode()  # noqa: SLF001
+
     def on_message(self, _: Any, userdata: Any, message: MQTTMessage) -> None:
         self._receive_queue.put(
             MQTTReceiptMessage(
@@ -257,14 +271,26 @@ class MQTTClientWrapper:
         reason_code: ReasonCode,
         _properties: Optional[MQTTProperties] = None,
     ) -> None:
-        self._receive_queue.put(
-            MQTTConnectMessage(
-                client_name=self._client_name,
-                userdata=userdata,
-                flags=flags,
-                rc=reason_code,
+        if reason_code.is_failure:
+            self._connack_accepted = False
+            self._receive_queue.put(
+                MQTTConnectFailMessage(
+                    client_name=self._client_name,
+                    userdata=userdata,
+                    rc=reason_code,
+                )
             )
-        )
+        else:
+            self._connack_accepted = True
+            self._backoff.reset()
+            self._receive_queue.put(
+                MQTTConnectMessage(
+                    client_name=self._client_name,
+                    userdata=userdata,
+                    flags=flags,
+                    rc=reason_code,
+                )
+            )
 
     def on_connect_fail(self, _: Any, userdata: Any) -> None:
         self._receive_queue.put(
@@ -282,6 +308,9 @@ class MQTTClientWrapper:
         rc: ReasonCode,
         _properties: Optional[MQTTProperties],
     ) -> None:
+        if not self._connack_accepted:
+            return
+        self._connack_accepted = False
         self._pending_subscriptions = set(self._subscriptions.keys())
         self._receive_queue.put(
             MQTTDisconnectMessage(
@@ -310,8 +339,9 @@ class MQTTClients:
     upstream_topic_dst: str = ""
     downstream_client: str = ""
 
-    def __init__(self) -> None:
+    def __init__(self, instance_id: str) -> None:
         self._send_queue = AsyncQueueWriter()
+        self._instance_id = instance_id
         self.clients = {}
 
     def add_client(self, settings: LinkConfig) -> None:
@@ -339,6 +369,10 @@ class MQTTClients:
             topic_dst=settings.spaceheat_name,
             client_config=settings.mqtt,
             receive_queue=self._send_queue,
+            # The upstream link presents the proactor's instance id; every
+            # other link mints its own, since a broker drops the existing
+            # session when a second CONNECT arrives with the same client_id.
+            client_id=self._instance_id if settings.upstream else str(uuid.uuid4()),
         )
 
     def publish(

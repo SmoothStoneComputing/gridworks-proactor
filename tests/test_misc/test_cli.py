@@ -22,6 +22,9 @@ def test_cli_completes(request: pytest.FixtureRequest) -> None:
         paths = Paths(name=app_type.paths_name())
         paths.mkdirs(parents=True, exist_ok=True)
         shutil.copyfile(Path(hardware_layout_test_path()), paths.hardware_layout)
+    # A group invoked with no command prints its help; typer 0.29 exits 2
+    # there, older typer exits 0.
+    help_only_exit_codes = {0, 2}
     command: list[str]
     for command in [
         [],
@@ -44,4 +47,7 @@ def test_cli_completes(request: pytest.FixtureRequest) -> None:
             f"\t<gwtest {' '.join(command)}> with output\n"
             f"{textwrap.indent(result.output, '        ')}"
         )
-        assert result.exit_code == 0, result_str
+        if len(command) <= 1:
+            assert result.exit_code in help_only_exit_codes, result_str
+        else:
+            assert result.exit_code == 0, result_str

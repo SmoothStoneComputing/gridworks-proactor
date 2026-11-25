@@ -10,6 +10,7 @@ from gwproto.messages import (
     EventBase,
     EventT,
     MQTTConnectEvent,
+    MQTTConnectFailedEvent,
     MQTTDisconnectEvent,
     MQTTFullySubscribedEvent,
     PeerActiveEvent,
@@ -88,6 +89,7 @@ class LinkManager:
         event_persister: PersisterInterface,
         timer_manager: TimerManagerInterface,
         ack_timeout_callback: AckTimerCallback,
+        instance_id: str,
     ) -> None:
         self.publication_name = publication_name
         self.subscription_name = subscription_name
@@ -100,7 +102,7 @@ class LinkManager:
             self._logger,
             self._settings.num_initial_event_reuploads,
         )
-        self._mqtt_clients = MQTTClients()
+        self._mqtt_clients = MQTTClients(instance_id=instance_id)
         self._mqtt_codecs = {}
         self._states = LinkStates()
         self._message_times = MessageTimes()
@@ -565,7 +567,23 @@ class LinkManager:
     def process_mqtt_connect_fail(
         self, message: Message[MQTTConnectFailPayload]
     ) -> Result[Transition, InvalidCommStateInput]:
-        return self._states.process_mqtt_connect_fail(message)
+        state_result = self._states.process_mqtt_connect_fail(message)
+        rc = message.Payload.rc
+        if rc is None:
+            reason = "no CONNACK"
+        else:
+            reason = f"CONNACK refused: {rc.string} (rc {rc.code})"
+        if state_result.is_ok():
+            self._logger.comm_event("%s  %s", state_result.value, reason)
+        else:
+            self._logger.comm_event(
+                "%s: connect failed, %s", message.Payload.client_name, reason
+            )
+        if rc is not None:
+            self.generate_event(
+                MQTTConnectFailedEvent(PeerName=message.Payload.client_name)
+            )
+        return state_result
 
     def process_mqtt_message(
         self, message: Message[MQTTReceiptPayload]

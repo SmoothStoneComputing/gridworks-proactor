@@ -58,11 +58,10 @@ class SignalException(Exception):
         super_str = super().__str__()
         if super_str:
             s += f" <{super_str}>"
-        enum_str = (
-            str(signal.Signals(self.signalnum).name)
-            if self.signalnum in signal.Signals
-            else "Unknown signal"
-        )
+        try:
+            enum_str = signal.Signals(self.signalnum).name
+        except ValueError:
+            enum_str = "Unknown signal"
         s += f"  {enum_str}  ({self.signalnum})"
         return s
 
@@ -634,6 +633,10 @@ class App(AppInterface):
         self, payload: Any, qos: QOS = QOS.AtMostOnce, **message_args: Any
     ) -> MQTTMessageInfo:
         return self.proactor.publish_upstream(payload=payload, qos=qos, **message_args)
+
+    @property
+    def instance_id(self) -> str:
+        return self.proactor.instance_id
 
     @property
     def upstream_client(self) -> str:

@@ -31,7 +31,10 @@ class MQTTClient(BaseModel):
 
     host: str = "localhost"
     port: int = 1883
-    keepalive: int = 60
+    keepalive: int = 30
+    """Seconds of silence before paho pings the broker, and the further
+    silence after which it drops the socket; a half-open socket is noticed
+    within two keepalives."""
     bind_address: str = ""
     bind_port: int = 0
     username: Optional[str] = None

@@ -232,6 +232,7 @@ def test_rotating_file_handler_settings(tmp_path: Path) -> None:
     assert handler.level == logging.NOTSET
     assert handler.maxBytes == DEFAULT_BYTES_PER_LOG_FILE
     assert handler.backupCount == DEFAULT_NUM_LOG_FILES - 1
+    assert handler.stream is not None
     assert handler.stream.name == str(tmp_path / DEFAULT_LOG_FILE_NAME)
     bytes_per_log_file = 10
     num_log_files = 3
@@ -244,4 +245,5 @@ def test_rotating_file_handler_settings(tmp_path: Path) -> None:
     assert handler.level == logging.INFO
     assert handler.maxBytes == bytes_per_log_file
     assert handler.backupCount == num_log_files - 1
+    assert handler.stream is not None
     assert handler.stream.name == str(tmp_path / DEFAULT_LOG_FILE_NAME)
