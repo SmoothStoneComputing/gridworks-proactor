@@ -715,7 +715,7 @@ wheels = [
 
 [[package]]
 name = "gridworks-proactor"
-version = "4.1.13+jm3"
+version = "4.1.13+jm4"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

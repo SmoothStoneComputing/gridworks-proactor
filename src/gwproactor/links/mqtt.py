@@ -41,6 +41,12 @@ from gwproactor.message import (
 from gwproactor.problems import Problems
 from gwproactor.sync_thread import AsyncQueueWriter, responsive_sleep
 
+MAX_RECONNECT_WAIT_S = 30
+"""Longest wait between connection attempts, for a link that never connected
+(the client thread's outer loop) and for one whose connection dropped (paho's
+reconnect inside loop_forever). Bounds how long a link sits idle after its
+broker is back."""
+
 
 class QOS(enum.IntEnum):
     AtMostOnce = 0
@@ -107,6 +113,7 @@ class MQTTClientWrapper:
                     f"from tls_config: {tls_config}"
                 ) from e
 
+        self._client.reconnect_delay_set(min_delay=1, max_delay=MAX_RECONNECT_WAIT_S)
         self._client.on_message = self.on_message
         self._client.on_connect = self.on_connect
         self._client.on_connect_fail = self.on_connect_fail
@@ -124,7 +131,7 @@ class MQTTClientWrapper:
         self._stop_requested = False
 
     def _client_thread(self) -> None:
-        max_back_off = 1024
+        max_back_off = MAX_RECONNECT_WAIT_S
         backoff = 1
         while not self._stop_requested:
             try:
