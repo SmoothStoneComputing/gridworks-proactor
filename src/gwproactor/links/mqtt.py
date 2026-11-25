@@ -29,6 +29,7 @@ from paho.mqtt.reasoncodes import ReasonCode
 
 from gwproactor import config
 from gwproactor.links.link_settings import LinkConfig
+from gwproactor.links.reconnect_backoff import MAX_RECONNECT_WAIT_S, ReconnectBackoff
 from gwproactor.message import (
     MQTTConnectFailMessage,
     MQTTConnectMessage,
@@ -40,12 +41,6 @@ from gwproactor.message import (
 )
 from gwproactor.problems import Problems
 from gwproactor.sync_thread import AsyncQueueWriter, responsive_sleep
-
-MAX_RECONNECT_WAIT_S = 30
-"""Longest wait between connection attempts, for a link that never connected
-(the client thread's outer loop) and for one whose connection dropped (paho's
-reconnect inside loop_forever). Bounds how long a link sits idle after its
-broker is back."""
 
 
 class QOS(enum.IntEnum):
@@ -70,6 +65,10 @@ class MQTTClientWrapper:
     """True from an accepting CONNACK until the socket drops. A refusing
     CONNACK (bad credentials, not authorized) never connected us, so the
     socket close that follows it is not a disconnect."""
+    _backoff: ReconnectBackoff
+    """The one wait schedule for every connection attempt, whether the link
+    never connected or its connection dropped: paho's own reconnect is off,
+    so loop_forever returns on a drop and the client thread reconnects."""
     _subscriptions: Dict[str, int]
     _pending_subscriptions: Set[str]
     _pending_subacks: Dict[int, List[str]]
@@ -89,7 +88,9 @@ class MQTTClientWrapper:
         self._client = PahoMQTTClient(
             callback_api_version=CallbackAPIVersion.VERSION2,
             client_id=client_id,
+            reconnect_on_failure=False,
         )
+        self._backoff = ReconnectBackoff(MAX_RECONNECT_WAIT_S)
         if self._client_config.username is not None:
             self._client.username_pw_set(
                 username=self._client_config.username,
@@ -113,7 +114,6 @@ class MQTTClientWrapper:
                     f"from tls_config: {tls_config}"
                 ) from e
 
-        self._client.reconnect_delay_set(min_delay=1, max_delay=MAX_RECONNECT_WAIT_S)
         self._client.on_message = self.on_message
         self._client.on_connect = self.on_connect
         self._client.on_connect_fail = self.on_connect_fail
@@ -131,12 +131,12 @@ class MQTTClientWrapper:
         self._stop_requested = False
 
     def _client_thread(self) -> None:
-        max_back_off = MAX_RECONNECT_WAIT_S
-        backoff = 1
         while not self._stop_requested:
             try:
                 self._client.connect(
-                    self._client_config.host, port=self._client_config.effective_port()
+                    self._client_config.host,
+                    port=self._client_config.effective_port(),
+                    keepalive=self._client_config.keepalive,
                 )
                 self._client.loop_forever(retry_first_connection=True)
             except Exception as e:  # noqa: BLE001
@@ -149,13 +149,9 @@ class MQTTClientWrapper:
                 with contextlib.suppress(Exception):
                     self._client.disconnect()
             if not self._stop_requested:
-                if backoff >= max_back_off:
-                    backoff = 1
-                else:
-                    backoff = min(backoff * 2, max_back_off)
                 responsive_sleep(
                     self,
-                    backoff,
+                    self._backoff.next_wait(),
                     running_field_name="_stop_requested",
                     running_field=False,
                 )
@@ -286,6 +282,7 @@ class MQTTClientWrapper:
             )
         else:
             self._connack_accepted = True
+            self._backoff.reset()
             self._receive_queue.put(
                 MQTTConnectMessage(
                     client_name=self._client_name,
